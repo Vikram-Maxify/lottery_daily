@@ -3,13 +3,16 @@ import {
   ArrowRight,
   BookOpen,
   CalendarDays,
+  Check,
   ChevronDown,
+  Edit3,
   FileText,
   Flame,
   Flower2,
   Gift,
   Info,
   PartyPopper,
+  Pencil,
   Plus,
   ShieldCheck,
   Sparkles,
@@ -19,19 +22,20 @@ import {
   TreePine,
   Trophy,
   Users,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 // =====================================================
 // CONSTANTS
 // =====================================================
 
 // ⚠️ Apne bottom navbar ki height (px) yahan daalo.
-// Purchase bar isse ke upar baithega, navbar ke andar nahi jayega.
 const BOTTOM_NAV_HEIGHT = 64;
 
 // Purchase bar ki approx height
-const PURCHASE_BAR_HEIGHT = 84;
+const PURCHASE_BAR_HEIGHT = 90;
 
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1605196560547-b2f7281b7355?auto=format&fit=crop&w=1400&q=80";
@@ -46,6 +50,9 @@ const EN_DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const QUICK_OPTIONS = [10, 20, 30, 50, 100];
 
 const MAX_TICKETS = 100;
+
+// Ticket format: 2 digits + 2 letters + 3 digits → 12AB137
+const TICKET_REGEX = /^\d{2}[A-Z]{2}\d{3}$/;
 
 const CHIP_COLORS = [
   { badge: "bg-[#ed1d43]", row: "bg-[#fff0f2]" },
@@ -129,21 +136,22 @@ const FESTIVALS = [
 
 const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 
+// 12AB137 format
 const randomTicketNumber = () => {
   const d = () => String(Math.floor(Math.random() * 10));
-  const letter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
-  return `${d()}${d()}${letter} ${d()}${d()}${d()}${d()}${d()}`;
+  const l = () => LETTERS[Math.floor(Math.random() * LETTERS.length)];
+  return `${d()}${d()}${l()}${l()}${d()}${d()}${d()}`;
 };
 
 const generateUniqueTickets = (count, existing = []) => {
-  const used = new Set(existing.map((t) => t.number));
+  const used = new Set(existing.map((t) => t.code));
   const result = [];
 
   while (result.length < count) {
-    const number = randomTicketNumber();
-    if (used.has(number)) continue;
-    used.add(number);
-    result.push({ id: `${Date.now()}-${Math.random()}`, number });
+    const code = randomTicketNumber();
+    if (used.has(code)) continue;
+    used.add(code);
+    result.push({ id: `${Date.now()}-${Math.random()}`, code });
   }
 
   return result;
@@ -156,13 +164,29 @@ const generateUniqueTickets = (count, existing = []) => {
 const FestivalLottery = () => {
   const navigate = useNavigate();
 
+  // 👇 KYC verification state — apne user object ke hisaab se adjust karo
+  const user = useSelector((state) => state.auth?.user);
+  const isKycVerified = Boolean(
+    user?.isKycVerified ?? user?.kycVerified ?? user?.kyc?.verified
+  );
+
   const [festivalKey, setFestivalKey] = useState("navratra");
   const [selectedDateIndex, setSelectedDateIndex] = useState(0);
   const [showQuick, setShowQuick] = useState(true);
   const [tickets, setTickets] = useState(() => generateUniqueTickets(10));
 
-  const festival =
-    FESTIVALS.find((f) => f.key === festivalKey) || FESTIVALS[0];
+  // 👇 manual add input
+  const [manualInput, setManualInput] = useState("");
+  const [manualError, setManualError] = useState("");
+
+  // 👇 edit mode — kis ticket ko edit kar rahe hain
+  const [editingId, setEditingId] = useState(null);
+  const [editingValue, setEditingValue] = useState("");
+
+  const festival = useMemo(
+    () => FESTIVALS.find((f) => f.key === festivalKey) || FESTIVALS[0],
+    [festivalKey]
+  );
 
   const price = festival.price;
   const totalTickets = tickets.length;
@@ -190,9 +214,8 @@ const FestivalLottery = () => {
 
   const selectedDate = dateOptions[selectedDateIndex] || dateOptions[0];
 
-  const summaryDate = `${String(selectedDate.day).padStart(2, "0")} ${
-    selectedDate.month
-  } ${selectedDate.year}`;
+  const summaryDate = `${String(selectedDate.day).padStart(2, "0")} ${selectedDate.month
+    } ${selectedDate.year}`;
 
   // ---------------------------------------------------
   // HANDLERS
@@ -210,14 +233,104 @@ const FestivalLottery = () => {
 
   const handleClear = () => setTickets(generateUniqueTickets(1));
 
+  // 👇 manual add — validate + duplicate
+  const handleManualAdd = () => {
+    const value = manualInput.trim().toUpperCase();
+
+    if (!TICKET_REGEX.test(value)) {
+      setManualError("Add valid number (e.g. 12AB137)");
+      return;
+    }
+
+    if (tickets.some((t) => t.code === value)) {
+      setManualError("This number is already added");
+      return;
+    }
+
+    if (tickets.length >= MAX_TICKETS) {
+      setManualError(`Maximum ${MAX_TICKETS} tickets allowed`);
+      return;
+    }
+
+    setTickets((prev) => [
+      ...prev,
+      { id: `${Date.now()}-${Math.random()}`, code: value },
+    ]);
+    setManualInput("");
+    setManualError("");
+  };
+
+  // 👇 delete ticket
+  const handleRemoveTicket = (id) => {
+    if (tickets.length === 1) return;
+    setTickets((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // 👇 start editing
+  const startEdit = (ticket) => {
+    setEditingId(ticket.id);
+    setEditingValue(ticket.code);
+    setManualError("");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingValue("");
+  };
+
+  // 👇 save edited ticket
+  const saveEdit = () => {
+    const value = editingValue.trim().toUpperCase();
+
+    if (!TICKET_REGEX.test(value)) {
+      setManualError("Add valid number (e.g. 12AB137)");
+      return;
+    }
+
+    if (
+      tickets.some((t) => t.id !== editingId && t.code === value)
+    ) {
+      setManualError("This number is already added");
+      return;
+    }
+
+    setTickets((prev) =>
+      prev.map((t) => (t.id === editingId ? { ...t, code: value } : t))
+    );
+    setEditingId(null);
+    setEditingValue("");
+    setManualError("");
+  };
+
+  // 👇 PURCHASE — KYC check first
   const handlePurchase = () => {
+    // 1. KYC verification check
+    if (!isKycVerified) {
+      navigate("/kyc");
+      return;
+    }
+
+    // 2. Validation — all tickets must match format
+    const invalid = tickets.find((t) => !TICKET_REGEX.test(t.code));
+    if (invalid) {
+      setManualError("Some tickets have invalid format (e.g. 12AB137)");
+      return;
+    }
+
+    // 3. Duplicate check
+    const codes = tickets.map((t) => t.code);
+    const dup = codes.find((c, i) => codes.indexOf(c) !== i);
+    if (dup) {
+      setManualError("Duplicate ticket number found");
+      return;
+    }
+
     // TODO: yahan apni purchase API / redux dispatch laga lena
-    // payload: festival.key, selectedDate, tickets (number), price
     console.log("FESTIVAL PURCHASE", {
       festival: festival.key,
       date: summaryDate,
       price,
-      tickets: tickets.map((t) => t.number),
+      tickets: codes,
       totalAmount,
     });
     navigate("/buy-ticket");
@@ -230,12 +343,13 @@ const FestivalLottery = () => {
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#eef3fa] text-[#173e70]">
       <div
-        className="relative mx-auto w-full max-w-[480px] overflow-x-hidden"
-        style={{ paddingBottom: BOTTOM_NAV_HEIGHT + PURCHASE_BAR_HEIGHT + 16 }}
+        className="relative mx-auto w-full max-w-[450px] overflow-x-hidden"
+        style={{
+          paddingBottom:
+            (festival ? BOTTOM_NAV_HEIGHT + PURCHASE_BAR_HEIGHT : BOTTOM_NAV_HEIGHT) + 16,
+        }}
       >
-        {/* =====================================================
-            HERO
-        ===================================================== */}
+        {/* ================= HERO ================= */}
         <section
           className="relative overflow-hidden bg-[#3b0a14] bg-cover bg-center"
           style={{ backgroundImage: `url(${HERO_IMAGE})` }}
@@ -254,7 +368,6 @@ const FestivalLottery = () => {
           />
 
           <div className="relative grid grid-cols-[1.05fr_1fr] items-center gap-2 px-3 pb-14 pt-5">
-            {/* text */}
             <div className="relative z-10 min-w-0">
               <h1 className="font-serif font-black leading-[0.9] tracking-tight">
                 <span className="block bg-gradient-to-b from-[#fff1a8] to-[#e0a11b] bg-clip-text text-[42px] text-transparent">
@@ -277,20 +390,17 @@ const FestivalLottery = () => {
               </div>
             </div>
 
-            {/* ticket */}
             <div className="relative flex items-center justify-center">
               <FestivalHeroTicket
                 special={festival.special}
                 price={price}
-                number="10F 68057"
+                number="12AB137"
               />
             </div>
           </div>
         </section>
 
-        {/* =====================================================
-            FESTIVAL TABS
-        ===================================================== */}
+        {/* ================= FESTIVAL TABS ================= */}
         <section className="relative z-10 -mt-10 px-2">
           <div className="grid grid-cols-6 gap-1">
             {FESTIVALS.map((f) => {
@@ -302,11 +412,10 @@ const FestivalLottery = () => {
                   key={f.key}
                   type="button"
                   onClick={() => setFestivalKey(f.key)}
-                  className={`flex min-h-[72px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-2 text-center shadow-md transition active:scale-95 ${
-                    active
+                  className={`flex min-h-[72px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-2 text-center shadow-md transition active:scale-95 ${active
                       ? "bg-gradient-to-b from-[#ff1744] to-[#c9102f] text-white"
                       : "bg-[#fffaf4] text-[#173e70]"
-                  }`}
+                    }`}
                 >
                   <Icon size={22} />
                   <span className="text-[9.5px] font-bold leading-tight">
@@ -321,9 +430,7 @@ const FestivalLottery = () => {
         </section>
 
         <main className="space-y-3 px-2 pt-3">
-          {/* =====================================================
-              FESTIVAL INFO CARD
-          ===================================================== */}
+          {/* ================= FESTIVAL INFO ================= */}
           <section className="relative overflow-hidden rounded-[16px] border border-[#f1d9a0] bg-gradient-to-r from-[#fff0c9] via-[#fff8e8] to-[#ffe7b8] p-3 shadow-sm">
             <div className="grid grid-cols-[auto_1fr] items-center gap-3">
               <MiniTicket
@@ -362,9 +469,7 @@ const FestivalLottery = () => {
             </div>
           </section>
 
-          {/* =====================================================
-              SELECT DRAW DATE
-          ===================================================== */}
+          {/* ================= SELECT DRAW DATE ================= */}
           <section className="rounded-[16px] bg-white p-3 shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -392,11 +497,10 @@ const FestivalLottery = () => {
                     key={`${d.day}-${d.month}`}
                     type="button"
                     onClick={() => setSelectedDateIndex(index)}
-                    className={`relative flex h-[66px] w-[64px] shrink-0 flex-col items-center justify-center rounded-xl border text-center transition active:scale-95 ${
-                      active
+                    className={`relative flex h-[66px] w-[64px] shrink-0 flex-col items-center justify-center rounded-xl border text-center transition active:scale-95 ${active
                         ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
                         : "border-transparent bg-[#e3e9f3]"
-                    }`}
+                      }`}
                   >
                     {index === 0 && (
                       <span className="text-[10px] font-semibold text-[#ed1d43]">
@@ -405,25 +509,22 @@ const FestivalLottery = () => {
                     )}
 
                     <span
-                      className={`text-[13px] font-extrabold ${
-                        active ? "text-[#ed1d43]" : "text-[#26354b]"
-                      }`}
+                      className={`text-[13px] font-extrabold ${active ? "text-[#ed1d43]" : "text-[#26354b]"
+                        }`}
                     >
                       {d.day} {d.month}
                     </span>
 
                     <span
-                      className={`text-[10px] ${
-                        active ? "text-[#ed1d43]" : "text-[#6b7280]"
-                      }`}
+                      className={`text-[10px] ${active ? "text-[#ed1d43]" : "text-[#6b7280]"
+                        }`}
                     >
                       {d.weekday}
                     </span>
 
                     <span
-                      className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
-                        active ? "bg-[#ed1d43]" : "bg-[#20a66a]"
-                      }`}
+                      className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${active ? "bg-[#ed1d43]" : "bg-[#20a66a]"
+                        }`}
                     />
                   </button>
                 );
@@ -431,9 +532,7 @@ const FestivalLottery = () => {
             </div>
           </section>
 
-          {/* =====================================================
-              HOW MANY TICKETS
-          ===================================================== */}
+          {/* ================= HOW MANY TICKETS ================= */}
           <section className="rounded-[16px] bg-white p-3 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -523,6 +622,41 @@ const FestivalLottery = () => {
               </div>
             </div>
 
+            {/* ================= SINGLE INPUT — lottery number add ================= */}
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                value={manualInput}
+                onChange={(e) => {
+                  setManualInput(
+                    e.target.value
+                      .toUpperCase()
+                      .replace(/[^0-9A-Z]/g, "")
+                      .slice(0, 7)
+                  );
+                  setManualError("");
+                }}
+                onKeyDown={(e) => e.key === "Enter" && handleManualAdd()}
+                placeholder="12AB137"
+                maxLength={7}
+                className="h-[44px] min-w-0 flex-1 rounded-xl border border-[#dfe5f0] bg-[#f6f9fe] px-3 text-[14px] font-bold tracking-wider text-[#173e70] outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-[#8a97ab] focus:border-[#ed1d43] focus:bg-white focus:shadow-[0_0_0_3px_rgba(237,29,67,0.12)]"
+              />
+
+              <button
+                type="button"
+                onClick={handleManualAdd}
+                disabled={!manualInput}
+                className="flex h-[44px] shrink-0 items-center gap-1 rounded-xl bg-[#173e70] px-3 text-[12px] font-bold text-white disabled:opacity-40"
+              >
+                <Plus size={14} /> Add
+              </button>
+            </div>
+
+            {manualError && (
+              <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-center text-[11px] font-medium text-red-600">
+                {manualError}
+              </p>
+            )}
+
             {showQuick && (
               <div className="mt-3 grid grid-cols-5 gap-1.5">
                 {QUICK_OPTIONS.map((count) => {
@@ -533,23 +667,20 @@ const FestivalLottery = () => {
                       key={count}
                       type="button"
                       onClick={() => setQuantity(count)}
-                      className={`relative min-w-0 rounded-lg border px-0.5 py-2 text-center transition active:scale-95 ${
-                        active
+                      className={`relative min-w-0 rounded-lg border px-0.5 py-2 text-center transition active:scale-95 ${active
                           ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
                           : "border-[#dfe5f0] bg-white"
-                      }`}
+                        }`}
                     >
                       <p
-                        className={`whitespace-nowrap text-[9.5px] font-semibold ${
-                          active ? "text-[#ed1d43]" : "text-[#26354b]"
-                        }`}
+                        className={`whitespace-nowrap text-[9.5px] font-semibold ${active ? "text-[#ed1d43]" : "text-[#26354b]"
+                          }`}
                       >
                         {count} Tickets
                       </p>
                       <p
-                        className={`whitespace-nowrap text-[12px] font-black ${
-                          active ? "text-[#ed1d43]" : "text-[#173e70]"
-                        }`}
+                        className={`whitespace-nowrap text-[12px] font-black ${active ? "text-[#ed1d43]" : "text-[#173e70]"
+                          }`}
                       >
                         ₹{(price * count).toLocaleString("en-IN")}
                       </p>
@@ -563,10 +694,7 @@ const FestivalLottery = () => {
               </div>
             )}
           </section>
-
-          {/* =====================================================
-              SELECTED TICKETS
-          ===================================================== */}
+          {/* ================= SELECTED TICKETS (with Edit + Delete) ================= */}
           <section className="rounded-[16px] bg-white p-3 shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
@@ -598,27 +726,98 @@ const FestivalLottery = () => {
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {tickets.map((ticket, index) => {
-                const color = CHIP_COLORS[index % CHIP_COLORS.length];
+            {/* ticket grid — bordered box me */}
+            <div className="mt-3 rounded-xl border border-[#e2e5f0] bg-[#f9fbff] p-2">
+              <div className="grid grid-cols-1 gap-2">
+                {tickets.map((ticket, index) => {
+                  const color = CHIP_COLORS[index % CHIP_COLORS.length];
+                  const editing = editingId === ticket.id;
 
-                return (
-                  <div
-                    key={ticket.id}
-                    className={`flex min-w-0 items-center gap-2 rounded-lg border border-white/70 px-2 py-2 shadow-sm ${color.row}`}
-                  >
-                    <span
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-black text-white ${color.badge}`}
+                  return (
+                    <div
+                      key={ticket.id}
+                      className={`flex min-w-0 items-center gap-2 rounded-lg border-2 px-2 py-2 shadow-sm transition ${editing
+                          ? "border-[#ed1d43] bg-white"
+                          : "border-white"
+                        } ${color.row}`}
                     >
-                      {index + 1}
-                    </span>
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[11px] font-black text-white ${color.badge}`}
+                      >
+                        {index + 1}
+                      </span>
 
-                    <span className="truncate text-[13px] font-bold tracking-wide text-[#26354b]">
-                      {ticket.number}
-                    </span>
-                  </div>
-                );
-              })}
+                      {/* 👇 editable input */}
+                      {editing ? (
+                        <input
+                          value={editingValue}
+                          onChange={(e) =>
+                            setEditingValue(
+                              e.target.value
+                                .toUpperCase()
+                                .replace(/[^0-9A-Z]/g, "")
+                                .slice(0, 7)
+                            )
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveEdit();
+                            if (e.key === "Escape") cancelEdit();
+                          }}
+                          maxLength={7}
+                          autoFocus
+                          className="min-w-0 flex-1 rounded-md border border-[#ed1d43] bg-white px-2 py-1 text-[13px] font-bold tracking-wider text-[#173e70] outline-none"
+                        />
+                      ) : (
+                        <span className="min-w-0 flex-1 truncate text-[14px] font-bold tracking-wider text-[#26354b]">
+                          {ticket.code}
+                        </span>
+                      )}
+
+                      {/* 👇 action buttons */}
+                      {editing ? (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={saveEdit}
+                            className="flex h-7 w-7 items-center justify-center rounded-md bg-[#20a66a] text-white"
+                            aria-label="Save"
+                          >
+                            <Check size={14} strokeWidth={3} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEdit}
+                            className="flex h-7 w-7 items-center justify-center rounded-md bg-[#6b7280] text-white"
+                            aria-label="Cancel"
+                          >
+                            <X size={14} strokeWidth={3} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => startEdit(ticket)}
+                            className="flex h-7 w-7 items-center justify-center rounded-md bg-[#173e70] text-white"
+                            aria-label="Edit"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTicket(ticket.id)}
+                            disabled={tickets.length === 1}
+                            className="flex h-7 w-7 items-center justify-center rounded-md bg-[#ed1d43] text-white disabled:opacity-40"
+                            aria-label="Delete"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#bfe8d3] bg-[#e7f8ef] px-3 py-2">
@@ -633,9 +832,7 @@ const FestivalLottery = () => {
             </div>
           </section>
 
-          {/* =====================================================
-              WINNING RULES
-          ===================================================== */}
+          {/* ================= WINNING RULES ================= */}
           <section className="overflow-hidden rounded-[18px] bg-gradient-to-br from-[#3a0b17] via-[#2b0a16] to-[#1a0710] p-2.5 shadow-lg">
             <div className="flex items-center justify-between gap-2 px-1">
               <div className="flex min-w-0 items-center gap-2">
@@ -661,7 +858,7 @@ const FestivalLottery = () => {
                 </span>
 
                 <span className="whitespace-nowrap rounded-md bg-white px-2 py-1 text-[15px] font-black tracking-wider text-[#d7193f]">
-                  10F <span className="text-[#173e70]">68057</span>
+                  12AB <span className="text-[#173e70]">137</span>
                 </span>
               </div>
 
@@ -699,7 +896,7 @@ const FestivalLottery = () => {
                     {[
                       "#",
                       "Match Condition",
-                      "Example (For 10F 68057)",
+                      "Example (For 12AB137)",
                       "Prize Per Ticket",
                       "Total Prize (10 Tickets)",
                     ].map((h) => (
@@ -717,7 +914,7 @@ const FestivalLottery = () => {
                   <RuleRow
                     number="1"
                     condition="All digits/characters match"
-                    example="10F 68057"
+                    example="12AB137"
                     prize="₹50 Lakh"
                     total="₹5 Crore"
                     badge="bg-[#ed1d43]"
@@ -726,7 +923,7 @@ const FestivalLottery = () => {
                   <RuleRow
                     number="2"
                     condition="Alphabet does not match but all remaining digits match"
-                    example="11F 68057"
+                    example="12XY137"
                     prize="₹30 Lakh"
                     total="₹3 Crore"
                     badge="bg-[#2e7dd7]"
@@ -735,7 +932,7 @@ const FestivalLottery = () => {
                   <RuleRow
                     number="3"
                     condition="All numbers after the alphabet match"
-                    example="99F 68057"
+                    example="99AB137"
                     prize="₹20,000"
                     total="₹2 Lakh"
                     badge="bg-[#f08a25]"
@@ -744,7 +941,7 @@ const FestivalLottery = () => {
                   <RuleRow
                     number="4"
                     condition="Left-most 4 digits match"
-                    example="10F6 1234"
+                    example="12AB1XX"
                     prize="₹20,000"
                     total="₹2 Lakh"
                     badge="bg-[#20a66a]"
@@ -753,7 +950,7 @@ const FestivalLottery = () => {
                   <RuleRow
                     number="5"
                     condition="Left-most 3 digits match"
-                    example="10A 1234"
+                    example="12AXXXX"
                     prize="₹900"
                     total="₹9,000"
                     badge="bg-[#8c4bd6]"
@@ -766,45 +963,43 @@ const FestivalLottery = () => {
         </main>
       </div>
 
-      {/* =====================================================
-          BOTTOM PURCHASE BAR
-          (navbar ke upar + app width ke andar)
-      ===================================================== */}
-      <div
-        className="fixed left-1/2 z-50 w-full max-w-[480px] -translate-x-1/2 overflow-hidden border-t border-[#ff3155]/20 bg-gradient-to-b from-[#2b0a16] to-[#160610] shadow-[0_-10px_30px_rgba(0,0,0,0.4)]"
-        style={{ bottom: BOTTOM_NAV_HEIGHT }}
-      >
-        <div className="grid grid-cols-[minmax(0,1fr)_150px] items-center gap-2 px-3 py-3">
-          {/* PRICE */}
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium leading-none text-white/90">
-              Total Amount
-            </p>
+      {/* ================= BOTTOM PURCHASE BAR ================= */}
+      {/* 👇 sirf tab show hoga jab festival selected ho */}
+      {festival && (
+        <div
+          className="fixed left-1/2 z-70 w-full max-w-[450px] -translate-x-1/2 overflow-hidden border-t border-[#ff3155]/20 bg-gradient-to-b from-[#2b0a16] to-[#160610] shadow-[0_-10px_30px_rgba(0,0,0,0.4)] rounded-lg mb-4"
+          style={{ bottom: BOTTOM_NAV_HEIGHT + 8 }}
+        >
+          <div className="grid grid-cols-[minmax(0,1fr)_150px] items-center gap-2 px-3 py-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium leading-none text-white/90">
+                Total Amount
+              </p>
 
-            <div className="mt-1 flex items-end gap-1.5">
-              <span className="shrink-0 whitespace-nowrap text-[24px] font-black leading-none text-[#2ee59d]">
-                ₹{totalAmount.toLocaleString("en-IN")}/-
-              </span>
+              <div className="mt-1 flex items-end gap-1.5">
+                <span className="shrink-0 whitespace-nowrap text-[24px] font-black leading-none text-[#2ee59d]">
+                  ₹{totalAmount.toLocaleString("en-IN")}/-
+                </span>
 
-              <span className="min-w-0 pb-0.5 text-[8.5px] leading-tight text-white/70">
-                {totalTickets} Tickets • {summaryDate}
-                <br />
-                {festival.name} Lottery
-              </span>
+                <span className="min-w-0 pb-0.5 text-[8.5px] leading-tight text-white/70">
+                  {totalTickets} Tickets • {summaryDate}
+                  <br />
+                  {festival.name} Lottery
+                </span>
+              </div>
             </div>
-          </div>
 
-          {/* BUTTON */}
-          <button
-            type="button"
-            onClick={handlePurchase}
-            className="flex h-[50px] w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-[#ff1744] to-[#e0102f] px-2 text-[14px] font-extrabold text-white shadow-[0_8px_25px_rgba(255,20,67,0.45)] transition active:scale-[0.98]"
-          >
-            Purchase Now
-            <ArrowRight size={18} className="shrink-0" />
-          </button>
+            <button
+              type="button"
+              onClick={handlePurchase}
+              className="flex h-[50px] w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-[#ff1744] to-[#e0102f] px-2 text-[14px] font-extrabold text-white shadow-[0_8px_25px_rgba(255,20,67,0.45)] transition active:scale-[0.98]"
+            >
+              Purchase Now
+              <ArrowRight size={18} className="shrink-0" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -824,7 +1019,6 @@ const HeroFeature = ({ icon, text }) => (
 
 const FestivalHeroTicket = ({ special, price, number }) => (
   <div className="relative w-full max-w-[230px]">
-    {/* back paper */}
     <div className="absolute inset-0 -rotate-[5deg] rounded-lg border border-[#e5c8a4] bg-[#fdf1dc]" />
 
     <div

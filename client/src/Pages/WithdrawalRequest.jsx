@@ -23,12 +23,9 @@ import {
 const WithdrawalRequest = () => {
   const dispatch = useDispatch();
 
-  const {
-    myWithdrawals,
-    loading,
-    error,
-    success,
-  } = useSelector((s) => s.withdrawal);
+  const { myWithdrawals, loading, error, success } = useSelector(
+    (s) => s.withdrawal
+  );
 
   const user = useSelector((s) => s.auth?.user);
 
@@ -72,9 +69,6 @@ const WithdrawalRequest = () => {
     }
   }, [success, dispatch]);
 
-  // ==========================================
-  // HANDLE INPUT
-  // ==========================================
   const handleChange = (e) => {
     setForm({
       ...form,
@@ -82,9 +76,6 @@ const WithdrawalRequest = () => {
     });
   };
 
-  // ==========================================
-  // SUBMIT WITHDRAWAL
-  // ==========================================
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -96,9 +87,6 @@ const WithdrawalRequest = () => {
     );
   };
 
-  // ==========================================
-  // WALLET
-  // ==========================================
   const walletBalance = Number(user?.wallet || 0);
 
   const formattedWalletBalance = walletBalance.toLocaleString("en-IN", {
@@ -113,28 +101,22 @@ const WithdrawalRequest = () => {
     pending: {
       icon: Clock3,
       label: "Pending",
-      className:
-        "border-yellow-500/30 bg-yellow-500/10 text-yellow-400",
+      className: "border-yellow-300 bg-yellow-50 text-yellow-700",
     },
-
     approved: {
       icon: CheckCircle2,
       label: "Approved",
-      className:
-        "border-green-500/30 bg-green-500/10 text-green-400",
+      className: "border-green-300 bg-green-50 text-green-700",
     },
-
     rejected: {
       icon: XCircle,
       label: "Rejected",
-      className:
-        "border-red-500/30 bg-red-500/10 text-red-400",
+      className: "border-red-300 bg-red-50 text-red-700",
     },
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white px-4 sm:px-5 pt-3 pb-8">
-
+    <div className="min-h-screen bg-[#EBF0F7] text-[#1b2a5c] px-4 sm:px-5 pt-4 pb-8">
       {/* ==================================================
           HEADER
       ================================================== */}
@@ -142,77 +124,53 @@ const WithdrawalRequest = () => {
         <button
           type="button"
           onClick={() => window.history.back()}
-          className="flex items-center gap-2 text-[#cfcfcf] hover:text-[#f5c542] transition mb-4"
+          className="flex items-center gap-2 text-[#5a6082] hover:text-[#ed1d43] transition mb-4"
         >
           <ArrowLeft size={20} />
-          <span className="text-sm font-semibold">
-            वापस जाएं
-          </span>
+          <span className="text-sm font-semibold">Go Back</span>
         </button>
 
         <div>
-          <p className="text-[#f5c542] text-sm font-semibold tracking-wide">
+          <p className="text-[#ed1d43] text-sm font-semibold tracking-wide">
             WALLET
           </p>
 
-          <h1 className="text-2xl sm:text-3xl font-extrabold mt-1">
-            पैसे निकालें
+          <h1 className="text-2xl sm:text-3xl font-extrabold mt-1 text-[#1b2a5c]">
+            Withdraw Money
           </h1>
 
-          <p className="text-[#9f9f9f] text-sm mt-2">
-            अपने बैंक खाते या UPI में पैसे निकालने का अनुरोध करें।
+          <p className="text-[#5a6082] text-sm mt-2">
+            Request a withdrawal to your bank account or UPI.
           </p>
         </div>
       </div>
 
       <div className="max-w-3xl mx-auto space-y-5">
-
         {/* ==================================================
             WALLET CARD
         ================================================== */}
-        <div
-          className="relative overflow-hidden rounded-[22px] border border-[#80631f] p-5 sm:p-6"
-          style={{
-            background:
-              "radial-gradient(circle at 80% 0%, rgba(150,105,20,0.28) 0%, rgba(30,24,10,0.65) 35%, #080808 78%)",
-            boxShadow:
-              "0 0 35px rgba(245,197,66,0.08)",
-          }}
-        >
-          {/* Decorative Circle */}
-          <div className="absolute right-[-45px] top-[-45px] w-36 h-36 rounded-full border border-[#f5c542]/10" />
-          <div className="absolute right-[-20px] top-[-20px] w-24 h-24 rounded-full border border-[#f5c542]/10" />
+        <div className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#0f1c4d] via-[#1b2a5c] to-[#2c3a72] p-5 sm:p-6 shadow-[0_12px_30px_rgba(15,28,77,0.25)]">
+          {/* Decorative circles */}
+          <div className="absolute right-[-45px] top-[-45px] w-36 h-36 rounded-full border border-white/10" />
+          <div className="absolute right-[-20px] top-[-20px] w-24 h-24 rounded-full border border-white/10" />
 
           <div className="relative flex items-center gap-4">
-
-            <div className="w-[62px] h-[62px] rounded-full border border-[#80631f] bg-black/50 flex items-center justify-center flex-shrink-0">
-              <Wallet
-                size={31}
-                fill="#f5c542"
-                className="text-[#f5c542]"
-              />
+            <div className="w-[62px] h-[62px] rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+              <Wallet size={31} className="text-[#ffd84a]" />
             </div>
 
             <div>
-              <p className="text-[#bdbdbd] text-sm">
-                उपलब्ध वॉलेट बैलेंस
-              </p>
+              <p className="text-white/70 text-sm">Available Wallet Balance</p>
 
-              <p className="text-[#f5c542] text-3xl sm:text-4xl font-extrabold mt-1">
+              <p className="text-[#ffd84a] text-3xl sm:text-4xl font-extrabold mt-1">
                 ₹{formattedWalletBalance}
               </p>
             </div>
           </div>
 
-          <div className="relative mt-5 flex items-center gap-2 text-[#a9a9a9] text-xs">
-            <ShieldCheck
-              size={16}
-              className="text-[#f5c542]"
-            />
-
-            <span>
-              आपका withdrawal request सुरक्षित रूप से process किया जाएगा।
-            </span>
+          <div className="relative mt-5 flex items-center gap-2 text-white/70 text-xs">
+            <ShieldCheck size={16} className="text-[#ffd84a]" />
+            <span>Your withdrawal request will be processed securely.</span>
           </div>
         </div>
 
@@ -220,19 +178,19 @@ const WithdrawalRequest = () => {
             SUCCESS MESSAGE
         ================================================== */}
         {success && (
-          <div className="rounded-2xl border border-green-500/30 bg-green-500/10 p-4 flex items-start gap-3">
+          <div className="rounded-2xl border border-green-200 bg-green-50 p-4 flex items-start gap-3">
             <CheckCircle2
               size={22}
-              className="text-green-400 flex-shrink-0 mt-0.5"
+              className="text-green-600 flex-shrink-0 mt-0.5"
             />
 
             <div>
-              <p className="text-green-400 font-bold">
+              <p className="text-green-700 font-bold">
                 Withdrawal Request Submitted
               </p>
 
-              <p className="text-green-400/70 text-sm mt-1">
-                आपका withdrawal request successfully submit हो गया है।
+              <p className="text-green-700/80 text-sm mt-1">
+                Your withdrawal request has been submitted successfully.
               </p>
             </div>
           </div>
@@ -242,21 +200,19 @@ const WithdrawalRequest = () => {
             ERROR MESSAGE
         ================================================== */}
         {error && (
-          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 flex items-start gap-3">
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 flex items-start gap-3">
             <XCircle
               size={22}
-              className="text-red-400 flex-shrink-0 mt-0.5"
+              className="text-red-600 flex-shrink-0 mt-0.5"
             />
 
             <div>
-              <p className="text-red-400 font-bold">
-                Withdrawal Failed
-              </p>
+              <p className="text-red-700 font-bold">Withdrawal Failed</p>
 
-              <p className="text-red-400/80 text-sm mt-1">
+              <p className="text-red-700/80 text-sm mt-1">
                 {typeof error === "string"
                   ? error
-                  : "Withdrawal request submit नहीं हो पाया।"}
+                  : "Could not submit withdrawal request."}
               </p>
             </div>
           </div>
@@ -265,33 +221,24 @@ const WithdrawalRequest = () => {
         {/* ==================================================
             WITHDRAW FORM
         ================================================== */}
-        <div
-          className="rounded-[22px] border border-[#303030] bg-[#0b0c0c] p-5 sm:p-6"
-        >
+        <div className="rounded-[22px] border border-white bg-white p-5 sm:p-6 shadow-[0_8px_24px_rgba(15,28,77,0.08)]">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-11 h-11 rounded-xl bg-[#211b0b] border border-[#80631f] flex items-center justify-center">
-              <Banknote
-                size={23}
-                className="text-[#f5c542]"
-              />
+            <div className="w-11 h-11 rounded-xl bg-[#ed1d43] flex items-center justify-center">
+              <Banknote size={23} className="text-white" />
             </div>
 
             <div>
-              <h2 className="text-xl font-extrabold">
+              <h2 className="text-xl font-extrabold text-[#1b2a5c]">
                 Withdrawal Details
               </h2>
 
-              <p className="text-[#8f8f8f] text-xs mt-1">
-                अपने payment details सही-सही भरें।
+              <p className="text-[#5a6082] text-xs mt-1">
+                Enter your payment details correctly.
               </p>
             </div>
           </div>
 
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-4"
-          >
-
+          <form onSubmit={handleSubmit} className="space-y-4">
             {/* AMOUNT */}
             <InputField
               label="Withdrawal Amount"
@@ -304,7 +251,6 @@ const WithdrawalRequest = () => {
               required
             />
 
-            {/* ACCOUNT HOLDER */}
             <InputField
               label="Account Holder Name"
               name="accountHolderName"
@@ -315,7 +261,6 @@ const WithdrawalRequest = () => {
               required
             />
 
-            {/* ACCOUNT NUMBER */}
             <InputField
               label="Account Number"
               name="accountNumber"
@@ -327,7 +272,6 @@ const WithdrawalRequest = () => {
               required
             />
 
-            {/* IFSC */}
             <InputField
               label="IFSC Code"
               name="ifscCode"
@@ -338,7 +282,6 @@ const WithdrawalRequest = () => {
               required
             />
 
-            {/* BANK NAME */}
             <InputField
               label="Bank Name"
               name="bankName"
@@ -349,7 +292,6 @@ const WithdrawalRequest = () => {
               required
             />
 
-            {/* BRANCH */}
             <InputField
               label="Branch Name"
               name="branchName"
@@ -359,7 +301,6 @@ const WithdrawalRequest = () => {
               icon={<Landmark size={19} />}
             />
 
-            {/* UPI */}
             <InputField
               label="UPI ID"
               name="upiId"
@@ -373,20 +314,11 @@ const WithdrawalRequest = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-3 rounded-xl py-4 text-black text-[17px] font-extrabold flex items-center justify-center gap-2 transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
-              style={{
-                background:
-                  "linear-gradient(180deg, #FFD966 0%, #f5c542 50%, #d4a017 100%)",
-                boxShadow:
-                  "0 4px 18px rgba(245,197,66,0.25), inset 0 1px 0 rgba(255,255,255,0.45)",
-              }}
+              className="w-full mt-3 rounded-xl py-4 text-white text-[17px] font-extrabold flex items-center justify-center gap-2 transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed bg-gradient-to-b from-red-500 to-red-700 shadow-[0_6px_18px_rgba(239,68,68,0.45)]"
             >
               {loading ? (
                 <>
-                  <Loader2
-                    size={21}
-                    className="animate-spin"
-                  />
+                  <Loader2 size={21} className="animate-spin" />
                   Processing...
                 </>
               ) : (
@@ -405,65 +337,55 @@ const WithdrawalRequest = () => {
         <div>
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="text-xl font-extrabold">
+              <h2 className="text-xl font-extrabold text-[#1b2a5c]">
                 Withdrawal History
               </h2>
 
-              <p className="text-[#8f8f8f] text-xs mt-1">
-                आपके सभी withdrawal requests
+              <p className="text-[#5a6082] text-xs mt-1">
+                All your withdrawal requests
               </p>
             </div>
 
-            <div className="px-3 py-1.5 rounded-lg border border-[#80631f] bg-[#17130a] text-[#f5c542] text-xs font-bold">
+            <div className="px-3 py-1.5 rounded-lg border border-[#d6dfec] bg-white text-[#ed1d43] text-xs font-bold">
               {myWithdrawals?.length || 0} Requests
             </div>
           </div>
 
           <div className="space-y-3">
-
             {myWithdrawals?.map((w) => {
-              const status =
-                statusConfig[w.status] || statusConfig.pending;
-
+              const status = statusConfig[w.status] || statusConfig.pending;
               const StatusIcon = status.icon;
 
               return (
                 <div
                   key={w._id}
-                  className="rounded-[18px] border border-[#303030] bg-[#0b0c0c] p-4 sm:p-5"
+                  className="rounded-[18px] border border-white bg-white p-4 sm:p-5 shadow-[0_6px_18px_rgba(15,28,77,0.06)]"
                 >
                   <div className="flex items-start justify-between gap-3">
-
-                    {/* LEFT */}
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <div className="w-10 h-10 rounded-xl bg-[#211b0b] border border-[#80631f] flex items-center justify-center">
-                          <Banknote
-                            size={19}
-                            className="text-[#f5c542]"
-                          />
+                        <div className="w-10 h-10 rounded-xl bg-[#ed1d43] flex items-center justify-center">
+                          <Banknote size={19} className="text-white" />
                         </div>
 
                         <div>
-                          <p className="text-[#999] text-xs">
+                          <p className="text-[#5a6082] text-xs">
                             Withdrawal Amount
                           </p>
 
-                          <p className="text-white text-xl font-extrabold">
+                          <p className="text-[#1b2a5c] text-xl font-extrabold">
                             ₹{Number(w.amount || 0).toLocaleString("en-IN")}
                           </p>
                         </div>
                       </div>
 
-                      {/* DATE */}
-                      <p className="text-[#777] text-xs mt-3">
+                      <p className="text-[#8a97ab] text-xs mt-3">
                         {w.createdAt
                           ? new Date(w.createdAt).toLocaleString()
                           : "-"}
                       </p>
                     </div>
 
-                    {/* STATUS */}
                     <div
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold capitalize ${status.className}`}
                     >
@@ -472,43 +394,34 @@ const WithdrawalRequest = () => {
                     </div>
                   </div>
 
-                  {/* BANK DETAILS */}
-                  <div className="mt-4 pt-4 border-t border-[#242424]">
-
+                  <div className="mt-4 pt-4 border-t border-[#e2e5f0]">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-
                       <div>
-                        <p className="text-[#707070] text-[11px]">
-                          Bank
-                        </p>
-
-                        <p className="text-[#d6d6d6] text-sm mt-1">
+                        <p className="text-[#8a97ab] text-[11px]">Bank</p>
+                        <p className="text-[#1b2a5c] text-sm mt-1">
                           {w.bankDetail?.bankName || "-"}
                         </p>
                       </div>
 
                       <div>
-                        <p className="text-[#707070] text-[11px]">
+                        <p className="text-[#8a97ab] text-[11px]">
                           Account Number
                         </p>
-
-                        <p className="text-[#d6d6d6] text-sm mt-1">
+                        <p className="text-[#1b2a5c] text-sm mt-1">
                           {w.bankDetail?.accountNumber
                             ? `A/C ${w.bankDetail.accountNumber}`
                             : "-"}
                         </p>
                       </div>
-
                     </div>
 
-                    {/* REMARK */}
                     {w.adminRemark && (
-                      <div className="mt-3 rounded-xl border border-[#303030] bg-black/30 p-3">
-                        <p className="text-[#707070] text-[11px]">
+                      <div className="mt-3 rounded-xl border border-[#e2e5f0] bg-[#f6f9fe] p-3">
+                        <p className="text-[#8a97ab] text-[11px]">
                           Admin Remark
                         </p>
 
-                        <p className="text-[#cfcfcf] text-sm mt-1">
+                        <p className="text-[#1b2a5c] text-sm mt-1">
                           {w.adminRemark}
                         </p>
                       </div>
@@ -518,23 +431,18 @@ const WithdrawalRequest = () => {
               );
             })}
 
-            {/* EMPTY */}
-            {(!myWithdrawals ||
-              myWithdrawals.length === 0) && (
-              <div className="rounded-[20px] border border-[#303030] bg-[#0b0c0c] p-8 text-center">
-                <div className="w-14 h-14 rounded-full border border-[#80631f] bg-[#17130a] flex items-center justify-center mx-auto">
-                  <Wallet
-                    size={26}
-                    className="text-[#f5c542]"
-                  />
+            {(!myWithdrawals || myWithdrawals.length === 0) && (
+              <div className="rounded-[20px] border border-white bg-white p-8 text-center shadow-[0_6px_18px_rgba(15,28,77,0.06)]">
+                <div className="w-14 h-14 rounded-full bg-[#ed1d43] flex items-center justify-center mx-auto">
+                  <Wallet size={26} className="text-white" />
                 </div>
 
-                <p className="text-white font-bold mt-4">
+                <p className="text-[#1b2a5c] font-bold mt-4">
                   No Withdrawals Yet
                 </p>
 
-                <p className="text-[#777] text-sm mt-1">
-                  आपके withdrawal requests यहां दिखाई देंगे।
+                <p className="text-[#5a6082] text-sm mt-1">
+                  Your withdrawal requests will appear here.
                 </p>
               </div>
             )}
@@ -546,20 +454,15 @@ const WithdrawalRequest = () => {
         ================================================== */}
         <div className="pt-3 flex flex-col items-center">
           <div className="w-full flex items-center gap-4">
-            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#f5c542] to-[#f5c542]" />
-
-            <div className="text-[#f5c542]">
-              <SmallLotus />
-            </div>
-
-            <div className="flex-1 h-px bg-gradient-to-l from-transparent via-[#f5c542] to-[#f5c542]" />
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent to-[#1b2a5c]/30" />
+            <ShieldCheck size={20} className="text-[#1b2a5c]" />
+            <div className="flex-1 h-px bg-gradient-to-l from-transparent to-[#1b2a5c]/30" />
           </div>
 
-          <p className="text-[#f5c542] text-sm mt-2">
-            खेलो विश्वास के साथ
+          <p className="text-[#1b2a5c] text-sm mt-2 font-medium">
+            Play with trust
           </p>
         </div>
-
       </div>
     </div>
   );
@@ -581,17 +484,13 @@ const InputField = ({
 }) => {
   return (
     <div>
-      <label className="block text-[#c8c8c8] text-sm font-semibold mb-2">
+      <label className="block text-[#26354b] text-sm font-semibold mb-2">
         {label}
-        {required && (
-          <span className="text-[#f5c542] ml-1">
-            *
-          </span>
-        )}
+        {required && <span className="text-[#ed1d43] ml-1">*</span>}
       </label>
 
       <div className="relative">
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#80631f] pointer-events-none">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#ed1d43] pointer-events-none">
           {icon}
         </div>
 
@@ -603,44 +502,11 @@ const InputField = ({
           onChange={onChange}
           required={required}
           min={name === "amount" ? "1" : undefined}
-          className="w-full h-[52px] rounded-xl border border-[#303030] bg-[#080909] text-white placeholder:text-[#555] pl-12 pr-4 outline-none transition focus:border-[#f5c542] focus:ring-1 focus:ring-[#f5c542]/20"
+          className="w-full h-[52px] rounded-xl border border-[#d6dfec] bg-[#f6f9fe] text-[#1b2a5c] placeholder:text-[#8a97ab] pl-12 pr-4 outline-none transition focus:border-[#ed1d43] focus:bg-white focus:shadow-[0_0_0_3px_rgba(237,29,67,0.12)]"
         />
       </div>
     </div>
   );
 };
-
-// ==========================================================
-// SMALL LOTUS
-// ==========================================================
-
-const SmallLotus = () => (
-  <svg
-    width="42"
-    height="27"
-    viewBox="0 0 46 30"
-    fill="none"
-  >
-    <path
-      d="M23 2C19 7 19 12 23 16C27 12 27 7 23 2Z"
-      fill="#f5c542"
-    />
-
-    <path
-      d="M23 13C15 13 9 17 6 23C13 24 19 21 23 13Z"
-      fill="#f5c542"
-    />
-
-    <path
-      d="M23 13C31 13 37 17 40 23C33 24 27 21 23 13Z"
-      fill="#f5c542"
-    />
-
-    <path
-      d="M23 13C20 19 20 24 23 28C26 24 26 19 23 13Z"
-      fill="#f5c542"
-    />
-  </svg>
-);
 
 export default WithdrawalRequest;

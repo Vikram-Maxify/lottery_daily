@@ -14,8 +14,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-// ⚠️ Apne bottom navbar ki height (px). Content isse peeche nahi chhupega.
-// Agar is page par navbar nahi hai to 0 kar do.
+// ⚠️ Apne bottom navbar ki height (px)
 const BOTTOM_NAV_HEIGHT = 64;
 
 const MAX_FILE_MB = 5;
@@ -59,7 +58,6 @@ const KycVarificationPage = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // page band hone par preview URLs free karo
   useEffect(() => {
     return () => {
       Object.values(files).forEach((f) => {
@@ -160,13 +158,10 @@ const KycVarificationPage = () => {
       formData.append("pan", files.pan.file);
       formData.append("selfie", files.selfie.file);
 
-      // TODO: yahan apni KYC API / redux dispatch laga lena, jaise:
-      // const result = await dispatch(submitKyc(formData));
-      // if (submitKyc.fulfilled.match(result)) { ... }
+      // TODO: apni KYC API / redux dispatch yahan lagao
       console.log("KYC SUBMIT", Object.fromEntries(formData.entries()));
 
       setSuccess("KYC submitted. Verification usually takes some time.");
-      // navigate("/");
     } catch (err) {
       setError(err?.message || "Could not submit KYC. Please try again.");
     } finally {
@@ -240,7 +235,6 @@ const KycVarificationPage = () => {
               Complete KYC to start withdrawing your winnings
             </p>
 
-            {/* progress */}
             <div className="mt-3 flex items-center gap-2">
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e3e9f3]">
                 <div
@@ -307,6 +301,7 @@ const KycVarificationPage = () => {
                 hint="Aadhaar front"
                 data={files.aadhaarFront}
                 disabled={loading}
+                icon="file"
                 onPick={(file) => handleFile("aadhaarFront", file)}
                 onRemove={() => removeFile("aadhaarFront")}
               />
@@ -315,6 +310,7 @@ const KycVarificationPage = () => {
                 hint="Aadhaar back"
                 data={files.aadhaarBack}
                 disabled={loading}
+                icon="file"
                 onPick={(file) => handleFile("aadhaarBack", file)}
                 onRemove={() => removeFile("aadhaarBack")}
               />
@@ -328,6 +324,7 @@ const KycVarificationPage = () => {
               hint="PAN card front"
               data={files.pan}
               disabled={loading}
+              icon="file"
               onPick={(file) => handleFile("pan", file)}
               onRemove={() => removeFile("pan")}
             />
@@ -388,7 +385,6 @@ const KycVarificationPage = () => {
             </button>
           </form>
 
-          {/* NOTE */}
           <p className="mt-4 border-t border-[#d8c8ad] pt-3 text-center text-[10px] leading-snug text-[#6b7280]">
             Upload clear, uncropped photos. Your documents are used only for
             identity verification.
@@ -417,15 +413,16 @@ const UploadBox = ({
   onPick,
   onRemove,
   disabled,
-  icon = "upload",
+  icon = "file",        // 👈 default is now "file" (gallery), not "upload"
   selfie = false,
 }) => {
   const inputRef = useRef(null);
+
+  // 👇 file → Upload icon (gallery picker) | camera → Camera icon (selfie)
   const Icon = icon === "camera" ? Camera : Upload;
 
   const handleInput = (e) => {
     onPick(e.target.files?.[0]);
-    // same file dobara choose karne par bhi onChange chale
     e.target.value = "";
   };
 
@@ -435,6 +432,7 @@ const UploadBox = ({
         ref={inputRef}
         type="file"
         accept="image/*"
+        // 👇 capture ONLY for selfie (opens camera); otherwise gallery picker
         capture={selfie ? "user" : undefined}
         onChange={handleInput}
         disabled={disabled}

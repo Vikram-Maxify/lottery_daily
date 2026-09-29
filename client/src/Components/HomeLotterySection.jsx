@@ -496,7 +496,7 @@ const HomeLotterySection = () => {
               className="pointer-events-none absolute bottom-[22%] left-[3%] text-[#ff3155]/70"
             />
 
-            <div className="relative grid w-full grid-cols-[1fr_1.08fr] items-center gap-2 px-3 pb-7 pt-4">
+            <div className="relative grid w-full grid-cols-[1fr_1.08fr] items-center gap-2 px-3 pb-5 pt-4">
 
               {/* LEFT */}
 

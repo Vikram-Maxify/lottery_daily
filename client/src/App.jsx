@@ -34,6 +34,8 @@ import Deposit from "./Pages/Deposit";
 import WithdrawHistory from "./Pages/WithdrawHistory";
 import FestivalLottery from "./Pages/FestivalLottery";
 import KycVarificationPage from "./Pages/KycVarificationPage";
+import VarifyTicket from "./Pages/VarifyTicket";
+import LeaderboardPage from "./Pages/LeaderboardPage";
 
 // ==========================================================
 // WHATSAPP SUPPORT NUMBER
@@ -116,16 +118,31 @@ function App() {
               path="/buy-ticket"
               element={<BuyTicket />}
             />
-             <Route
+            <Route
               path="/festival"
               element={<FestivalLottery />}
             />
-              <Route
+            <Route
               path="/kyc"
               element={<KycVarificationPage />}
             />
 
-            {/* My Tickets */}
+            <Route
+              path="/kyc"
+              element={<KycVarificationPage />}
+            />
+
+            <Route
+              path="/verify"
+              element={<VarifyTicket />}
+            />
+
+            <Route
+              path="/leaderboard"
+              element={<LeaderboardPage />}
+            />
+
+
             {/* <Route
               path="/my-tickets"
               element={<MyTickets />}

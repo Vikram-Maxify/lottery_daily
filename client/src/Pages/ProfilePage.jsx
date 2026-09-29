@@ -1,5 +1,6 @@
 import {
   BadgeCheck,
+  BarChart3,
   ChevronRight,
   Edit3,
   HandCoins,
@@ -242,6 +243,24 @@ const ProfilePage = () => {
             title="KYC Verification"
             description="Verify your identity to withdraw winnings"
             onClick={() => navigate("/kyc")}
+          />
+
+          {/* ✅ NEW — Verify Ticket */}
+          <ProfileMenu
+            icon={<ShieldCheck />}
+            tone="navy"
+            title="Verify Ticket"
+            description="Check if your ticket number is a winner"
+            onClick={() => navigate("/verify")}
+          />
+
+          {/* ✅ NEW — Leaderboard */}
+          <ProfileMenu
+            icon={<BarChart3 />}
+            tone="orange"
+            title="Leaderboard"
+            description="Top winners & latest draw results"
+            onClick={() => navigate("/leaderboard")}
           />
 
           <ProfileMenu

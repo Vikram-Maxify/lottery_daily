@@ -2,6 +2,7 @@ import {
   ArrowRight,
   BookOpen,
   CalendarDays,
+  Check,
   ChevronDown,
   ChevronUp,
   Clock,
@@ -48,7 +49,7 @@ const DEFAULT_TICKET_PRICE = 20;
 const BOTTOM_NAV_HEIGHT = 72;
 
 // Purchase bar height (px)
-const PURCHASE_BAR_HEIGHT = 110;
+const PURCHASE_BAR_HEIGHT = 118;
 
 // Ticket number format: 2 digits + 2 letters + 3 digits  → e.g. 12AB137
 const TICKET_REGEX = /^\d{2}[A-Z]{2}\d{3}$/;
@@ -286,8 +287,8 @@ const BuyTicket = () => {
   const countdownText = !countdown.available
     ? "Timer not available"
     : countdown.expired
-    ? "Draw started"
-    : `${countdown.days > 0 ? `${countdown.days}d ` : ""}${pad(countdown.hours)}:${pad(
+      ? "Draw started"
+      : `${countdown.days > 0 ? `${countdown.days}d ` : ""}${pad(countdown.hours)}:${pad(
         countdown.minutes
       )}:${pad(countdown.seconds)}`;
 
@@ -349,34 +350,59 @@ const BuyTicket = () => {
     clearMessages();
   };
 
-  // ✅ MANUAL ADD — validate + duplicate check
-  const handleManualAdd = () => {
+  // ✅ UPDATE — validate current ticket & show success
+  const handleUpdateTicket = (ticketId) => {
     if (depositLoading) return;
 
-    const value = manualInput.trim().toUpperCase();
+    const ticket = tickets.find((t) => t.id === ticketId);
+    if (!ticket) return;
 
-    // 1. format check
+    const value = ticket.code.trim().toUpperCase();
+
     if (!TICKET_REGEX.test(value)) {
       setLocalError("Add valid number (e.g. 12AB137)");
       setLocalSuccess("");
       return;
     }
 
-    // 2. duplicate check (existing tickets)
+    if (tickets.some((t) => t.id !== ticketId && t.code === value)) {
+      setLocalError("This number is already added");
+      setLocalSuccess("");
+      return;
+    }
+
+    setTickets((prev) =>
+      prev.map((t) => (t.id === ticketId ? { ...t, code: value } : t))
+    );
+    setLocalError("");
+    setLocalSuccess(`Ticket ${value} updated`);
+    setTimeout(() => setLocalSuccess(""), 1500);
+  };
+
+  // ✅ MANUAL ADD — validate + duplicate check
+  const handleManualAdd = () => {
+    if (depositLoading) return;
+
+    const value = manualInput.trim().toUpperCase();
+
+    if (!TICKET_REGEX.test(value)) {
+      setLocalError("Add valid number (e.g. 12AB137)");
+      setLocalSuccess("");
+      return;
+    }
+
     if (tickets.some((t) => t.code === value)) {
       setLocalError("This number is already added");
       setLocalSuccess("");
       return;
     }
 
-    // 3. max limit
     if (tickets.length >= MAX_TICKETS) {
       setLocalError(`Maximum ${MAX_TICKETS} tickets allowed`);
       setLocalSuccess("");
       return;
     }
 
-    // 4. add
     setTickets((prev) => [
       ...prev,
       { id: `${Date.now()}-${Math.random()}`, code: value },
@@ -411,7 +437,6 @@ const BuyTicket = () => {
         return setLocalError("Ticket price is not available");
       }
 
-      // all tickets must match format
       const invalidTicket = tickets.findIndex((t) => !TICKET_REGEX.test(t.code));
       if (invalidTicket !== -1) {
         return setLocalError(`Ticket ${invalidTicket + 1} is not valid (e.g. 12AB137)`);
@@ -419,7 +444,6 @@ const BuyTicket = () => {
 
       const lotteryNumbers = tickets.map((t) => t.code);
 
-      // duplicate check
       const duplicates = lotteryNumbers.filter((n, i) => lotteryNumbers.indexOf(n) !== i);
       if (duplicates.length > 0) {
         return setLocalError("Two tickets cannot have the same number.");
@@ -462,9 +486,9 @@ const BuyTicket = () => {
         typeof purchaseError === "string"
           ? purchaseError
           : purchaseError?.message ||
-              purchaseError?.payload?.message ||
-              purchaseError?.payload ||
-              "Could not buy tickets"
+          purchaseError?.payload?.message ||
+          purchaseError?.payload ||
+          "Could not buy tickets"
       );
     }
   };
@@ -487,9 +511,9 @@ const BuyTicket = () => {
   return (
     <div
       className="min-h-screen overflow-x-hidden bg-[#f3f4fa] text-[#151a33]"
-      style={{ paddingBottom: BOTTOM_NAV_HEIGHT + PURCHASE_BAR_HEIGHT + 16 }}
+      style={{ paddingBottom: BOTTOM_NAV_HEIGHT + PURCHASE_BAR_HEIGHT + 24 }}
     >
-      {/* ================= HERO (height increased) ================= */}
+      {/* ================= HERO ================= */}
       <section className="grid grid-cols-[1.05fr_1fr] items-center gap-2 bg-gradient-to-br from-[#bfe1ff] via-[#e6f3ff] to-white px-3 py-6 min-h-[190px]">
         <TicketMock prize={firstPrizeAmount} price={priceText} />
 
@@ -531,11 +555,10 @@ const BuyTicket = () => {
                   key={i}
                   type="button"
                   onClick={() => setSelectedDate(i)}
-                  className={`w-[62px] shrink-0 rounded-xl border px-1 py-2 text-center ${
-                    active
-                      ? "border-red-500 bg-red-50 text-red-600 shadow-[0_0_0_1px_rgba(239,68,68,0.4)]"
-                      : "border-transparent bg-[#eceff8] text-[#3d4468]"
-                  }`}
+                  className={`w-[62px] shrink-0 rounded-xl border px-1 py-2 text-center ${active
+                    ? "border-red-500 bg-red-50 text-red-600 shadow-[0_0_0_1px_rgba(239,68,68,0.4)]"
+                    : "border-transparent bg-[#eceff8] text-[#3d4468]"
+                    }`}
                 >
                   <p className="h-[12px] text-[11px] font-medium leading-none">
                     {i === 0 ? "Today" : ""}
@@ -608,41 +631,43 @@ const BuyTicket = () => {
             </button>
           </div>
 
-          {/* ✅ QUICK SELECT + MANUAL INPUT */}
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleQuickSelect}
-              disabled={depositLoading}
-              className="flex shrink-0 items-center gap-1 rounded-lg border border-[#c9cde0] px-3 py-2 text-[12px] font-medium text-[#1b2a5c] disabled:opacity-50"
-            >
-              <Shuffle size={13} /> Quick Select
-            </button>
-
-            <div className="relative min-w-0 flex-1">
-              <input
-                value={manualInput}
-                onChange={(e) =>
-                  setManualInput(
-                    e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 7)
-                  )
-                }
-                onKeyDown={(e) => e.key === "Enter" && handleManualAdd()}
+          {/* ✅ QUICK SELECT + MANUAL INPUT (inside box) */}
+          <div className="mt-3 rounded-xl border border-[#dfe5f0] bg-[#f9fbff] p-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleQuickSelect}
                 disabled={depositLoading}
-                placeholder="12AB137"
-                maxLength={7}
-                className="w-full rounded-lg border border-[#c9cde0] bg-white px-3 py-2 text-[14px] font-bold tracking-wider text-[#151a33] outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-[#a5aac4] focus:border-red-500 focus:shadow-[0_0_0_2px_rgba(239,68,68,0.15)] disabled:opacity-50"
-              />
-            </div>
+                className="flex shrink-0 items-center gap-1 rounded-lg border border-[#c9cde0] bg-white px-3 py-2 text-[12px] font-medium text-[#1b2a5c] disabled:opacity-50"
+              >
+                <Shuffle size={13} /> Quick Select
+              </button>
 
-            <button
-              type="button"
-              onClick={handleManualAdd}
-              disabled={depositLoading || !manualInput}
-              className="flex shrink-0 items-center gap-1 rounded-lg bg-[#1b2a5c] px-3 py-2 text-[12px] font-bold text-white disabled:opacity-40"
-            >
-              <Plus size={14} /> Add
-            </button>
+              <div className="relative min-w-0 flex-1">
+                <input
+                  value={manualInput}
+                  onChange={(e) =>
+                    setManualInput(
+                      e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 7)
+                    )
+                  }
+                  onKeyDown={(e) => e.key === "Enter" && handleManualAdd()}
+                  disabled={depositLoading}
+                  placeholder="12AB137"
+                  maxLength={7}
+                  className="w-full rounded-lg border border-[#c9cde0] bg-white px-3 py-2 text-[14px] font-bold tracking-wider text-[#151a33] outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-[#a5aac4] focus:border-red-500 focus:shadow-[0_0_0_2px_rgba(239,68,68,0.15)] disabled:opacity-50"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleManualAdd}
+                disabled={depositLoading || !manualInput}
+                className="flex shrink-0 items-center gap-1 rounded-lg bg-[#1b2a5c] px-3 py-2 text-[12px] font-bold text-white disabled:opacity-40"
+              >
+                <Plus size={14} /> Add
+              </button>
+            </div>
           </div>
 
           {showPicker && (
@@ -699,11 +724,10 @@ const BuyTicket = () => {
                       type="button"
                       onClick={() => setTicketCount(count)}
                       disabled={depositLoading}
-                      className={`relative flex min-w-0 flex-col items-center justify-center rounded-xl border px-0.5 py-2 ${
-                        active
-                          ? "border-red-500 bg-red-50 text-red-600"
-                          : "border-[#e2e5f0] bg-white text-[#1b2a5c]"
-                      }`}
+                      className={`relative flex min-w-0 flex-col items-center justify-center rounded-xl border px-0.5 py-2 ${active
+                        ? "border-red-500 bg-red-50 text-red-600"
+                        : "border-[#e2e5f0] bg-white text-[#1b2a5c]"
+                        }`}
                     >
                       {active && (
                         <span className="absolute right-1 top-1 h-[6px] w-[6px] rounded-full bg-red-500" />
@@ -722,7 +746,7 @@ const BuyTicket = () => {
           )}
         </Card>
 
-        {/* ================= SELECTED TICKETS ================= */}
+        {/* ================= SELECTED TICKETS (with Update + Delete) ================= */}
         <Card>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -753,12 +777,11 @@ const BuyTicket = () => {
             {tickets.map((ticket, index) => (
               <div
                 key={ticket.id}
-                className={`flex items-center gap-2 rounded-xl px-2 py-2 ${ROW_TINTS[index % 5]}`}
+                className={`flex items-center gap-1.5 rounded-xl px-2 py-2 ${ROW_TINTS[index % 5]}`}
               >
                 <span
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[12px] font-bold text-white ${
-                    BADGES[index % 5]
-                  }`}
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[12px] font-bold text-white ${BADGES[index % 5]
+                    }`}
                 >
                   {index + 1}
                 </span>
@@ -772,14 +795,26 @@ const BuyTicket = () => {
                   className="min-w-0 flex-1 bg-transparent text-[14px] font-bold tracking-wider text-[#151a33] outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-[#a5aac4]"
                 />
 
+                {/* ✅ UPDATE */}
+                <button
+                  type="button"
+                  onClick={() => handleUpdateTicket(ticket.id)}
+                  disabled={depositLoading || !TICKET_REGEX.test(ticket.code)}
+                  aria-label={`Update ticket ${index + 1}`}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-500 text-white disabled:opacity-40"
+                >
+                  <Check size={13} strokeWidth={3} />
+                </button>
+
+                {/* ✅ DELETE */}
                 <button
                   type="button"
                   onClick={() => handleRemoveTicket(ticket.id)}
                   disabled={depositLoading || totalTickets === 1}
                   aria-label={`Remove ticket ${index + 1}`}
-                  className="shrink-0 text-[#a5aac4] disabled:opacity-30"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-red-500 text-white disabled:opacity-40"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={12} />
                 </button>
               </div>
             ))}
@@ -793,90 +828,87 @@ const BuyTicket = () => {
         </Card>
 
         {/* ================= WINNING RULES ================= */}
-       <section className="overflow-hidden rounded-[18px] bg-[#0f1c4d] text-white">
-  <div className="p-3 sm:p-4">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <div className="flex items-center gap-2">
-        <BookOpen size={24} className="shrink-0 text-[#ffd84a]" />
-        <h2 className="text-[15px] font-extrabold sm:text-[16px]">
-          Daily Lottery Winning Rules
-        </h2>
-      </div>
-      <button
-        type="button"
-        className="flex items-center gap-1 whitespace-nowrap rounded-lg border border-white/30 px-2 py-1.5 text-[10px] sm:text-[11px]"
-      >
-        View Official Terms <ArrowRight size={12} />
-      </button>
-    </div>
+        <section className="overflow-hidden rounded-[18px] bg-[#0f1c4d] text-white">
+          <div className="p-3 sm:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <BookOpen size={24} className="shrink-0 text-[#ffd84a]" />
+                <h2 className="text-[15px] font-extrabold sm:text-[16px]">
+                  Daily Lottery Winning Rules
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="flex items-center gap-1 whitespace-nowrap rounded-lg border border-white/30 px-2 py-1.5 text-[10px] sm:text-[11px]"
+              >
+                View Official Terms <ArrowRight size={12} />
+              </button>
+            </div>
 
-    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-      {/* Example Winning Number — text top, number bottom */}
-      <div className="flex flex-col items-start gap-1.5 rounded-xl border border-[#2c3a72] bg-[#14235a] px-3 py-2.5">
-        <span className="text-[10px] leading-tight text-white/80 sm:text-[11px]">
-          Example Winning Number
-        </span>
-        <span className="rounded-md bg-white px-2.5 py-1 text-[16px] font-black text-[#0b1a4a] sm:text-[17px]">
-          <span className="text-red-600">7A</span> 45823
-        </span>
-      </div>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="flex flex-col items-start gap-1.5 rounded-xl border border-[#2c3a72] bg-[#14235a] px-3 py-2.5">
+                <span className="text-[10px] leading-tight text-white/80 sm:text-[11px]">
+                  Example Winning Number
+                </span>
+                <span className="rounded-md bg-white px-2.5 py-1 text-[16px] font-black text-[#0b1a4a] sm:text-[17px]">
+                  <span className="text-red-600">7A</span> 45823
+                </span>
+              </div>
 
-      <div className="flex items-center gap-2 rounded-xl border border-[#2c3a72] bg-[#14235a] px-3 py-2.5">
-        <Trophy size={28} className="shrink-0 text-[#ffd84a] sm:size-[30px]" />
-        <div className="min-w-0">
-          <p className="text-[8px] text-white/70 sm:text-[9px]">Total First Prize</p>
-          <p className="truncate text-[16px] font-black uppercase leading-tight text-[#ffd84a] sm:text-[17px]">
-            {firstPrizeAmount}
-          </p>
-          <p className="text-[7px] text-white/60 sm:text-[8px]">(10 Tickets × ₹10 Lakh)</p>
-        </div>
-      </div>
-    </div>
-  </div>
+              <div className="flex items-center gap-2 rounded-xl border border-[#2c3a72] bg-[#14235a] px-3 py-2.5">
+                <Trophy size={28} className="shrink-0 text-[#ffd84a] sm:size-[30px]" />
+                <div className="min-w-0">
+                  <p className="text-[8px] text-white/70 sm:text-[9px]">Total First Prize</p>
+                  <p className="truncate text-[16px] font-black uppercase leading-tight text-[#ffd84a] sm:text-[17px]">
+                    {firstPrizeAmount}
+                  </p>
+                  <p className="text-[7px] text-white/60 sm:text-[8px]">(10 Tickets × ₹10 Lakh)</p>
+                </div>
+              </div>
+            </div>
+          </div>
 
-  <div className="bg-white text-[#151a33]">
-    {/* Header row */}
-    <div className="grid grid-cols-[20px_1.4fr_1.1fr_0.9fr_0.9fr] gap-1.5 bg-[#0f1c4d] px-2 py-2 text-[7.5px] font-semibold text-white sm:grid-cols-[24px_1.4fr_1.1fr_0.9fr_1fr] sm:gap-2 sm:px-3 sm:py-2.5 sm:text-[9px]">
-      <span>#</span>
-      <span>Match Condition</span>
-      <span>Example (For 7A 45823)</span>
-      <span className="text-center">Prize Per Ticket</span>
-      <span className="text-center">Total Prize (10 Tickets)</span>
-    </div>
+          <div className="bg-white text-[#151a33]">
+            <div className="grid grid-cols-[20px_1.4fr_1.1fr_0.9fr_0.9fr] gap-1.5 bg-[#0f1c4d] px-2 py-2 text-[7.5px] font-semibold text-white sm:grid-cols-[24px_1.4fr_1.1fr_0.9fr_1fr] sm:gap-2 sm:px-3 sm:py-2.5 sm:text-[9px]">
+              <span>#</span>
+              <span>Match Condition</span>
+              <span>Example (For 7A 45823)</span>
+              <span className="text-center">Prize Per Ticket</span>
+              <span className="text-center">Total Prize (10 Tickets)</span>
+            </div>
 
-    {/* Rows */}
-    {RULES.map((rule, i) => (
-      <div
-        key={i}
-        className={`grid grid-cols-[20px_1.4fr_1.1fr_0.9fr_0.9fr] items-center gap-1.5 px-2 py-2.5 sm:grid-cols-[24px_1.4fr_1.1fr_0.9fr_1fr] sm:gap-2 sm:px-3 sm:py-3 ${ROW_TINTS[i]}`}
-      >
-        <span
-          className={`flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold text-white sm:h-[22px] sm:w-[22px] sm:text-[11px] ${BADGES[i]}`}
-        >
-          {i + 1}
-        </span>
-        <span className="text-[8.5px] leading-tight text-[#3d4468] sm:text-[10px]">
-          {rule.cond}
-        </span>
-        <span className="whitespace-nowrap font-mono text-[10px] font-bold tracking-wider text-[#0b1a4a] sm:text-[12px]">
-          {rule.ex}
-        </span>
-        <span className="text-center text-[9.5px] font-extrabold sm:text-[11px]">
-          {rule.per}
-        </span>
-        <span className="text-center text-[9.5px] font-extrabold text-red-600 sm:text-[11px]">
-          {rule.total}
-        </span>
-      </div>
-    ))}
-  </div>
-</section>
+            {RULES.map((rule, i) => (
+              <div
+                key={i}
+                className={`grid grid-cols-[20px_1.4fr_1.1fr_0.9fr_0.9fr] items-center gap-1.5 px-2 py-2.5 sm:grid-cols-[24px_1.4fr_1.1fr_0.9fr_1fr] sm:gap-2 sm:px-3 sm:py-3 ${ROW_TINTS[i]}`}
+              >
+                <span
+                  className={`flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold text-white sm:h-[22px] sm:w-[22px] sm:text-[11px] ${BADGES[i]}`}
+                >
+                  {i + 1}
+                </span>
+                <span className="text-[8.5px] leading-tight text-[#3d4468] sm:text-[10px]">
+                  {rule.cond}
+                </span>
+                <span className="whitespace-nowrap font-mono text-[10px] font-bold tracking-wider text-[#0b1a4a] sm:text-[12px]">
+                  {rule.ex}
+                </span>
+                <span className="text-center text-[9.5px] font-extrabold sm:text-[11px]">
+                  {rule.per}
+                </span>
+                <span className="text-center text-[9.5px] font-extrabold text-red-600 sm:text-[11px]">
+                  {rule.total}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
       </main>
 
-      {/* ================= PURCHASE BAR (sits above bottom navbar) ================= */}
+      {/* ================= PURCHASE BAR (above bottom navbar) ================= */}
       <div
-        className="fixed inset-x-0 z-40 mx-auto w-full max-w-[480px] bg-[#0f1c4d] px-3 py-3 shadow-[0_-6px_20px_rgba(0,0,0,0.25)]"
-        style={{ bottom: BOTTOM_NAV_HEIGHT }}
+        className="fixed inset-x-0 z-70 mx-auto w-full max-w-[450px] bg-[#0f1c4d] px-3 py-3 shadow-[0_-6px_20px_rgba(0,0,0,0.25)] rounded-lg mb-2"
+        style={{ bottom: BOTTOM_NAV_HEIGHT + 8 }}
       >
         {displayError && (
           <div className="mb-2 rounded-lg border border-red-400/40 bg-red-500/15 px-3 py-1.5 text-center text-[11px] text-red-200">
@@ -951,9 +983,8 @@ const InfoItem = ({ icon, title, sub }) => (
 
 const TicketMock = ({ prize, price, small = false }) => (
   <div
-    className={`relative -rotate-6 rounded-lg border-2 border-[#e0b24a] bg-gradient-to-br from-[#fff8e6] to-[#ffe9b8] shadow-md ${
-      small ? "p-1.5" : "p-3"
-    }`}
+    className={`relative -rotate-6 rounded-lg border-2 border-[#e0b24a] bg-gradient-to-br from-[#fff8e6] to-[#ffe9b8] shadow-md ${small ? "p-1.5" : "p-3"
+      }`}
   >
     <p className={`font-black leading-none text-red-600 ${small ? "text-[15px]" : "text-[26px]"}`}>
       DEAR
@@ -963,9 +994,8 @@ const TicketMock = ({ prize, price, small = false }) => (
     </p>
     <p className={`mt-1 text-[#5a4a2a] ${small ? "text-[6px]" : "text-[9px]"}`}>First Prize</p>
     <p
-      className={`font-black uppercase leading-none text-[#0b1a4a] ${
-        small ? "text-[12px]" : "text-[22px]"
-      }`}
+      className={`font-black uppercase leading-none text-[#0b1a4a] ${small ? "text-[12px]" : "text-[22px]"
+        }`}
     >
       {prize}
     </p>
@@ -975,9 +1005,8 @@ const TicketMock = ({ prize, price, small = false }) => (
       47B 39120
     </p>
     <span
-      className={`absolute right-1 top-1 rounded-full bg-pink-400 font-extrabold text-white ${
-        small ? "px-1 text-[6px]" : "px-2 py-1 text-[10px]"
-      }`}
+      className={`absolute right-1 top-1 rounded-full bg-pink-400 font-extrabold text-white ${small ? "px-1 text-[6px]" : "px-2 py-1 text-[10px]"
+        }`}
     >
       {price}
     </span>
