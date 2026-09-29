@@ -1,19 +1,17 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   BookOpen,
   CalendarDays,
-  Check,
   ChevronDown,
-  Edit3,
   FileText,
   Flame,
   Flower2,
   Gift,
   Info,
   PartyPopper,
-  Pencil,
   Plus,
+  Shuffle,
   ShieldCheck,
   Sparkles,
   Target,
@@ -51,7 +49,14 @@ const QUICK_OPTIONS = [10, 20, 30, 50, 100];
 
 const MAX_TICKETS = 100;
 
-// Ticket format: 2 digits + 2 letters + 3 digits → 12AB137
+// Kitne din ki dates "View Full Schedule" me dikhani hain
+const ALL_DATES_COUNT = 30;
+
+// Ticket number format (D = digit, L = letter) → 12AB137
+const SLOT_PATTERN = ["D", "D", "L", "L", "D", "D", "D"];
+const TICKET_LENGTH = SLOT_PATTERN.length;
+const TICKET_EXAMPLE = "12AB137";
+
 const TICKET_REGEX = /^\d{2}[A-Z]{2}\d{3}$/;
 
 const CHIP_COLORS = [
@@ -143,6 +148,17 @@ const randomTicketNumber = () => {
   return `${d()}${d()}${l()}${l()}${d()}${d()}${d()}`;
 };
 
+const randomUniqueCode = (usedCodes = []) => {
+  const used = new Set(usedCodes);
+  let code = randomTicketNumber();
+  let guard = 0;
+  while (used.has(code) && guard < 100) {
+    code = randomTicketNumber();
+    guard += 1;
+  }
+  return code;
+};
+
 const generateUniqueTickets = (count, existing = []) => {
   const used = new Set(existing.map((t) => t.code));
   const result = [];
@@ -154,6 +170,23 @@ const generateUniqueTickets = (count, existing = []) => {
     result.push({ id: `${Date.now()}-${Math.random()}`, code });
   }
 
+  return result;
+};
+
+// Box (slot) ke hisaab se character allowed hai ya nahi
+const slotAccepts = (index, ch) =>
+  SLOT_PATTERN[index] === "D" ? /^\d$/.test(ch) : /^[A-Z]$/.test(ch);
+
+const slotPlaceholder = (index) => (SLOT_PATTERN[index] === "D" ? "0" : "A");
+
+// Pasted / raw text ko valid ticket code me badalta hai
+const sanitizeCode = (raw) => {
+  const cleaned = String(raw || "").toUpperCase().replace(/[^0-9A-Z]/g, "");
+  let result = "";
+  for (const ch of cleaned) {
+    if (result.length >= TICKET_LENGTH) break;
+    if (slotAccepts(result.length, ch)) result += ch;
+  }
   return result;
 };
 
@@ -172,16 +205,14 @@ const FestivalLottery = () => {
 
   const [festivalKey, setFestivalKey] = useState("navratra");
   const [selectedDateIndex, setSelectedDateIndex] = useState(0);
+  const [showAllDates, setShowAllDates] = useState(false);
   const [showQuick, setShowQuick] = useState(true);
   const [tickets, setTickets] = useState(() => generateUniqueTickets(10));
 
-  // 👇 manual add input
-  const [manualInput, setManualInput] = useState("");
+  // 👇 draft ticket (box wala input)
+  const [draft, setDraft] = useState("");
   const [manualError, setManualError] = useState("");
-
-  // 👇 edit mode — kis ticket ko edit kar rahe hain
-  const [editingId, setEditingId] = useState(null);
-  const [editingValue, setEditingValue] = useState("");
+  const draftRefs = useRef([]);
 
   const festival = useMemo(
     () => FESTIVALS.find((f) => f.key === festivalKey) || FESTIVALS[0],
@@ -199,7 +230,7 @@ const FestivalLottery = () => {
   const dateOptions = useMemo(() => {
     const today = new Date();
 
-    return Array.from({ length: 8 }, (_, i) => {
+    return Array.from({ length: ALL_DATES_COUNT }, (_, i) => {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
 
@@ -211,6 +242,8 @@ const FestivalLottery = () => {
       };
     });
   }, []);
+
+  const visibleDates = showAllDates ? dateOptions : dateOptions.slice(0, 8);
 
   const selectedDate = dateOptions[selectedDateIndex] || dateOptions[0];
 
@@ -233,16 +266,93 @@ const FestivalLottery = () => {
 
   const handleClear = () => setTickets(generateUniqueTickets(1));
 
-  // 👇 manual add — validate + duplicate
-  const handleManualAdd = () => {
-    const value = manualInput.trim().toUpperCase();
+  // ----- draft box handlers -----
 
-    if (!TICKET_REGEX.test(value)) {
-      setManualError("Add valid number (e.g. 12AB137)");
+  const focusDraft = (index) => {
+    const el = draftRefs.current[index];
+    if (el) {
+      el.focus();
+      if (el.select) el.select();
+    }
+  };
+
+  const updateDraft = (code) => {
+    setDraft(code);
+    setManualError("");
+  };
+
+  const handleDraftChange = (index, e) => {
+    const raw = e.target.value;
+
+    // Mobile keyboard backspace → empty value
+    if (raw === "") {
+      updateDraft(draft.slice(0, index));
       return;
     }
 
-    if (tickets.some((t) => t.code === value)) {
+    const ch = raw.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(-1);
+    if (!ch) return;
+
+    // Hamesha agle khaali box se bharna shuru karo (beech me gap nahi)
+    const pos = Math.min(index, draft.length);
+    if (!slotAccepts(pos, ch)) return;
+
+    const next = draft.slice(0, pos) + ch + draft.slice(pos + 1);
+    updateDraft(next);
+
+    if (pos < TICKET_LENGTH - 1) focusDraft(pos + 1);
+  };
+
+  const handleDraftKeyDown = (index, e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleManualAdd();
+      return;
+    }
+    if (e.key === "Backspace" && !draft[index]) {
+      e.preventDefault();
+      if (index > 0) {
+        updateDraft(draft.slice(0, index - 1));
+        focusDraft(index - 1);
+      }
+      return;
+    }
+    if (e.key === "ArrowLeft" && index > 0) {
+      e.preventDefault();
+      focusDraft(index - 1);
+    }
+    if (e.key === "ArrowRight" && index < TICKET_LENGTH - 1) {
+      e.preventDefault();
+      focusDraft(index + 1);
+    }
+  };
+
+  const handleDraftPaste = (e) => {
+    e.preventDefault();
+    const code = sanitizeCode(e.clipboardData.getData("text"));
+    if (!code) return;
+    updateDraft(code);
+    focusDraft(Math.min(code.length, TICKET_LENGTH - 1));
+  };
+
+  // 👇 Random — format wala number auto fill
+  const handleRandomDraft = () => {
+    updateDraft(randomUniqueCode(tickets.map((t) => t.code)));
+  };
+
+  const handleClearDraft = () => {
+    updateDraft("");
+    focusDraft(0);
+  };
+
+  // 👇 Add More — draft ticket list me add
+  const handleManualAdd = () => {
+    if (!TICKET_REGEX.test(draft)) {
+      setManualError(`Enter full ticket number (e.g. ${TICKET_EXAMPLE})`);
+      return;
+    }
+
+    if (tickets.some((t) => t.code === draft)) {
       setManualError("This number is already added");
       return;
     }
@@ -254,52 +364,17 @@ const FestivalLottery = () => {
 
     setTickets((prev) => [
       ...prev,
-      { id: `${Date.now()}-${Math.random()}`, code: value },
+      { id: `${Date.now()}-${Math.random()}`, code: draft },
     ]);
-    setManualInput("");
+    setDraft("");
     setManualError("");
+    setTimeout(() => focusDraft(0), 60);
   };
 
-  // 👇 delete ticket
+  // 👇 X — ticket hatao
   const handleRemoveTicket = (id) => {
     if (tickets.length === 1) return;
     setTickets((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  // 👇 start editing
-  const startEdit = (ticket) => {
-    setEditingId(ticket.id);
-    setEditingValue(ticket.code);
-    setManualError("");
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditingValue("");
-  };
-
-  // 👇 save edited ticket
-  const saveEdit = () => {
-    const value = editingValue.trim().toUpperCase();
-
-    if (!TICKET_REGEX.test(value)) {
-      setManualError("Add valid number (e.g. 12AB137)");
-      return;
-    }
-
-    if (
-      tickets.some((t) => t.id !== editingId && t.code === value)
-    ) {
-      setManualError("This number is already added");
-      return;
-    }
-
-    setTickets((prev) =>
-      prev.map((t) => (t.id === editingId ? { ...t, code: value } : t))
-    );
-    setEditingId(null);
-    setEditingValue("");
-    setManualError("");
   };
 
   // 👇 PURCHASE — KYC check first
@@ -313,7 +388,7 @@ const FestivalLottery = () => {
     // 2. Validation — all tickets must match format
     const invalid = tickets.find((t) => !TICKET_REGEX.test(t.code));
     if (invalid) {
-      setManualError("Some tickets have invalid format (e.g. 12AB137)");
+      setManualError(`Some tickets have invalid format (e.g. ${TICKET_EXAMPLE})`);
       return;
     }
 
@@ -413,8 +488,8 @@ const FestivalLottery = () => {
                   type="button"
                   onClick={() => setFestivalKey(f.key)}
                   className={`flex min-h-[72px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-2 text-center shadow-md transition active:scale-95 ${active
-                      ? "bg-gradient-to-b from-[#ff1744] to-[#c9102f] text-white"
-                      : "bg-[#fffaf4] text-[#173e70]"
+                    ? "bg-gradient-to-b from-[#ff1744] to-[#c9102f] text-white"
+                    : "bg-[#fffaf4] text-[#173e70]"
                     }`}
                 >
                   <Icon size={22} />
@@ -481,55 +556,43 @@ const FestivalLottery = () => {
 
               <button
                 type="button"
+                onClick={() => setShowAllDates((s) => !s)}
                 className="flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[#c9d3e3] bg-white px-2.5 text-[10px] font-semibold text-[#173e70]"
               >
-                View Full Schedule
-                <ArrowRight size={12} />
+                {showAllDates ? "Show Less" : "View Full Schedule"}
+                <ArrowRight
+                  size={12}
+                  className={`transition-transform ${showAllDates ? "rotate-90" : ""}`}
+                />
               </button>
             </div>
 
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {dateOptions.map((d, index) => {
-                const active = index === selectedDateIndex;
-
-                return (
-                  <button
-                    key={`${d.day}-${d.month}`}
-                    type="button"
+            {showAllDates ? (
+              <div className="mt-3 grid grid-cols-4 gap-2 min-[400px]:grid-cols-5">
+                {visibleDates.map((d, index) => (
+                  <DateChip
+                    key={`${d.day}-${d.month}-${index}`}
+                    date={d}
+                    today={index === 0}
+                    active={index === selectedDateIndex}
                     onClick={() => setSelectedDateIndex(index)}
-                    className={`relative flex h-[66px] w-[64px] shrink-0 flex-col items-center justify-center rounded-xl border text-center transition active:scale-95 ${active
-                        ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
-                        : "border-transparent bg-[#e3e9f3]"
-                      }`}
-                  >
-                    {index === 0 && (
-                      <span className="text-[10px] font-semibold text-[#ed1d43]">
-                        Today
-                      </span>
-                    )}
-
-                    <span
-                      className={`text-[13px] font-extrabold ${active ? "text-[#ed1d43]" : "text-[#26354b]"
-                        }`}
-                    >
-                      {d.day} {d.month}
-                    </span>
-
-                    <span
-                      className={`text-[10px] ${active ? "text-[#ed1d43]" : "text-[#6b7280]"
-                        }`}
-                    >
-                      {d.weekday}
-                    </span>
-
-                    <span
-                      className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${active ? "bg-[#ed1d43]" : "bg-[#20a66a]"
-                        }`}
-                    />
-                  </button>
-                );
-              })}
-            </div>
+                    fluid
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {visibleDates.map((d, index) => (
+                  <DateChip
+                    key={`${d.day}-${d.month}-${index}`}
+                    date={d}
+                    today={index === 0}
+                    active={index === selectedDateIndex}
+                    onClick={() => setSelectedDateIndex(index)}
+                  />
+                ))}
+              </div>
+            )}
           </section>
 
           {/* ================= HOW MANY TICKETS ================= */}
@@ -622,40 +685,94 @@ const FestivalLottery = () => {
               </div>
             </div>
 
-            {/* ================= SINGLE INPUT — lottery number add ================= */}
-            <div className="mt-3 flex items-center gap-2">
-              <input
-                value={manualInput}
-                onChange={(e) => {
-                  setManualInput(
-                    e.target.value
-                      .toUpperCase()
-                      .replace(/[^0-9A-Z]/g, "")
-                      .slice(0, 7)
+            {/* ================= TICKET BOX INPUT ================= */}
+            <div
+              className={`mt-3 rounded-2xl border p-3 ${manualError
+                ? "border-red-300 bg-red-50/50"
+                : TICKET_REGEX.test(draft)
+                  ? "border-emerald-300 bg-emerald-50/40"
+                  : "border-[#dfe5f0] bg-[#f9fbff]"
+                }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 leading-tight">
+                  <h3 className="text-[14px] font-extrabold text-[#173e70]">
+                    Enter Ticket Number
+                  </h3>
+                  <p className="truncate text-[10px] text-[#4b5563]">
+                    Format: {TICKET_EXAMPLE} ({draft.length}/{TICKET_LENGTH})
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleClearDraft}
+                    disabled={!draft}
+                    className="text-[12px] font-medium text-[#3d4468] underline underline-offset-2 disabled:opacity-40"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRandomDraft}
+                    className="flex items-center gap-1 rounded-lg border border-[#c9d3e3] bg-white px-3 py-1.5 text-[12px] font-bold text-[#173e70]"
+                  >
+                    <Shuffle size={13} /> Random
+                  </button>
+                </div>
+              </div>
+
+              <div
+                className="mt-3 grid gap-1.5"
+                style={{ gridTemplateColumns: `repeat(${TICKET_LENGTH}, minmax(0, 1fr))` }}
+              >
+                {SLOT_PATTERN.map((_, i) => {
+                  const filled = Boolean(draft[i]);
+                  return (
+                    <input
+                      key={i}
+                      ref={(el) => {
+                        draftRefs.current[i] = el;
+                      }}
+                      value={draft[i] || ""}
+                      onChange={(e) => handleDraftChange(i, e)}
+                      onKeyDown={(e) => handleDraftKeyDown(i, e)}
+                      onPaste={handleDraftPaste}
+                      onFocus={(e) => e.target.select()}
+                      inputMode={SLOT_PATTERN[i] === "D" ? "numeric" : "text"}
+                      autoCapitalize="characters"
+                      autoComplete="off"
+                      spellCheck={false}
+                      placeholder={slotPlaceholder(i)}
+                      aria-label={`Ticket character ${i + 1}`}
+                      className={`h-12 w-full min-w-0 rounded-xl border-2 text-center text-[18px] font-extrabold outline-none transition placeholder:font-bold placeholder:text-[#c3c8de] focus:border-[#ed1d43] focus:shadow-[0_0_0_3px_rgba(237,29,67,0.15)] ${filled
+                        ? "border-[#173e70] bg-white text-[#173e70]"
+                        : "border-[#c9d3e3] bg-[#f1f3fa] text-[#173e70]"
+                        }`}
+                    />
                   );
-                  setManualError("");
-                }}
-                onKeyDown={(e) => e.key === "Enter" && handleManualAdd()}
-                placeholder="12AB137"
-                maxLength={7}
-                className="h-[44px] min-w-0 flex-1 rounded-xl border border-[#dfe5f0] bg-[#f6f9fe] px-3 text-[14px] font-bold tracking-wider text-[#173e70] outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-[#8a97ab] focus:border-[#ed1d43] focus:bg-white focus:shadow-[0_0_0_3px_rgba(237,29,67,0.12)]"
-              />
+                })}
+              </div>
+
+              {manualError && (
+                <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-center text-[11px] font-medium text-red-600">
+                  {manualError}
+                </p>
+              )}
 
               <button
                 type="button"
                 onClick={handleManualAdd}
-                disabled={!manualInput}
-                className="flex h-[44px] shrink-0 items-center gap-1 rounded-xl bg-[#173e70] px-3 text-[12px] font-bold text-white disabled:opacity-40"
+                disabled={totalTickets >= MAX_TICKETS}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#ed1d43]/50 bg-[#fff0f2]/60 py-3 text-[14px] font-extrabold text-[#ed1d43] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Plus size={14} /> Add
+                <span className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#ed1d43]">
+                  <Plus size={14} strokeWidth={3} />
+                </span>
+                Add More Tickets
               </button>
             </div>
-
-            {manualError && (
-              <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-center text-[11px] font-medium text-red-600">
-                {manualError}
-              </p>
-            )}
 
             {showQuick && (
               <div className="mt-3 grid grid-cols-5 gap-1.5">
@@ -668,8 +785,8 @@ const FestivalLottery = () => {
                       type="button"
                       onClick={() => setQuantity(count)}
                       className={`relative min-w-0 rounded-lg border px-0.5 py-2 text-center transition active:scale-95 ${active
-                          ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
-                          : "border-[#dfe5f0] bg-white"
+                        ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
+                        : "border-[#dfe5f0] bg-white"
                         }`}
                     >
                       <p
@@ -694,7 +811,8 @@ const FestivalLottery = () => {
               </div>
             )}
           </section>
-          {/* ================= SELECTED TICKETS (with Edit + Delete) ================= */}
+
+          {/* ================= SELECTED TICKETS (2 per row + X) ================= */}
           <section className="rounded-[16px] bg-white p-3 shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
@@ -704,116 +822,46 @@ const FestivalLottery = () => {
                 </h2>
               </div>
 
-              <div className="flex shrink-0 items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setQuantity(totalTickets + 1)}
-                  disabled={totalTickets >= MAX_TICKETS}
-                  className="flex h-8 items-center gap-1 whitespace-nowrap rounded-lg border border-[#ed1d43] bg-white px-2 text-[11px] font-bold text-[#ed1d43] disabled:opacity-50"
-                >
-                  Add More
-                  <Plus size={13} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="flex h-8 items-center gap-1 px-1 text-[11px] font-semibold text-[#173e70]"
-                >
-                  <Trash2 size={14} />
-                  Clear
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleClear}
+                className="flex h-8 shrink-0 items-center gap-1 px-1 text-[12px] font-semibold text-[#173e70]"
+              >
+                <Trash2 size={14} />
+                Clear
+              </button>
             </div>
 
-            {/* ticket grid — bordered box me */}
+            {/* ticket grid — ek row me 2 */}
             <div className="mt-3 rounded-xl border border-[#e2e5f0] bg-[#f9fbff] p-2">
-              <div className="grid grid-cols-1 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {tickets.map((ticket, index) => {
                   const color = CHIP_COLORS[index % CHIP_COLORS.length];
-                  const editing = editingId === ticket.id;
 
                   return (
                     <div
                       key={ticket.id}
-                      className={`flex min-w-0 items-center gap-2 rounded-lg border-2 px-2 py-2 shadow-sm transition ${editing
-                          ? "border-[#ed1d43] bg-white"
-                          : "border-white"
-                        } ${color.row}`}
+                      className={`flex min-w-0 items-center gap-1.5 rounded-lg border-2 border-white px-1.5 py-2 shadow-sm ${color.row}`}
                     >
                       <span
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[11px] font-black text-white ${color.badge}`}
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-black text-white ${color.badge}`}
                       >
                         {index + 1}
                       </span>
 
-                      {/* 👇 editable input */}
-                      {editing ? (
-                        <input
-                          value={editingValue}
-                          onChange={(e) =>
-                            setEditingValue(
-                              e.target.value
-                                .toUpperCase()
-                                .replace(/[^0-9A-Z]/g, "")
-                                .slice(0, 7)
-                            )
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") saveEdit();
-                            if (e.key === "Escape") cancelEdit();
-                          }}
-                          maxLength={7}
-                          autoFocus
-                          className="min-w-0 flex-1 rounded-md border border-[#ed1d43] bg-white px-2 py-1 text-[13px] font-bold tracking-wider text-[#173e70] outline-none"
-                        />
-                      ) : (
-                        <span className="min-w-0 flex-1 truncate text-[14px] font-bold tracking-wider text-[#26354b]">
-                          {ticket.code}
-                        </span>
-                      )}
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-bold tracking-wider text-[#26354b]">
+                        {ticket.code}
+                      </span>
 
-                      {/* 👇 action buttons */}
-                      {editing ? (
-                        <div className="flex shrink-0 items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={saveEdit}
-                            className="flex h-7 w-7 items-center justify-center rounded-md bg-[#20a66a] text-white"
-                            aria-label="Save"
-                          >
-                            <Check size={14} strokeWidth={3} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={cancelEdit}
-                            className="flex h-7 w-7 items-center justify-center rounded-md bg-[#6b7280] text-white"
-                            aria-label="Cancel"
-                          >
-                            <X size={14} strokeWidth={3} />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex shrink-0 items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => startEdit(ticket)}
-                            className="flex h-7 w-7 items-center justify-center rounded-md bg-[#173e70] text-white"
-                            aria-label="Edit"
-                          >
-                            <Pencil size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveTicket(ticket.id)}
-                            disabled={tickets.length === 1}
-                            className="flex h-7 w-7 items-center justify-center rounded-md bg-[#ed1d43] text-white disabled:opacity-40"
-                            aria-label="Delete"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTicket(ticket.id)}
+                        disabled={tickets.length === 1}
+                        aria-label={`Remove ticket ${index + 1}`}
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#ed1d43] text-white disabled:opacity-40"
+                      >
+                        <X size={13} strokeWidth={3} />
+                      </button>
                     </div>
                   );
                 })}
@@ -825,7 +873,7 @@ const FestivalLottery = () => {
                 <Info size={13} />
               </span>
 
-              <p className="text-[10px] leading-snug text-[#26354b]">
+              <p className="text-[11px] leading-snug text-[#26354b]">
                 {totalTickets} unique tickets will be generated for the selected
                 draw date. Each ticket costs ₹{price}.
               </p>
@@ -834,35 +882,35 @@ const FestivalLottery = () => {
 
           {/* ================= WINNING RULES ================= */}
           <section className="overflow-hidden rounded-[18px] bg-gradient-to-br from-[#3a0b17] via-[#2b0a16] to-[#1a0710] p-2.5 shadow-lg">
-            <div className="flex items-center justify-between gap-2 px-1">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
               <div className="flex min-w-0 items-center gap-2">
-                <BookOpen size={24} className="shrink-0 text-[#ffd34e]" />
-                <h2 className="text-[12.5px] font-extrabold leading-tight text-white">
+                <BookOpen size={26} className="shrink-0 text-[#ffd34e]" />
+                <h2 className="text-[15px] font-extrabold leading-tight text-white">
                   {festival.name} Festival Lottery Winning Rules
                 </h2>
               </div>
 
               <button
                 type="button"
-                className="flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-white/40 px-2 text-[9px] font-semibold text-white"
+                className="flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-white/40 px-2.5 text-[11px] font-semibold text-white"
               >
                 View Official Terms
-                <ArrowRight size={11} />
+                <ArrowRight size={12} />
               </button>
             </div>
 
-            <div className="mt-3 grid grid-cols-[1fr_1.05fr] gap-2">
-              <div className="flex min-w-0 items-center justify-between gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2 py-2">
-                <span className="text-[9.5px] font-medium leading-tight text-white">
-                  Example Winning Number:
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="flex min-w-0 flex-col items-start justify-center gap-1 rounded-xl border border-white/15 bg-white/5 px-2.5 py-2">
+                <span className="text-[11px] font-medium leading-tight text-white">
+                  Example Winning Number
                 </span>
 
-                <span className="whitespace-nowrap rounded-md bg-white px-2 py-1 text-[15px] font-black tracking-wider text-[#d7193f]">
+                <span className="whitespace-nowrap rounded-md bg-white px-2 py-1 text-[17px] font-black tracking-wider text-[#d7193f]">
                   12AB <span className="text-[#173e70]">137</span>
                 </span>
               </div>
 
-              <div className="flex min-w-0 items-center gap-1.5 rounded-xl border border-[#ffd34e]/30 bg-white/5 px-2 py-2">
+              <div className="flex min-w-0 items-center gap-1.5 rounded-xl border border-[#ffd34e]/30 bg-white/5 px-2.5 py-2">
                 <Trophy
                   size={30}
                   className="shrink-0 text-[#ffd34e]"
@@ -870,11 +918,11 @@ const FestivalLottery = () => {
                 />
 
                 <div className="min-w-0">
-                  <p className="text-[8px] text-white/80">Total First Prize</p>
-                  <p className="whitespace-nowrap text-[18px] font-black leading-none text-[#ffd34e]">
+                  <p className="text-[10px] text-white/80">Total First Prize</p>
+                  <p className="whitespace-nowrap text-[20px] font-black leading-none text-[#ffd34e]">
                     ₹5 CRORE
                   </p>
-                  <p className="mt-0.5 whitespace-nowrap text-[7px] text-white/75">
+                  <p className="mt-0.5 whitespace-nowrap text-[9px] text-white/75">
                     (10 Tickets × ₹50 Lakh)
                   </p>
                 </div>
@@ -885,9 +933,9 @@ const FestivalLottery = () => {
               <table className="w-full table-fixed border-collapse text-left">
                 <colgroup>
                   <col style={{ width: "9%" }} />
-                  <col style={{ width: "30%" }} />
+                  <col style={{ width: "29%" }} />
                   <col style={{ width: "24%" }} />
-                  <col style={{ width: "17%" }} />
+                  <col style={{ width: "18%" }} />
                   <col style={{ width: "20%" }} />
                 </colgroup>
 
@@ -902,7 +950,7 @@ const FestivalLottery = () => {
                     ].map((h) => (
                       <th
                         key={h}
-                        className="px-1.5 py-2 text-[8px] font-semibold leading-tight"
+                        className="px-1.5 py-2.5 text-[10px] font-semibold leading-tight"
                       >
                         {h}
                       </th>
@@ -964,10 +1012,9 @@ const FestivalLottery = () => {
       </div>
 
       {/* ================= BOTTOM PURCHASE BAR ================= */}
-      {/* 👇 sirf tab show hoga jab festival selected ho */}
       {festival && (
         <div
-          className="fixed left-1/2 z-70 w-full max-w-[450px] -translate-x-1/2 overflow-hidden border-t border-[#ff3155]/20 bg-gradient-to-b from-[#2b0a16] to-[#160610] shadow-[0_-10px_30px_rgba(0,0,0,0.4)] rounded-lg mb-4"
+          className="fixed left-1/2 z-[70] mb-4 w-full max-w-[450px] -translate-x-1/2 overflow-hidden rounded-lg border-t border-[#ff3155]/20 bg-gradient-to-b from-[#2b0a16] to-[#160610] shadow-[0_-10px_30px_rgba(0,0,0,0.4)]"
           style={{ bottom: BOTTOM_NAV_HEIGHT + 8 }}
         >
           <div className="grid grid-cols-[minmax(0,1fr)_150px] items-center gap-2 px-3 py-3">
@@ -1007,6 +1054,40 @@ const FestivalLottery = () => {
 // =====================================================
 // SMALL COMPONENTS
 // =====================================================
+
+const DateChip = ({ date, today, active, onClick, fluid = false }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`relative flex h-[66px] ${fluid ? "w-full" : "w-[64px] shrink-0"
+      } flex-col items-center justify-center rounded-xl border text-center transition active:scale-95 ${active
+        ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
+        : "border-transparent bg-[#e3e9f3]"
+      }`}
+  >
+    {today && (
+      <span className="text-[10px] font-semibold text-[#ed1d43]">Today</span>
+    )}
+
+    <span
+      className={`whitespace-nowrap text-[13px] font-extrabold ${active ? "text-[#ed1d43]" : "text-[#26354b]"
+        }`}
+    >
+      {date.day} {date.month}
+    </span>
+
+    <span
+      className={`text-[10px] ${active ? "text-[#ed1d43]" : "text-[#6b7280]"}`}
+    >
+      {date.weekday}
+    </span>
+
+    <span
+      className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${active ? "bg-[#ed1d43]" : "bg-[#20a66a]"
+        }`}
+    />
+  </button>
+);
 
 const HeroFeature = ({ icon, text }) => (
   <div className="flex min-w-0 flex-col items-center gap-1 text-center">
@@ -1105,29 +1186,29 @@ const InfoMini = ({ icon, title, sub }) => (
 
 const RuleRow = ({ number, condition, example, prize, total, badge, row }) => (
   <tr className={`${row} border-b border-white/60`}>
-    <td className="px-1.5 py-2">
+    <td className="px-1.5 py-2.5">
       <span
-        className={`flex h-5 w-5 items-center justify-center rounded-md text-[10px] font-black text-white ${badge}`}
+        className={`flex h-6 w-6 items-center justify-center rounded-md text-[11px] font-black text-white ${badge}`}
       >
         {number}
       </span>
     </td>
 
-    <td className="px-1.5 py-2 text-[8.5px] font-medium leading-tight text-[#26354b]">
+    <td className="px-1.5 py-2.5 text-[10.5px] font-medium leading-tight text-[#26354b]">
       {condition}
     </td>
 
-    <td className="px-1.5 py-2">
-      <span className="whitespace-nowrap rounded border border-[#e6c97c] bg-[#fffdf5] px-1 py-0.5 font-mono text-[9px] font-black tracking-[0.5px] text-[#d7193f]">
+    <td className="px-1.5 py-2.5">
+      <span className="whitespace-nowrap rounded border border-[#e6c97c] bg-[#fffdf5] px-1 py-0.5 font-mono text-[10.5px] font-black tracking-[0.3px] text-[#d7193f]">
         {example}
       </span>
     </td>
 
-    <td className="px-1.5 py-2 text-[9.5px] font-bold text-[#173e70]">
+    <td className="px-1.5 py-2.5 text-[11.5px] font-bold leading-tight text-[#173e70]">
       {prize}
     </td>
 
-    <td className="px-1.5 py-2 text-[9.5px] font-black text-[#d7193f]">
+    <td className="px-1.5 py-2.5 text-[11.5px] font-black leading-tight text-[#d7193f]">
       {total}
     </td>
   </tr>

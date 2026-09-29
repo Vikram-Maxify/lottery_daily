@@ -8,6 +8,7 @@ import {
   Loader2,
   LogOut,
   ShieldCheck,
+  Sparkles,
   Ticket,
   Trophy,
   UserRound,
@@ -34,10 +35,24 @@ import {
 import { getMyDeposits } from "../reducer/slice/depositSlice";
 import { fetchMyWithdrawals } from "../reducer/slice/withdrawalSlice";
 
+// =====================================================
+// CONSTANTS
+// =====================================================
+
 const WHATSAPP_NUMBER = "";
 
+// ⚠️ Apne bottom navbar ki height (px) yahan daalo.
+const BOTTOM_NAV_HEIGHT = 64;
+
+const HERO_IMAGE =
+  "https://images.unsplash.com/photo-1605196560547-b2f7281b7355?auto=format&fit=crop&w=1400&q=80";
+
 const modalInput =
-  "w-full rounded-xl border border-[#d6dfec] bg-[#f6f9fe] px-4 py-3.5 text-[14px] font-medium text-[#1b2a5c] outline-none transition placeholder:text-[#8a97ab] focus:border-[#ed1d43] focus:bg-white focus:shadow-[0_0_0_3px_rgba(237,29,67,0.12)] disabled:opacity-60";
+  "w-full rounded-xl border border-[#c9d3e3] bg-[#f6f9fe] px-4 py-3.5 text-[14px] font-medium text-[#173e70] outline-none transition placeholder:text-[#8a97ab] focus:border-[#ed1d43] focus:bg-white focus:shadow-[0_0_0_3px_rgba(237,29,67,0.12)] disabled:opacity-60";
+
+// =====================================================
+// PROFILE PAGE
+// =====================================================
 
 const ProfilePage = () => {
   const dispatch = useDispatch();
@@ -143,36 +158,52 @@ const ProfilePage = () => {
   const totalWithdrawals = Number(myWithdrawals?.length || 0);
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[#EBF0F7] pb-[90px] text-[#1b2a5c]">
-      <div className="mx-auto w-full max-w-[600px]">
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#eef3fa] text-[#173e70]">
+      <div
+        className="relative mx-auto w-full max-w-[450px] overflow-x-hidden"
+        style={{ paddingBottom: BOTTOM_NAV_HEIGHT + 24 }}
+      >
         {/* ================= HERO / PROFILE ================= */}
-        <section className="relative overflow-hidden bg-gradient-to-br from-[#0f1c4d] via-[#1b2a5c] to-[#3b0d1c] px-3 pb-16 pt-6 sm:px-6">
-          <div className="pointer-events-none absolute -left-16 top-6 h-48 w-48 rounded-full bg-[#ed1d43]/20 blur-3xl" />
-          <div className="pointer-events-none absolute -right-10 top-0 h-56 w-56 rounded-full bg-[#ffd84a]/10 blur-3xl" />
+        <section
+          className="relative overflow-hidden bg-[#3b0a14] bg-cover bg-center"
+          style={{ backgroundImage: `url(${HERO_IMAGE})` }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-[#2a0610]/95 via-[#4a0b18]/75 to-[#2a0610]/55" />
+          <div className="pointer-events-none absolute -right-10 top-0 h-52 w-52 rounded-full bg-[#ff8a00]/25 blur-3xl" />
+          <div className="pointer-events-none absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-[#ff1744]/20 blur-3xl" />
 
-          <div className="relative flex items-center gap-3 sm:gap-4">
-            <div className="flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-full border-[3px] border-[#ffd84a] bg-white/10 shadow-[0_0_25px_rgba(255,216,74,0.25)] sm:h-[96px] sm:w-[96px]">
+          <Sparkles
+            size={16}
+            className="pointer-events-none absolute left-[46%] top-4 text-[#ffcf4a]/80"
+          />
+          <Sparkles
+            size={12}
+            className="pointer-events-none absolute bottom-[30%] left-[4%] text-[#ffb82e]/70"
+          />
+
+          <div className="relative flex items-center gap-3 px-3 pb-16 pt-6">
+            <div className="flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-full border-[3px] border-[#ffd34e] bg-white/10 shadow-[0_0_25px_rgba(255,209,90,0.25)]">
               <UserRound
-                className="h-[38px] w-[38px] text-[#ffd84a] sm:h-[50px] sm:w-[50px]"
+                className="h-[38px] w-[38px] text-[#ffd34e]"
                 strokeWidth={1.5}
               />
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="text-[12px] text-white/70 sm:text-[14px]">Hello,</p>
+              <p className="text-[12px] text-white/70">Hello,</p>
 
-              <h1 className="truncate text-[21px] font-extrabold leading-tight text-white sm:text-[27px]">
+              <h1 className="truncate bg-gradient-to-b from-[#fff1a8] to-[#e0a11b] bg-clip-text font-serif text-[28px] font-black leading-tight text-transparent">
                 {user?.name || "User"}
               </h1>
 
-              <p className="mt-0.5 text-[12px] text-white/80 sm:text-[14px]">
+              <p className="mt-0.5 text-[12.5px] text-white/85">
                 +91 {user?.mobile || "----------"}
               </p>
 
               <button
                 type="button"
                 onClick={handleOpenEditProfile}
-                className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/40 px-3 py-1.5 text-[11px] font-semibold text-white transition active:scale-95 sm:text-[13px]"
+                className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/40 px-3 py-1.5 text-[11.5px] font-semibold text-white transition active:scale-95"
               >
                 <Edit3 size={13} />
                 Edit Profile
@@ -182,10 +213,10 @@ const ProfilePage = () => {
         </section>
 
         {/* ================= STATS + WALLET ================= */}
-        <section className="relative z-10 -mt-10 space-y-3 px-3 sm:px-6">
-          <div className="grid grid-cols-2 overflow-hidden rounded-[18px] border border-white bg-white shadow-[0_12px_30px_rgba(15,28,77,0.10)]">
+        <section className="relative z-10 -mt-10 space-y-3 px-2">
+          <div className="grid grid-cols-2 gap-1.5">
             <StatBox
-              icon={<Ticket size={22} />}
+              icon={<Ticket size={20} />}
               label="Total Tickets"
               tone="red"
               value={
@@ -198,27 +229,24 @@ const ProfilePage = () => {
             />
 
             <StatBox
-              icon={<Trophy size={22} />}
+              icon={<Trophy size={20} />}
               label="Total Wins"
               tone="navy"
               value={0}
-              bordered
             />
           </div>
 
           {/* WALLET CARD */}
-          <div className="flex items-center justify-between gap-3 rounded-[18px] bg-gradient-to-br from-[#0f1c4d] via-[#1b2a5c] to-[#2c3a72] p-3.5 shadow-[0_12px_30px_rgba(15,28,77,0.25)] sm:p-4">
+          <div className="flex items-center justify-between gap-3 rounded-[16px] bg-gradient-to-br from-[#3a0b17] via-[#2b0a16] to-[#1a0710] p-3.5 shadow-lg">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10 sm:h-14 sm:w-14">
-                <Wallet className="h-6 w-6 text-[#ffd84a] sm:h-7 sm:w-7" />
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10">
+                <Wallet className="h-6 w-6 text-[#ffd34e]" />
               </div>
 
               <div className="min-w-0">
-                <p className="text-[12px] text-white/70 sm:text-[14px]">
-                  Wallet Balance
-                </p>
+                <p className="text-[12px] text-white/75">Wallet Balance</p>
 
-                <p className="truncate text-[22px] font-black leading-tight text-[#ffd84a] sm:text-[27px]">
+                <p className="truncate text-[24px] font-black leading-tight text-[#ffd34e]">
                   ₹{formattedWalletBalance}
                 </p>
               </div>
@@ -227,16 +255,16 @@ const ProfilePage = () => {
             <button
               type="button"
               onClick={() => navigate("/user/withdraw")}
-              className="flex h-11 shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-b from-red-500 to-red-700 px-3.5 text-[13px] font-extrabold text-white shadow-[0_6px_18px_rgba(239,68,68,0.45)] transition active:scale-95 sm:h-12 sm:px-5 sm:text-[15px]"
+              className="flex h-11 shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#ff1744] to-[#e0102f] px-3.5 text-[13px] font-extrabold text-white shadow-[0_6px_18px_rgba(255,20,67,0.45)] transition active:scale-95"
             >
-              <HandCoins size={19} strokeWidth={2.4} />
+              <HandCoins size={18} strokeWidth={2.4} />
               Withdraw
             </button>
           </div>
         </section>
 
         {/* ================= MENU ================= */}
-        <section className="mt-3 flex flex-col gap-2.5 px-3 sm:px-6">
+        <section className="mt-3 flex flex-col gap-2.5 px-2">
           <ProfileMenu
             icon={<BadgeCheck />}
             tone="red"
@@ -245,7 +273,6 @@ const ProfilePage = () => {
             onClick={() => navigate("/kyc")}
           />
 
-          {/* ✅ NEW — Verify Ticket */}
           <ProfileMenu
             icon={<ShieldCheck />}
             tone="navy"
@@ -254,7 +281,6 @@ const ProfilePage = () => {
             onClick={() => navigate("/verify")}
           />
 
-          {/* ✅ NEW — Leaderboard */}
           <ProfileMenu
             icon={<BarChart3 />}
             tone="orange"
@@ -308,9 +334,9 @@ const ProfilePage = () => {
             type="button"
             disabled={logoutLoading}
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-[16px] border border-red-200 bg-white px-3.5 py-3 text-left shadow-md transition active:scale-[0.99] disabled:opacity-60 sm:gap-4 sm:px-5 sm:py-3.5"
+            className="flex w-full items-center gap-3 rounded-[16px] border border-red-200 bg-white px-3.5 py-3 text-left shadow-sm transition active:scale-[0.99] disabled:opacity-60"
           >
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-red-500 to-red-700 text-white sm:h-14 sm:w-14">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-[#ff1744] to-[#e0102f] text-white">
               {logoutLoading ? (
                 <Loader2 size={24} className="animate-spin" />
               ) : (
@@ -319,17 +345,17 @@ const ProfilePage = () => {
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="text-[16px] font-extrabold text-[#ed1d43] sm:text-[19px]">
+              <p className="text-[16px] font-extrabold text-[#ed1d43]">
                 {logoutLoading ? "Logging out..." : "Logout"}
               </p>
 
-              <p className="mt-0.5 truncate text-[12px] text-[#6b2737] sm:text-[13px]">
+              <p className="mt-0.5 truncate text-[12px] text-[#6b2737]">
                 Sign out of your account
               </p>
             </div>
 
             {!logoutLoading && (
-              <ChevronRight size={24} className="shrink-0 text-[#ed1d43]" />
+              <ChevronRight size={22} className="shrink-0 text-[#ed1d43]" />
             )}
           </button>
         </section>
@@ -337,12 +363,12 @@ const ProfilePage = () => {
         {/* ================= FOOTER ================= */}
         <div className="mt-6 flex flex-col items-center px-6">
           <div className="flex w-full items-center gap-3">
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent to-[#1b2a5c]/30" />
-            <ShieldCheck size={22} className="text-[#1b2a5c]" />
-            <div className="h-px flex-1 bg-gradient-to-l from-transparent to-[#1b2a5c]/30" />
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent to-[#173e70]/30" />
+            <ShieldCheck size={22} className="text-[#173e70]" />
+            <div className="h-px flex-1 bg-gradient-to-l from-transparent to-[#173e70]/30" />
           </div>
 
-          <p className="mt-2 text-[14px] font-medium text-[#1b2a5c]">
+          <p className="mt-2 text-[14px] font-medium text-[#173e70]">
             Play with trust
           </p>
         </div>
@@ -357,7 +383,7 @@ const ProfilePage = () => {
               onClick={handleCloseEditProfile}
               disabled={updateProfileLoading}
               aria-label="Close"
-              className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-[#d6dfec] bg-white text-[#1b2a5c] transition active:scale-90 disabled:opacity-40"
+              className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-[#c9d3e3] bg-white text-[#173e70] transition active:scale-90 disabled:opacity-40"
             >
               <X size={19} />
             </button>
@@ -365,7 +391,7 @@ const ProfilePage = () => {
             <div className="mb-5 pr-12">
               <p className="text-[13px] text-[#6b7280]">Profile</p>
 
-              <h2 className="mt-0.5 text-[22px] font-extrabold text-[#1b2a5c]">
+              <h2 className="mt-0.5 text-[22px] font-extrabold text-[#173e70]">
                 Edit <span className="text-[#ed1d43]">Profile</span>
               </h2>
             </div>
@@ -425,7 +451,7 @@ const ProfilePage = () => {
                   className={modalInput}
                 />
 
-                <p className="mt-1.5 text-[11px] text-[#8a97ab]">
+                <p className="mt-1.5 text-[11px] text-[#6b7280]">
                   Leave blank if you don't want to change your password.
                 </p>
               </div>
@@ -443,7 +469,7 @@ const ProfilePage = () => {
                   type="button"
                   onClick={handleCloseEditProfile}
                   disabled={updateProfileLoading}
-                  className="h-[50px] flex-1 rounded-xl border border-[#d6dfec] bg-[#f6f9fe] font-bold text-[#1b2a5c] transition active:scale-[0.98] disabled:opacity-50"
+                  className="h-[50px] flex-1 rounded-xl border border-[#c9d3e3] bg-[#f6f9fe] font-bold text-[#173e70] transition active:scale-[0.98] disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -451,7 +477,7 @@ const ProfilePage = () => {
                 <button
                   type="submit"
                   disabled={updateProfileLoading}
-                  className="flex h-[50px] flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-red-500 to-red-700 font-extrabold text-white shadow-[0_6px_18px_rgba(239,68,68,0.45)] transition active:scale-[0.98] disabled:opacity-60"
+                  className="flex h-[50px] flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#ff1744] to-[#e0102f] font-extrabold text-white shadow-[0_6px_18px_rgba(255,20,67,0.45)] transition active:scale-[0.98] disabled:opacity-60"
                 >
                   {updateProfileLoading ? (
                     <>
@@ -471,71 +497,65 @@ const ProfilePage = () => {
   );
 };
 
-/* ==========================================================
-   TONES
-========================================================== */
+// =====================================================
+// TONES
+// =====================================================
 
 const TONES = {
   red: "bg-[#ed1d43]",
-  navy: "bg-[#1b2a5c]",
+  navy: "bg-[#173e70]",
   orange: "bg-[#f08a25]",
   green: "bg-[#20a66a]",
   purple: "bg-[#8c4bd6]",
 };
 
-/* ==========================================================
-   STAT BOX
-========================================================== */
+// =====================================================
+// STAT BOX
+// =====================================================
 
-const StatBox = ({ icon, label, value, tone = "red", bordered = false }) => (
-  <div
-    className={`flex items-center gap-3 px-3.5 py-3.5 sm:px-5 ${
-      bordered ? "border-l border-[#e2e5f0]" : ""
-    }`}
-  >
+const StatBox = ({ icon, label, value, tone = "red" }) => (
+  <div className="flex min-w-0 items-center gap-3 rounded-xl bg-white px-3 py-3.5 shadow-md">
     <div
-      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white sm:h-12 sm:w-12 ${TONES[tone]}`}
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white ${TONES[tone]}`}
     >
       {icon}
     </div>
 
     <div className="min-w-0">
-      <p className="text-[12px] text-[#5a6082] sm:text-[14px]">{label}</p>
+      <p className="truncate text-[12px] font-medium text-[#4b5563]">{label}</p>
 
-      <div className="mt-0.5 flex min-h-[28px] items-center text-[24px] font-black leading-none text-[#1b2a5c] sm:text-[28px]">
+      <div className="mt-0.5 flex min-h-[28px] items-center text-[24px] font-black leading-none text-[#173e70]">
         {value}
       </div>
     </div>
   </div>
 );
 
-/* ==========================================================
-   PROFILE MENU
-========================================================== */
+// =====================================================
+// PROFILE MENU
+// =====================================================
 
 const ProfileMenu = ({ icon, title, description, onClick, tone = "red" }) => (
   <button
     type="button"
     onClick={onClick}
-    className="flex w-full items-center gap-3 rounded-[16px] border border-white bg-white px-3.5 py-3 text-left shadow-[0_4px_14px_rgba(15,28,77,0.06)] transition active:scale-[0.99] sm:gap-4 sm:px-5 sm:py-3.5"
+    className="flex w-full items-center gap-3 rounded-[16px] bg-white px-3.5 py-3 text-left shadow-sm transition active:scale-[0.99]"
   >
     <div
-      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white sm:h-14 sm:w-14 ${TONES[tone]}`}
+      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white ${TONES[tone]}`}
     >
       <span className="inline-flex [&>svg]:h-6 [&>svg]:w-6">{icon}</span>
     </div>
 
     <div className="min-w-0 flex-1">
-      <p className="text-[16px] font-extrabold text-[#1b2a5c] sm:text-[19px]">
-        {title}
-      </p>
+      <p className="text-[16px] font-extrabold text-[#173e70]">{title}</p>
 
-      <p className="mt-0.5 truncate text-[12px] text-[#5a6082] sm:text-[13px]">
+      <p className="mt-0.5 truncate text-[12px] text-[#4b5563]">
         {description}
       </p>
     </div>
 
-    <ChevronRight size={24} className="shrink-0 text-[#1b2a5c]" />
+    <ChevronRight size={22} className="shrink-0 text-[#173e70]" />
   </button>
 );
 

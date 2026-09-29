@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
@@ -294,6 +293,10 @@ const RULES = [
   },
 ];
 
+// Shared grid template for the winning-rules table (header + rows)
+const RULES_GRID =
+  "grid-cols-[24px_minmax(0,1fr)_70px_54px_58px]";
+
 // =====================================================
 // COMPONENT
 // =====================================================
@@ -453,12 +456,6 @@ const HomeLotterySection = () => {
   };
 
   // =====================================================
-  // WINNERS TOGGLE
-  // =====================================================
-
-  const [showAllWinners, setShowAllWinners] = useState(false);
-
-  // =====================================================
   // DRAW DISPLAY DATA
   // =====================================================
 
@@ -466,7 +463,33 @@ const HomeLotterySection = () => {
 
   return (
     <div className="min-h-screen w-full bg-[#EEF3FA] flex justify-center">
-      <main className="relative w-full max-w-[500px] min-h-screen bg-[#EEF3FA] pb-[84px] shadow-xl">
+      {/* Winners infinite scroll animation */}
+      <style>{`
+        @keyframes winners-marquee {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+
+        .winners-track {
+          display: flex;
+          width: max-content;
+          animation: winners-marquee 24s linear infinite;
+          will-change: transform;
+        }
+
+        .winners-wrap:hover .winners-track,
+        .winners-wrap:active .winners-track {
+          animation-play-state: paused;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .winners-track {
+            animation: none;
+          }
+        }
+      `}</style>
+
+      <main className="relative w-full max-w-[500px] min-h-screen bg-[#EEF3FA] shadow-xl">
 
         {/* =====================================================
             HERO
@@ -697,89 +720,66 @@ const HomeLotterySection = () => {
         </section>
 
         {/* =====================================================
-            TOP WINNERS
+            TOP WINNERS (INFINITE SCROLL)
         ===================================================== */}
 
         <section className="px-2.5 pt-3">
 
-          <div className="rounded-2xl border border-[#ff3155]/40 bg-gradient-to-br from-[#5d1028] via-[#461025] to-[#27102a] px-3 py-3 shadow-[0_10px_28px_rgba(0,0,0,0.25)]">
+          <div className="overflow-hidden rounded-2xl border border-[#ff3155]/40 bg-gradient-to-br from-[#5d1028] via-[#461025] to-[#27102a] py-3 shadow-[0_10px_28px_rgba(0,0,0,0.25)]">
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 px-3">
 
-              <div className="flex items-center gap-2">
+              <Trophy
+                size={21}
+                className="text-[#ffd24c]"
+              />
 
-                <Trophy
-                  size={21}
-                  className="text-[#ffd24c]"
-                  fill="#ffd24c"
-                />
+              <div className="leading-tight">
 
-                <div className="leading-tight">
+                <h2 className="text-[16px] font-extrabold text-white">
+                  Top Winners
+                </h2>
 
-                  <h2 className="text-[16px] font-extrabold text-white">
-                    Top Winners
-                  </h2>
-
-                  <p className="text-[10px] text-white/65">
-                    Real People. Real Winnings.
-                  </p>
-
-                </div>
+                <p className="text-[10px] text-white/65">
+                  Real People. Real Winnings.
+                </p>
 
               </div>
 
-              <button
-                type="button"
-                onClick={() =>
-                  setShowAllWinners(!showAllWinners)
-                }
-                className="flex h-8 items-center gap-1 rounded-full border border-white/40 px-3 text-[11px] font-semibold text-white transition hover:bg-white/10"
-              >
-                {showAllWinners
-                  ? "Show Less"
-                  : "View All"}
-
-                <ArrowRight
-                  size={13}
-                  className={
-                    showAllWinners ? "rotate-90" : ""
-                  }
-                />
-              </button>
-
             </div>
 
-            <div className="mt-2.5 flex gap-3 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div
+              className="winners-wrap mt-3 overflow-hidden"
+              style={{
+                WebkitMaskImage:
+                  "linear-gradient(to right, transparent 0, #000 7%, #000 93%, transparent 100%)",
+                maskImage:
+                  "linear-gradient(to right, transparent 0, #000 7%, #000 93%, transparent 100%)",
+              }}
+            >
 
-              {WINNERS.slice(0, 4).map((winner) => (
-                <WinnerCard
-                  key={winner.name}
-                  {...winner}
-                />
-              ))}
+              <div className="winners-track">
 
-            </div>
+                {/* Two identical sets = seamless infinite loop */}
 
-            {showAllWinners && (
-              <div className="mt-4 border-t border-white/10 pt-4">
-
-                <h3 className="mb-3 text-[14px] font-bold text-white">
-                  All Winners
-                </h3>
-
-                <div className="grid grid-cols-2 gap-3">
-
-                  {WINNERS.map((winner) => (
-                    <WinnerCard
-                      key={winner.name}
-                      {...winner}
-                    />
-                  ))}
-
-                </div>
+                {[0, 1].map((set) => (
+                  <div
+                    key={set}
+                    className="flex shrink-0"
+                    aria-hidden={set === 1}
+                  >
+                    {WINNERS.map((winner) => (
+                      <WinnerCard
+                        key={`${set}-${winner.name}`}
+                        {...winner}
+                      />
+                    ))}
+                  </div>
+                ))}
 
               </div>
-            )}
+
+            </div>
 
           </div>
 
@@ -915,18 +915,18 @@ const HomeLotterySection = () => {
 
           <div className="overflow-hidden rounded-[20px] bg-[#fffaf4] shadow-[0_12px_35px_rgba(0,0,0,0.2)]">
 
-            <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-3.5">
+            <div className="flex items-center justify-between gap-3 px-3 pb-3 pt-4">
 
               <div className="min-w-0">
 
-                <h2 className="font-serif text-[23px] font-black leading-none tracking-tight text-[#173e70]">
+                <h2 className="font-serif text-[27px] font-black leading-none tracking-tight text-[#173e70]">
                   Winning{" "}
                   <span className="text-[#d7193f]">
                     Rules
                   </span>
                 </h2>
 
-                <p className="mt-1.5 max-w-[185px] text-[9px] leading-snug text-[#4b5563]">
+                <p className="mt-2 max-w-[200px] text-[11px] leading-snug text-[#4b5563]">
                   Match your ticket number with the drawn number and win exciting prizes!
                 </p>
 
@@ -934,11 +934,11 @@ const HomeLotterySection = () => {
 
               <div className="shrink-0 overflow-hidden rounded-lg border border-[#e6c97c] bg-[#fffdf5] text-center shadow-sm">
 
-                <p className="bg-[#fff6d9] px-2 py-0.5 text-[8px] font-medium text-gray-600">
+                <p className="bg-[#fff6d9] px-2 py-1 text-[9px] font-semibold leading-tight text-gray-600">
                   Example Winning Number
                 </p>
 
-                <p className="px-2 py-1 text-[14px] font-black tracking-[2px] text-[#d7193f]">
+                <p className="px-2 py-1.5 text-[17px] font-black tracking-[2px] text-[#d7193f]">
                   10F{" "}
                   <span className="text-[#173e70]">
                     68057
@@ -949,11 +949,13 @@ const HomeLotterySection = () => {
 
             </div>
 
-            <div className="px-2 pb-2.5">
+            <div className="px-2 pb-3">
 
               <div className="overflow-hidden rounded-lg border border-[#e8e0d4]">
 
-                <div className="grid grid-cols-[20px_1fr_60px_45px_45px] items-center gap-1 bg-[#0d2547] px-1.5 py-1.5 text-[8px] font-semibold text-white">
+                <div
+                  className={`grid ${RULES_GRID} items-center gap-1.5 bg-[#0d2547] px-2 py-2 text-[10px] font-semibold leading-tight text-white`}
+                >
 
                   <span className="text-center">
                     ₹
@@ -963,7 +965,7 @@ const HomeLotterySection = () => {
 
                   <span>Example</span>
 
-                  <span>Prize/Ticket</span>
+                  <span>Prize / Ticket</span>
 
                   <span>Total (×10)</span>
 
@@ -980,13 +982,13 @@ const HomeLotterySection = () => {
 
             </div>
 
-            <div className="mx-2 mb-3 flex items-start gap-2 rounded-xl border border-[#f2c4c4] bg-[#fff0f0] px-2.5 py-2.5">
+            <div className="mx-2 mb-3 flex items-start gap-2 rounded-xl border border-[#f2c4c4] bg-[#fff0f0] px-3 py-3">
 
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#d7193f] text-[10px] font-black text-white">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#d7193f] text-[11px] font-black text-white">
                 i
               </div>
 
-              <p className="text-[8px] leading-relaxed text-[#6b2737]">
+              <p className="text-[10px] leading-relaxed text-[#6b2737]">
                 <strong>Note:</strong> The above is a general representation of winning rules. Actual prizes, rules, and draw details are subject to the official published terms and conditions.
               </p>
 
@@ -1132,12 +1134,12 @@ const WinnerCard = ({
   time,
   image,
 }) => (
-  <div className="flex min-w-[140px] shrink-0 items-center gap-2">
+  <div className="flex min-w-[170px] shrink-0 items-center gap-2.5 pl-4 pr-2">
 
     <img
       src={image}
       alt={name}
-      className="h-10 w-10 shrink-0 rounded-full border-2 border-[#ffd34e] object-cover"
+      className="h-11 w-11 shrink-0 rounded-full border-2 border-[#ffd34e] object-cover"
     />
 
     <div className="min-w-0 leading-tight">
@@ -1146,7 +1148,7 @@ const WinnerCard = ({
         {name}
       </p>
 
-      <p className="truncate text-[13px] font-black text-[#ffd34e]">
+      <p className="truncate text-[14px] font-black text-[#ffd34e]">
         {amount}
       </p>
 
@@ -1345,28 +1347,28 @@ const RuleRow = ({
   row,
 }) => (
   <div
-    className={`grid grid-cols-[20px_1fr_60px_45px_45px] items-center gap-1 border-t border-white/70 px-1.5 py-1.5 ${row}`}
+    className={`grid ${RULES_GRID} items-center gap-1.5 border-t border-white/70 px-2 py-2.5 ${row}`}
   >
 
     <span
-      className={`mx-auto flex h-5 w-5 items-center justify-center rounded-md text-[10px] font-black text-white ${badge}`}
+      className={`mx-auto flex h-6 w-6 items-center justify-center rounded-md text-[12px] font-black text-white ${badge}`}
     >
       {n}
     </span>
 
-    <span className="text-[8px] font-medium leading-tight text-[#26354b]">
+    <span className="text-[11px] font-medium leading-snug text-[#26354b]">
       {condition}
     </span>
 
-    <span className="rounded border border-[#e6c97c] bg-[#fffdf5] px-1 py-0.5 text-center font-mono text-[9px] font-black tracking-[0.5px] text-[#d7193f]">
+    <span className="rounded border border-[#e6c97c] bg-[#fffdf5] px-0.5 py-1 text-center font-mono text-[10px] font-black tracking-normal text-[#d7193f]">
       {example}
     </span>
 
-    <span className="text-[9px] font-bold leading-tight text-[#173e70]">
+    <span className="text-[11px] font-bold leading-tight text-[#173e70]">
       {prize}
     </span>
 
-    <span className="text-[9px] font-black leading-tight text-[#d7193f]">
+    <span className="text-[11px] font-black leading-tight text-[#d7193f]">
       {total}
     </span>
 
@@ -1374,4 +1376,3 @@ const RuleRow = ({
 );
 
 export default HomeLotterySection;
-
