@@ -221,10 +221,13 @@ const createDeposit = async (req, res) => {
         for (let i = 0; i < lotteryNumbers.length; i++) {
           const num = String(lotteryNumbers[i] || "").trim();
 
-          if (!/^\d{6}$/.test(num)) {
+          // Exactly 7 alphanumeric characters
+          // Allowed: A-Z, a-z, 0-9
+          if (!/^[a-zA-Z0-9]{7}$/.test(num)) {
             return res.status(400).json({
               success: false,
-              message: `Ticket ${i + 1}: number must be exactly 6 digits`,
+              message:
+                `Ticket ${i + 1}: number must be exactly 7 alphanumeric characters`,
             });
           }
 
@@ -361,9 +364,9 @@ const createDeposit = async (req, res) => {
 
         const gatewayCode = Number(
           gatewayResponse?.code ??
-            gatewayResponse?.status_code ??
-            gatewayResponse?.statusCode ??
-            0
+          gatewayResponse?.status_code ??
+          gatewayResponse?.statusCode ??
+          0
         );
 
         if (paymentUrl) {
@@ -1059,19 +1062,19 @@ const onlinePayCallback = async (req, res) => {
         "order_id",
         "orderId",
       ]) ??
-        getGatewayValue(result, [
-          "merchant_order_id",
-          "merchantOrderId",
-          "order_id",
-          "orderId",
-        ]) ??
-        getGatewayValue(root, [
-          "merchant_order_id",
-          "merchantOrderId",
-          "order_id",
-          "orderId",
-        ]) ??
-        ""
+      getGatewayValue(result, [
+        "merchant_order_id",
+        "merchantOrderId",
+        "order_id",
+        "orderId",
+      ]) ??
+      getGatewayValue(root, [
+        "merchant_order_id",
+        "merchantOrderId",
+        "order_id",
+        "orderId",
+      ]) ??
+      ""
     ).trim();
 
     const qwackOrderId = String(
@@ -1083,23 +1086,23 @@ const onlinePayCallback = async (req, res) => {
         "payment_id",
         "paymentId",
       ]) ??
-        getGatewayValue(result, [
-          "qwack_order_id",
-          "qwackOrderId",
-          "transaction_id",
-          "transactionId",
-          "payment_id",
-          "paymentId",
-        ]) ??
-        getGatewayValue(root, [
-          "qwack_order_id",
-          "qwackOrderId",
-          "transaction_id",
-          "transactionId",
-          "payment_id",
-          "paymentId",
-        ]) ??
-        ""
+      getGatewayValue(result, [
+        "qwack_order_id",
+        "qwackOrderId",
+        "transaction_id",
+        "transactionId",
+        "payment_id",
+        "paymentId",
+      ]) ??
+      getGatewayValue(root, [
+        "qwack_order_id",
+        "qwackOrderId",
+        "transaction_id",
+        "transactionId",
+        "payment_id",
+        "paymentId",
+      ]) ??
+      ""
     ).trim();
 
     const utr = String(
@@ -1111,23 +1114,23 @@ const onlinePayCallback = async (req, res) => {
         "reference",
         "reference_number",
       ]) ??
-        getGatewayValue(result, [
-          "utr",
-          "utr_number",
-          "utrNumber",
-          "rrn",
-          "reference",
-          "reference_number",
-        ]) ??
-        getGatewayValue(root, [
-          "utr",
-          "utr_number",
-          "utrNumber",
-          "rrn",
-          "reference",
-          "reference_number",
-        ]) ??
-        ""
+      getGatewayValue(result, [
+        "utr",
+        "utr_number",
+        "utrNumber",
+        "rrn",
+        "reference",
+        "reference_number",
+      ]) ??
+      getGatewayValue(root, [
+        "utr",
+        "utr_number",
+        "utrNumber",
+        "rrn",
+        "reference",
+        "reference_number",
+      ]) ??
+      ""
     ).trim();
 
     const status = String(statusRaw ?? "").trim().toLowerCase();
@@ -1489,13 +1492,13 @@ const onlinePayCallback = async (req, res) => {
     const finalStatus = gatewayResult?.isSuccess
       ? "success"
       : gatewayResult?.isFailed
-      ? "failed"
-      : callbackStatusLower;
+        ? "failed"
+        : callbackStatusLower;
 
     const finalAmount =
       gatewayResult &&
-      Number.isFinite(gatewayResult.amount) &&
-      gatewayResult.amount > 0
+        Number.isFinite(gatewayResult.amount) &&
+        gatewayResult.amount > 0
         ? gatewayResult.amount
         : callbackAmount;
 
@@ -1556,9 +1559,8 @@ const onlinePayCallback = async (req, res) => {
           $set: {
             status: STATUS.FAILED,
             amount: Number(deposit.amount),
-            remark: `QwackPay recharge failed. Status: ${
-              gatewayResult?.status || gatewayStatus
-            }`,
+            remark: `QwackPay recharge failed. Status: ${gatewayResult?.status || gatewayStatus
+              }`,
             updatedAt: new Date(),
           },
         },
@@ -1568,9 +1570,8 @@ const onlinePayCallback = async (req, res) => {
       await setCallbackLog({
         event: "PAYMENT_FAILED",
         processingStatus: "SUCCESS",
-        message: `Verified payment failure: ${
-          gatewayResult?.status || gatewayStatus
-        }`,
+        message: `Verified payment failure: ${gatewayResult?.status || gatewayStatus
+          }`,
         processedAt: new Date(),
       });
 
@@ -1585,9 +1586,8 @@ const onlinePayCallback = async (req, res) => {
       await setCallbackLog({
         event: "PAYMENT_PENDING",
         processingStatus: "SUCCESS",
-        message: `Payment is still pending. Callback status=${
-          gatewayStatus || "unknown"
-        }`,
+        message: `Payment is still pending. Callback status=${gatewayStatus || "unknown"
+          }`,
         processedAt: new Date(),
       });
 
@@ -1715,12 +1715,10 @@ const onlinePayCallback = async (req, res) => {
         // =====================================================
 
         const successRemark = freshDeposit.lotteryNumbers?.length
-          ? `Lottery purchase successful via QwackPay. UTR: ${
-              finalUtr || "N/A"
-            }. ${freshDeposit.lotteryNumbers.length} ticket(s) added. Amount: ₹${finalAmount}`
-          : `Payment successful via QwackPay. UTR: ${
-              finalUtr || "N/A"
-            }. Amount: ₹${finalAmount}`;
+          ? `Lottery purchase successful via QwackPay. UTR: ${finalUtr || "N/A"
+          }. ${freshDeposit.lotteryNumbers.length} ticket(s) added. Amount: ₹${finalAmount}`
+          : `Payment successful via QwackPay. UTR: ${finalUtr || "N/A"
+          }. Amount: ₹${finalAmount}`;
 
         const historyUpdate = await TransactionHistory.findOneAndUpdate(
           {
@@ -1798,9 +1796,8 @@ const onlinePayCallback = async (req, res) => {
       event: "PAYMENT_SUCCESS",
       processingStatus: "SUCCESS",
       signValid: signValid || Boolean(gatewayResult?.isSuccess),
-      message: `₹${finalAmount} processed (wallet unchanged). Lottery entries: ${
-        lotteryResult?.createdCount || 0
-      } added.`,
+      message: `₹${finalAmount} processed (wallet unchanged). Lottery entries: ${lotteryResult?.createdCount || 0
+        } added.`,
       processedAt: new Date(),
     });
 
@@ -2085,10 +2082,10 @@ const getMyTurnoverHistory = async (req, res) => {
         referredUsername,
         date: commission.createdAt
           ? new Date(commission.createdAt).toLocaleDateString("en-GB", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })
           : "-",
         createdAt: commission.createdAt,
       };

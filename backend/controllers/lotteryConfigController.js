@@ -44,6 +44,24 @@ const formatDateString = (date) => {
 };
 
 // =====================================================
+// GET DB DATE STRING (YYYY-MM-DD)
+// =====================================================
+
+const getDBDateString = (date) => {
+  if (!date) {
+    return null;
+  }
+
+  const d = new Date(date);
+
+  if (Number.isNaN(d.getTime())) {
+    return null;
+  }
+
+  return d.toISOString().slice(0, 10);
+};
+
+// =====================================================
 // VALIDATE DRAW DATE
 // =====================================================
 
@@ -131,11 +149,7 @@ const validateDrawTime = (drawTime) => {
 // =====================================================
 
 const validateMonth = (month) => {
-  if (
-    month === undefined ||
-    month === null ||
-    month === ""
-  ) {
+  if (month === undefined || month === null || month === "") {
     return {
       valid: false,
       message: "Month is required",
@@ -144,11 +158,7 @@ const validateMonth = (month) => {
 
   const value = Number(month);
 
-  if (
-    !Number.isInteger(value) ||
-    value < 1 ||
-    value > 12
-  ) {
+  if (!Number.isInteger(value) || value < 1 || value > 12) {
     return {
       valid: false,
       message: "Month must be between 1 and 12",
@@ -166,11 +176,7 @@ const validateMonth = (month) => {
 // =====================================================
 
 const validateYear = (year) => {
-  if (
-    year === undefined ||
-    year === null ||
-    year === ""
-  ) {
+  if (year === undefined || year === null || year === "") {
     return {
       valid: false,
       message: "Year is required",
@@ -179,11 +185,7 @@ const validateYear = (year) => {
 
   const value = Number(year);
 
-  if (
-    !Number.isInteger(value) ||
-    value < 2000 ||
-    value > 2100
-  ) {
+  if (!Number.isInteger(value) || value < 2000 || value > 2100) {
     return {
       valid: false,
       message: "Year must be a valid year (2000-2100)",
@@ -197,27 +199,23 @@ const validateYear = (year) => {
 };
 
 // =====================================================
-// VALIDATE 6 DIGIT NUMBER
+// VALIDATE 7 CHARACTER ALPHANUMERIC NUMBER
 // =====================================================
 
 const validateNumber = (number) => {
-  if (
-    number === undefined ||
-    number === null ||
-    number === ""
-  ) {
+  if (number === undefined || number === null || number === "") {
     return {
       valid: false,
-      message: "6 digit lottery number is required",
+      message: "7 character alphanumeric lottery number is required",
     };
   }
 
   const value = String(number).trim();
 
-  if (!/^\d{6}$/.test(value)) {
+  if (!/^[a-zA-Z0-9]{7}$/.test(value)) {
     return {
       valid: false,
-      message: "Lottery number must be exactly 6 digits",
+      message: "Lottery number must be exactly 7 alphanumeric characters",
     };
   }
 
@@ -232,11 +230,7 @@ const validateNumber = (number) => {
 // =====================================================
 
 const validateAmount = (amount) => {
-  if (
-    amount === undefined ||
-    amount === null ||
-    amount === ""
-  ) {
+  if (amount === undefined || amount === null || amount === "") {
     return {
       valid: false,
       message: "Valid amount is required",
@@ -270,11 +264,7 @@ const validateAmount = (amount) => {
 // =====================================================
 
 const validateStatus = (status) => {
-  const allowedStatuses = [
-    "pending",
-    "win",
-    "lost",
-  ];
+  const allowedStatuses = ["pending", "win", "lost"];
 
   if (!allowedStatuses.includes(status)) {
     return {
@@ -290,22 +280,62 @@ const validateStatus = (status) => {
 };
 
 // =====================================================
-// CREATE LOTTERY CONFIG
+// CHECK IF CONFIG SALE IS STILL OPEN
+// (draw date + draw time cross check)
+// =====================================================
+
+const isSaleOpen = (config) => {
+  const dateString = getDBDateString(config.drawDate);
+
+  if (!dateString) {
+    return { open: false, reason: "Invalid draw date in config" };
+  }
+
+  if (
+    !config.drawTime ||
+    typeof config.drawTime !== "string" ||
+    !/^\d{2}:\d{2}$/.test(config.drawTime)
+  ) {
+    return { open: false, reason: "Invalid draw time in config" };
+  }
+
+  const drawDateTime = new Date(
+    `${dateString}T${config.drawTime}:00+05:30`
+  );
+
+  if (Number.isNaN(drawDateTime.getTime())) {
+    return { open: false, reason: "Unable to calculate draw time" };
+  }
+
+  const now = new Date();
+
+  if (now >= drawDateTime) {
+    return {
+      open: false,
+      reason: "Lottery ticket sale time has ended",
+      drawDate: dateString,
+      drawTime: config.drawTime,
+      drawDateTime,
+    };
+  }
+
+  return {
+    open: true,
+    drawDate: dateString,
+    drawTime: config.drawTime,
+    drawDateTime,
+  };
+};
+
+// =====================================================
+// CREATE LOTTERY CONFIG + AUTO CREATE NEXT DAY
 // ADMIN
-//
 // POST /api/lottery
 // =====================================================
 
 const createLotteryConfig = async (req, res) => {
   try {
-    const {
-      marketName,
-      month,
-      year,
-      drawDate,
-      drawTime,
-      prizes,
-    } = req.body;
+    const { marketName, month, year, drawDate, drawTime, prizes } = req.body;
 
     // ================================================
     // MARKET VALIDATION
@@ -380,43 +410,28 @@ const createLotteryConfig = async (req, res) => {
     // PRIZES VALIDATION
     // ================================================
 
-    if (
-      !prizes ||
-      typeof prizes !== "object"
-    ) {
+    if (!prizes || typeof prizes !== "object") {
       return res.status(400).json({
         success: false,
         message: "Prize amounts are required",
       });
     }
 
-    if (
-      prizes.first === undefined ||
-      prizes.first === null ||
-      prizes.first === ""
-    ) {
+    if (prizes.first === undefined || prizes.first === null || prizes.first === "") {
       return res.status(400).json({
         success: false,
         message: "First prize is required",
       });
     }
 
-    if (
-      prizes.second === undefined ||
-      prizes.second === null ||
-      prizes.second === ""
-    ) {
+    if (prizes.second === undefined || prizes.second === null || prizes.second === "") {
       return res.status(400).json({
         success: false,
         message: "Second prize is required",
       });
     }
 
-    if (
-      prizes.third === undefined ||
-      prizes.third === null ||
-      prizes.third === ""
-    ) {
+    if (prizes.third === undefined || prizes.third === null || prizes.third === "") {
       return res.status(400).json({
         success: false,
         message: "Third prize is required",
@@ -427,30 +442,21 @@ const createLotteryConfig = async (req, res) => {
     const secondPrize = Number(prizes.second);
     const thirdPrize = Number(prizes.third);
 
-    if (
-      !Number.isFinite(firstPrize) ||
-      firstPrize < 0
-    ) {
+    if (!Number.isFinite(firstPrize) || firstPrize < 0) {
       return res.status(400).json({
         success: false,
         message: "Valid first prize amount is required",
       });
     }
 
-    if (
-      !Number.isFinite(secondPrize) ||
-      secondPrize < 0
-    ) {
+    if (!Number.isFinite(secondPrize) || secondPrize < 0) {
       return res.status(400).json({
         success: false,
         message: "Valid second prize amount is required",
       });
     }
 
-    if (
-      !Number.isFinite(thirdPrize) ||
-      thirdPrize < 0
-    ) {
+    if (!Number.isFinite(thirdPrize) || thirdPrize < 0) {
       return res.status(400).json({
         success: false,
         message: "Valid third prize amount is required",
@@ -458,7 +464,7 @@ const createLotteryConfig = async (req, res) => {
     }
 
     // ================================================
-    // CHECK DUPLICATE
+    // CHECK DUPLICATE (TODAY / SELECTED DATE)
     // ================================================
 
     const startOfDay = new Date(dateValidation.date);
@@ -485,30 +491,72 @@ const createLotteryConfig = async (req, res) => {
     }
 
     // ================================================
-    // CREATE ONLY ONE CONFIG
+    // CREATE TODAY'S LOTTERY
     // ================================================
 
     const lottery = await LotteryConfig.create({
       marketName: cleanMarketName,
-
       month: monthValidation.month,
-
       year: yearValidation.year,
-
       drawDate: dateValidation.date,
-
       drawTime: timeValidation.drawTime,
-
       prizes: {
         first: firstPrize,
         second: secondPrize,
         third: thirdPrize,
       },
-
       users: [],
-
       isActive: false,
     });
+
+    // ================================================
+    // AUTO CREATE NEXT DAY LOTTERY (SAME MARKET)
+    // ================================================
+
+    let nextDayLottery = null;
+
+    try {
+      const nextDate = new Date(dateValidation.date);
+      nextDate.setDate(nextDate.getDate() + 1);
+
+      const nextStartOfDay = new Date(nextDate);
+      nextStartOfDay.setHours(0, 0, 0, 0);
+
+      const nextEndOfDay = new Date(nextDate);
+      nextEndOfDay.setHours(23, 59, 59, 999);
+
+      const existingNextLottery = await LotteryConfig.findOne({
+        marketName: cleanMarketName,
+        drawDate: { $gte: nextStartOfDay, $lte: nextEndOfDay },
+      });
+
+      if (!existingNextLottery) {
+        nextDayLottery = await LotteryConfig.create({
+          marketName: cleanMarketName,
+          month: nextDate.getMonth() + 1,
+          year: nextDate.getFullYear(),
+          drawDate: nextDate,
+          drawTime: timeValidation.drawTime,
+          prizes: {
+            first: firstPrize,
+            second: secondPrize,
+            third: thirdPrize,
+          },
+          users: [],
+          isActive: false,
+        });
+
+        console.log(
+          `✅ Next day lottery auto-created: ${cleanMarketName} - ${formatDateString(nextDate)}`
+        );
+      } else {
+        console.log(
+          `ℹ️ Next day lottery already exists: ${cleanMarketName} - ${formatDateString(nextDate)}`
+        );
+      }
+    } catch (nextDayError) {
+      console.error("Next day lottery auto-create error:", nextDayError);
+    }
 
     // ================================================
     // RESPONSE
@@ -516,17 +564,16 @@ const createLotteryConfig = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-
-      message:
-        "Lottery ticket created successfully for selected date",
-
-      data: lottery,
+      message: nextDayLottery
+        ? "Lottery created successfully. Next day lottery bhi auto-create ho gayi."
+        : "Lottery ticket created successfully for selected date",
+      data: {
+        today: lottery,
+        nextDay: nextDayLottery,
+      },
     });
   } catch (error) {
-    console.error(
-      "Create lottery config error:",
-      error
-    );
+    console.error("Create lottery config error:", error);
 
     if (error.code === 11000) {
       return res.status(409).json({
@@ -547,29 +594,22 @@ const createLotteryConfig = async (req, res) => {
 // =====================================================
 // ADD USER LOTTERY ENTRY (SINGLE)
 // USER
-//
 // POST /api/lottery/entry
 //
 // BODY:
-//
 // {
 //   "configId": "...",
-//   "number": "123456",
+//   "number": "1234567",
 //   "amount": 100
 // }
+//
+// 👉 Entry SIRF usi config ki lottery mein jayegi jo user ne select ki.
+// 👉 Purani lottery par kabhi entry nahi lagegi.
 // =====================================================
 
 const addUserLotteryEntry = async (req, res) => {
   try {
-    // =====================================================
-    // GET DATA FROM REQUEST
-    // =====================================================
-
     const { configId, number, amount } = req.body;
-
-    // =====================================================
-    // GET USER ID
-    // =====================================================
 
     const userId = getUserId(req);
 
@@ -632,7 +672,7 @@ const addUserLotteryEntry = async (req, res) => {
     }
 
     // =====================================================
-    // FIND USER (DB SE — wallet check ke liye)
+    // FIND USER
     // =====================================================
 
     const isObjectId = /^[a-f\d]{24}$/i.test(String(userId));
@@ -652,7 +692,7 @@ const addUserLotteryEntry = async (req, res) => {
     }
 
     // =====================================================
-    // WALLET BALANCE CHECK (pre-check)
+    // WALLET PRE-CHECK
     // =====================================================
 
     if (Number(user.wallet || 0) < Number(amountValidation.amount)) {
@@ -666,6 +706,7 @@ const addUserLotteryEntry = async (req, res) => {
 
     // =====================================================
     // FIND LOTTERY CONFIG BY CONFIG ID
+    // 👉 SIRF YAHI CONFIG MEIN ENTRY JAYEGI
     // =====================================================
 
     const config = await LotteryConfig.findById(configId);
@@ -692,100 +733,36 @@ const addUserLotteryEntry = async (req, res) => {
     }
 
     // =====================================================
-    // GET DRAW DATE
+    // CHECK SALE OPEN (draw date + time cross)
     // =====================================================
 
-    const getDBDateString = (date) => {
-      if (!date) {
-        return null;
-      }
+    const saleCheck = isSaleOpen(config);
 
-      const d = new Date(date);
-
-      if (Number.isNaN(d.getTime())) {
-        return null;
-      }
-
-      return d.toISOString().slice(0, 10);
-    };
-
-    const dateString = getDBDateString(config.drawDate);
-
-    if (!dateString) {
-      return res.status(500).json({
-        success: false,
-        message: "Invalid draw date in lottery configuration",
-        configId: config._id,
-      });
-    }
-
-    // =====================================================
-    // VALIDATE DRAW TIME
-    // =====================================================
-
-    if (
-      !config.drawTime ||
-      typeof config.drawTime !== "string" ||
-      !/^\d{2}:\d{2}$/.test(config.drawTime)
-    ) {
+    if (!saleCheck.open) {
       return res.status(400).json({
         success: false,
-        message: "Invalid draw time in lottery configuration",
+        message: saleCheck.reason,
         configId: config._id,
-        drawDate: dateString,
-        drawTime: config.drawTime,
+        marketName: config.marketName,
+        drawDate: saleCheck.drawDate,
+        drawTime: saleCheck.drawTime,
       });
     }
 
-    // =====================================================
-    // CREATE DRAW DATETIME (IST)
-    // =====================================================
-
-    const drawDateTime = new Date(
-      `${dateString}T${config.drawTime}:00+05:30`
-    );
-
-    if (Number.isNaN(drawDateTime.getTime())) {
-      return res.status(500).json({
-        success: false,
-        message: "Unable to calculate lottery draw time",
-        configId: config._id,
-      });
-    }
-
-    // =====================================================
-    // CURRENT TIME
-    // =====================================================
-
-    const now = new Date();
+    const { drawDate: dateString, drawTime, drawDateTime } = saleCheck;
 
     console.log("==============================================");
-    console.log("LOTTERY ENTRY");
+    console.log("LOTTERY ENTRY (SINGLE)");
     console.log("CONFIG ID       :", config._id);
     console.log("MARKET NAME     :", config.marketName);
     console.log("DRAW DATE       :", dateString);
-    console.log("DRAW TIME IST   :", config.drawTime);
+    console.log("DRAW TIME IST   :", drawTime);
     console.log("DRAW DATETIME   :", drawDateTime.toISOString());
-    console.log("CURRENT UTC     :", now.toISOString());
+    console.log("CURRENT UTC     :", new Date().toISOString());
     console.log("USER WALLET     :", user.wallet);
     console.log("TICKET AMOUNT   :", amountValidation.amount);
     console.log("NUMBER          :", numberValidation.number);
     console.log("==============================================");
-
-    // =====================================================
-    // CHECK DRAW TIME
-    // =====================================================
-
-    if (now >= drawDateTime) {
-      return res.status(400).json({
-        success: false,
-        message: "Lottery ticket sale time has ended",
-        configId: config._id,
-        marketName: config.marketName,
-        drawDate: dateString,
-        drawTime: config.drawTime,
-      });
-    }
 
     // =====================================================
     // SAFETY FOR USERS ARRAY
@@ -824,44 +801,34 @@ const addUserLotteryEntry = async (req, res) => {
     );
 
     // =====================================================
-    // ADD USER ENTRY
+    // ADD ENTRY INTO THIS CONFIG ONLY
     // =====================================================
 
     config.users.push({
       userId: String(user._id),
-
       entryDate: dateString,
-
       number: numberValidation.number,
-
       amount: amountValidation.amount,
-
       isBuy: true,
-
-      prize: {
-        first: 0,
-        second: 0,
-        third: 0,
-      },
-
+      prize: { first: 0, second: 0, third: 0 },
       prizeType: null,
-
       status: "pending",
     });
 
     // =====================================================
-    // SAVE CONFIG
+    // SAVE CONFIG (with rollback)
     // =====================================================
 
     try {
       await config.save();
     } catch (saveError) {
-      // Config save fail hua toh wallet refund karo
       console.error("Config save failed, refunding wallet:", saveError);
 
       await User.findByIdAndUpdate(user._id, {
         $inc: { wallet: Number(amountValidation.amount) },
       });
+
+      config.users.pop();
 
       return res.status(500).json({
         success: false,
@@ -883,23 +850,17 @@ const addUserLotteryEntry = async (req, res) => {
         type: "Lottery Ticket Purchase",
         amount: amountValidation.amount,
         status: 1,
-        remark: `Lottery ticket purchased. Market: ${config.marketName}, Draw: ${dateString} ${config.drawTime}, Number: ${numberValidation.number}`,
+        remark: `Lottery ticket purchased. Market: ${config.marketName}, Draw: ${dateString} ${drawTime}, Number: ${numberValidation.number}`,
       });
     } catch (historyError) {
       console.error("TransactionHistory create error:", historyError);
-      // Wallet already deduct ho chuka hai, entry save ho chuki hai.
-      // History fail hone pe rollback nahi karenge, sirf log karenge.
     }
 
     // =====================================================
-    // GET NEW ENTRY
+    // RESPONSE
     // =====================================================
 
     const newEntry = config.users[config.users.length - 1];
-
-    // =====================================================
-    // GET ALL ENTRIES OF THIS USER FOR THIS DRAW
-    // =====================================================
 
     const userEntries = config.users.filter(
       (entry) =>
@@ -907,52 +868,29 @@ const addUserLotteryEntry = async (req, res) => {
         String(entry.entryDate) === String(dateString)
     );
 
-    // =====================================================
-    // SUCCESS RESPONSE
-    // =====================================================
-
     return res.status(201).json({
       success: true,
-
       message: "Lottery entry submitted successfully",
-
       data: {
         configId: config._id,
-
         lotteryId: config._id,
-
         marketName: config.marketName,
-
         month: config.month,
-
         year: config.year,
-
         drawDate: dateString,
-
-        drawTime: config.drawTime,
-
+        drawTime: drawTime,
         isActive: config.isActive,
-
         entryDate: dateString,
-
         number: numberValidation.number,
-
         amount: amountValidation.amount,
-
         walletBalance: updatedUser.wallet,
-
         entry: newEntry,
-
         totalTickets: userEntries.length,
-
         allEntries: userEntries,
       },
     });
   } catch (error) {
-    console.error(
-      "Add user lottery entry error:",
-      error
-    );
+    console.error("Add user lottery entry error:", error);
 
     return res.status(500).json({
       success: false,
@@ -965,37 +903,24 @@ const addUserLotteryEntry = async (req, res) => {
 // =====================================================
 // ADD BULK USER LOTTERY ENTRIES
 // USER
-//
 // POST /api/lottery/entry/bulk
 //
 // BODY:
-//
 // {
 //   "configId": "...",
 //   "entries": [
-//     { "number": "123456", "amount": 100 },
-//     { "number": "654321", "amount": 100 }
+//     { "number": "1234567", "amount": 100 },
+//     { "number": "7654321", "amount": 100 }
 //   ]
 // }
 //
-// ✅ Ek hi API call mein multiple tickets
-// ✅ Total amount ek baar mein deduct hoga
-// ✅ Saare entries ek saath insert honge
-// ✅ Koi bhi fail ho toh poora rollback
-// ✅ TransactionHistory mein total amount ki ek entry
+// 👉 Saari entries SIRF usi config mein jayengi jo user ne select ki.
+// 👉 Purani lottery par kabhi entry nahi lagegi.
 // =====================================================
 
 const addBulkUserLotteryEntries = async (req, res) => {
   try {
-    // =====================================================
-    // 1. GET DATA
-    // =====================================================
-
     const { configId, entries } = req.body;
-
-    // =====================================================
-    // 2. GET USER ID
-    // =====================================================
 
     const userId = getUserId(req);
 
@@ -1007,7 +932,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     }
 
     // =====================================================
-    // 3. VALIDATE CONFIG ID
+    // VALIDATE CONFIG ID
     // =====================================================
 
     if (!configId) {
@@ -1025,7 +950,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     }
 
     // =====================================================
-    // 4. VALIDATE ENTRIES ARRAY
+    // VALIDATE ENTRIES ARRAY
     // =====================================================
 
     if (!Array.isArray(entries) || entries.length === 0) {
@@ -1043,7 +968,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     }
 
     // =====================================================
-    // 5. VALIDATE EACH ENTRY
+    // VALIDATE EACH ENTRY
     // =====================================================
 
     const normalizedEntries = [];
@@ -1051,7 +976,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
 
-      // Number validation
       const numberValidation = validateNumber(entry?.number);
 
       if (!numberValidation.valid) {
@@ -1061,7 +985,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
         });
       }
 
-      // Amount validation
       const amountValidation = validateAmount(entry?.amount);
 
       if (!amountValidation.valid) {
@@ -1085,7 +1008,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     }
 
     // =====================================================
-    // 6. CHECK DUPLICATE NUMBERS IN REQUEST
+    // CHECK DUPLICATE NUMBERS IN REQUEST
     // =====================================================
 
     const numbers = normalizedEntries.map((e) => e.number);
@@ -1099,7 +1022,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     }
 
     // =====================================================
-    // 7. CALCULATE TOTAL AMOUNT
+    // CALCULATE TOTAL AMOUNT
     // =====================================================
 
     const totalAmount = normalizedEntries.reduce(
@@ -1115,7 +1038,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     }
 
     // =====================================================
-    // 8. FIND USER
+    // FIND USER
     // =====================================================
 
     const isObjectId = /^[a-f\d]{24}$/i.test(String(userId));
@@ -1135,7 +1058,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     }
 
     // =====================================================
-    // 9. PRE-CHECK WALLET BALANCE
+    // WALLET PRE-CHECK
     // =====================================================
 
     if (Number(user.wallet || 0) < totalAmount) {
@@ -1149,7 +1072,8 @@ const addBulkUserLotteryEntries = async (req, res) => {
     }
 
     // =====================================================
-    // 10. FIND LOTTERY CONFIG
+    // FIND LOTTERY CONFIG BY CONFIG ID
+    // 👉 SIRF YAHI CONFIG MEIN SAARI ENTRIES JAYENGI
     // =====================================================
 
     const config = await LotteryConfig.findById(configId);
@@ -1163,7 +1087,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     }
 
     // =====================================================
-    // 11. CHECK ACTIVE
+    // CHECK ACTIVE
     // =====================================================
 
     if (!config.isActive) {
@@ -1176,62 +1100,23 @@ const addBulkUserLotteryEntries = async (req, res) => {
     }
 
     // =====================================================
-    // 12. GET DRAW DATE STRING
+    // CHECK SALE OPEN
     // =====================================================
 
-    const getDBDateString = (date) => {
-      if (!date) return null;
+    const saleCheck = isSaleOpen(config);
 
-      const d = new Date(date);
-
-      if (Number.isNaN(d.getTime())) return null;
-
-      return d.toISOString().slice(0, 10);
-    };
-
-    const dateString = getDBDateString(config.drawDate);
-
-    if (!dateString) {
-      return res.status(500).json({
-        success: false,
-        message: "Invalid draw date in lottery configuration",
-        configId: config._id,
-      });
-    }
-
-    // =====================================================
-    // 13. VALIDATE DRAW TIME
-    // =====================================================
-
-    if (
-      !config.drawTime ||
-      typeof config.drawTime !== "string" ||
-      !/^\d{2}:\d{2}$/.test(config.drawTime)
-    ) {
+    if (!saleCheck.open) {
       return res.status(400).json({
         success: false,
-        message: "Invalid draw time in lottery configuration",
+        message: saleCheck.reason,
         configId: config._id,
-        drawDate: dateString,
-        drawTime: config.drawTime,
+        marketName: config.marketName,
+        drawDate: saleCheck.drawDate,
+        drawTime: saleCheck.drawTime,
       });
     }
 
-    // =====================================================
-    // 14. CREATE DRAW DATETIME (IST)
-    // =====================================================
-
-    const drawDateTime = new Date(
-      `${dateString}T${config.drawTime}:00+05:30`
-    );
-
-    if (Number.isNaN(drawDateTime.getTime())) {
-      return res.status(500).json({
-        success: false,
-        message: "Unable to calculate lottery draw time",
-        configId: config._id,
-      });
-    }
+    const { drawDate: dateString, drawTime, drawDateTime } = saleCheck;
 
     const now = new Date();
 
@@ -1239,6 +1124,8 @@ const addBulkUserLotteryEntries = async (req, res) => {
     console.log("BULK LOTTERY ENTRY");
     console.log("CONFIG ID       :", config._id);
     console.log("MARKET NAME     :", config.marketName);
+    console.log("DRAW DATE       :", dateString);
+    console.log("DRAW TIME IST   :", drawTime);
     console.log("DRAW DATETIME   :", drawDateTime.toISOString());
     console.log("CURRENT UTC     :", now.toISOString());
     console.log("USER WALLET     :", user.wallet);
@@ -1248,22 +1135,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     console.log("==============================================");
 
     // =====================================================
-    // 15. CHECK DRAW TIME
-    // =====================================================
-
-    if (now >= drawDateTime) {
-      return res.status(400).json({
-        success: false,
-        message: "Lottery ticket sale time has ended",
-        configId: config._id,
-        marketName: config.marketName,
-        drawDate: dateString,
-        drawTime: config.drawTime,
-      });
-    }
-
-    // =====================================================
-    // 16. SAFETY FOR USERS ARRAY
+    // SAFETY FOR USERS ARRAY
     // =====================================================
 
     if (!Array.isArray(config.users)) {
@@ -1271,7 +1143,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     }
 
     // =====================================================
-    // 17. ATOMIC WALLET DEDUCTION (TOTAL AMOUNT)
+    // ATOMIC WALLET DEDUCTION (TOTAL AMOUNT)
     // =====================================================
 
     const updatedUser = await User.findOneAndUpdate(
@@ -1299,7 +1171,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     );
 
     // =====================================================
-    // 18. PUSH ALL ENTRIES
+    // PUSH ALL ENTRIES INTO THIS CONFIG ONLY
     // =====================================================
 
     const startIndex = config.users.length;
@@ -1307,45 +1179,29 @@ const addBulkUserLotteryEntries = async (req, res) => {
     for (const entry of normalizedEntries) {
       config.users.push({
         userId: String(user._id),
-
         entryDate: dateString,
-
         number: entry.number,
-
         amount: entry.amount,
-
         isBuy: true,
-
-        prize: {
-          first: 0,
-          second: 0,
-          third: 0,
-        },
-
+        prize: { first: 0, second: 0, third: 0 },
         prizeType: null,
-
         status: "pending",
       });
     }
 
     // =====================================================
-    // 19. SAVE CONFIG (with rollback on failure)
+    // SAVE CONFIG (with rollback)
     // =====================================================
 
     try {
       await config.save();
     } catch (saveError) {
-      console.error(
-        "Config save failed, refunding wallet:",
-        saveError
-      );
+      console.error("Config save failed, refunding wallet:", saveError);
 
-      // Wallet wapas karo
       await User.findByIdAndUpdate(user._id, {
         $inc: { wallet: totalAmount },
       });
 
-      // Config object se naye entries hata do (memory only)
       config.users.splice(startIndex);
 
       return res.status(500).json({
@@ -1356,7 +1212,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     }
 
     // =====================================================
-    // 20. TRANSACTION HISTORY (SINGLE ENTRY FOR TOTAL)
+    // TRANSACTION HISTORY (SINGLE ENTRY FOR TOTAL)
     // =====================================================
 
     let transaction = null;
@@ -1373,25 +1229,18 @@ const addBulkUserLotteryEntries = async (req, res) => {
         remark:
           `${normalizedEntries.length} lottery ticket(s) purchased. ` +
           `Market: ${config.marketName}, ` +
-          `Draw: ${dateString} ${config.drawTime}, ` +
+          `Draw: ${dateString} ${drawTime}, ` +
           `Numbers: ${numbers.join(", ")}`,
       });
     } catch (historyError) {
-      console.error(
-        "TransactionHistory create error:",
-        historyError
-      );
+      console.error("TransactionHistory create error:", historyError);
     }
 
     // =====================================================
-    // 21. GET NEW ENTRIES
+    // RESPONSE
     // =====================================================
 
     const newEntries = config.users.slice(startIndex);
-
-    // =====================================================
-    // 22. GET ALL ENTRIES OF THIS USER FOR THIS DRAW
-    // =====================================================
 
     const userEntries = config.users.filter(
       (entry) =>
@@ -1399,60 +1248,32 @@ const addBulkUserLotteryEntries = async (req, res) => {
         String(entry.entryDate) === String(dateString)
     );
 
-    // =====================================================
-    // 23. SUCCESS RESPONSE
-    // =====================================================
-
     return res.status(201).json({
       success: true,
-
       message:
         normalizedEntries.length === 1
           ? "Lottery entry submitted successfully"
           : `${normalizedEntries.length} lottery entries submitted successfully`,
-
       data: {
         configId: config._id,
-
         lotteryId: config._id,
-
         marketName: config.marketName,
-
         month: config.month,
-
         year: config.year,
-
         drawDate: dateString,
-
-        drawTime: config.drawTime,
-
+        drawTime: drawTime,
         isActive: config.isActive,
-
-        // 👇 summary
         totalTickets: normalizedEntries.length,
-
         totalAmount,
-
         numbers: numbers,
-
-        // 👇 wallet info
         walletBalance: updatedUser.wallet,
-
-        // 👇 new entries
         entries: newEntries,
-
-        // 👇 all entries of this user for this draw
         allEntries: userEntries,
-
-        // 👇 transaction ref
         transactionId: transaction?._id || null,
       },
     });
   } catch (error) {
-    console.error(
-      "Add bulk user lottery entry error:",
-      error
-    );
+    console.error("Add bulk user lottery entry error:", error);
 
     return res.status(500).json({
       success: false,
@@ -1469,7 +1290,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
 const getMyLotteryEntries = async (req, res) => {
   try {
     const userId = getUserId(req);
-    console.log("STEP 0 userId:", userId);
 
     if (!userId) {
       return res.status(401).json({
@@ -1487,8 +1307,6 @@ const getMyLotteryEntries = async (req, res) => {
       ],
     }).lean();
 
-    console.log("STEP 1 user:", user ? { _id: user._id, uuid: user.uuid } : null);
-
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -1502,15 +1320,12 @@ const getMyLotteryEntries = async (req, res) => {
       String(userId),
     ];
     const uniqueIdentifiers = [...new Set(identifiers)];
-    console.log("STEP 2 identifiers:", uniqueIdentifiers);
 
     const configs = await LotteryConfig.find({
       "users.userId": { $in: uniqueIdentifiers },
     })
       .sort({ drawDate: -1 })
       .lean();
-
-    console.log("STEP 3 configs count:", configs.length);
 
     const entries = [];
 
@@ -1544,8 +1359,6 @@ const getMyLotteryEntries = async (req, res) => {
       }
     }
 
-    console.log("STEP 5 total entries:", entries.length);
-
     entries.sort((a, b) => new Date(b.drawDate) - new Date(a.drawDate));
 
     return res.status(200).json({
@@ -1577,16 +1390,11 @@ const getAllLotteryConfigs = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-
       count: configs.length,
-
       data: configs,
     });
   } catch (error) {
-    console.error(
-      "Get all lottery configs error:",
-      error
-    );
+    console.error("Get all lottery configs error:", error);
 
     return res.status(500).json({
       success: false,
@@ -1606,7 +1414,6 @@ const getActiveLotteryConfig = async (req, res) => {
 
     const configs = await LotteryConfig.find({
       isActive: true,
-
       drawDate: {
         $gte: new Date(
           now.getFullYear(),
@@ -1623,21 +1430,16 @@ const getActiveLotteryConfig = async (req, res) => {
     if (!config) {
       return res.status(404).json({
         success: false,
-        message:
-          "No active lottery configuration found",
+        message: "No active lottery configuration found",
       });
     }
 
     return res.status(200).json({
       success: true,
-
       data: config,
     });
   } catch (error) {
-    console.error(
-      "Get active lottery config error:",
-      error
-    );
+    console.error("Get active lottery config error:", error);
 
     return res.status(500).json({
       success: false,
@@ -1676,10 +1478,7 @@ const getLotteryConfigById = async (req, res) => {
       data: config,
     });
   } catch (error) {
-    console.error(
-      "Get lottery config by ID error:",
-      error
-    );
+    console.error("Get lottery config by ID error:", error);
 
     return res.status(500).json({
       success: false,
@@ -1743,17 +1542,11 @@ const activateLotteryConfig = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-
-      message:
-        "Lottery configuration activated successfully",
-
+      message: "Lottery configuration activated successfully",
       data: config,
     });
   } catch (error) {
-    console.error(
-      "Activate lottery config error:",
-      error
-    );
+    console.error("Activate lottery config error:", error);
 
     return res.status(500).json({
       success: false,
@@ -1794,17 +1587,11 @@ const deactivateLotteryConfig = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-
-      message:
-        "Lottery configuration deactivated successfully",
-
+      message: "Lottery configuration deactivated successfully",
       data: config,
     });
   } catch (error) {
-    console.error(
-      "Deactivate lottery config error:",
-      error
-    );
+    console.error("Deactivate lottery config error:", error);
 
     return res.status(500).json({
       success: false,
@@ -1862,19 +1649,14 @@ const updateEntryStatus = async (req, res) => {
     entry.status = statusValidation.status;
 
     if (statusValidation.status === "win") {
-      if (
-        prizeType &&
-        ["1st", "2nd", "3rd"].includes(prizeType)
-      ) {
+      if (prizeType && ["1st", "2nd", "3rd"].includes(prizeType)) {
         entry.prizeType = prizeType;
       }
 
       if (prize) {
         entry.prize = {
           first: Number(prize.first) || 0,
-
           second: Number(prize.second) || 0,
-
           third: Number(prize.third) || 0,
         };
       }
@@ -1900,16 +1682,11 @@ const updateEntryStatus = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-
       message: "Entry status updated successfully",
-
       data: entry,
     });
   } catch (error) {
-    console.error(
-      "Update entry status error:",
-      error
-    );
+    console.error("Update entry status error:", error);
 
     return res.status(500).json({
       success: false,
@@ -1946,19 +1723,13 @@ const deleteLotteryConfig = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-
-      message:
-        "Lottery configuration deleted successfully",
-
+      message: "Lottery configuration deleted successfully",
       data: {
         id: config._id,
       },
     });
   } catch (error) {
-    console.error(
-      "Delete lottery config error:",
-      error
-    );
+    console.error("Delete lottery config error:", error);
 
     return res.status(500).json({
       success: false,
@@ -1974,24 +1745,14 @@ const deleteLotteryConfig = async (req, res) => {
 
 module.exports = {
   createLotteryConfig,
-
   addUserLotteryEntry,
-
   addBulkUserLotteryEntries,
-
   getMyLotteryEntries,
-
   getAllLotteryConfigs,
-
   getActiveLotteryConfig,
-
   getLotteryConfigById,
-
   activateLotteryConfig,
-
   deactivateLotteryConfig,
-
   updateEntryStatus,
-
   deleteLotteryConfig,
 };

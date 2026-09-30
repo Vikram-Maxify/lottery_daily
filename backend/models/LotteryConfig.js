@@ -20,11 +20,13 @@ const lotteryUserEntrySchema = new mongoose.Schema(
       match: /^\d{4}-\d{2}-\d{2}$/,
     },
 
-    // 6 digit lottery number
+    // 7 character alphanumeric lottery number
+    // Example: 70ab786
     number: {
       type: String,
       required: true,
-      match: /^\d{6}$/,
+      trim: true,
+      match: /^[a-zA-Z0-9]{7}$/,
     },
 
     amount: {
@@ -192,11 +194,8 @@ const lotteryConfigSchema = new mongoose.Schema(
 // =====================================================
 // Same market ke same date par 2 lottery nahi banegi.
 //
-// Example:
-//
 // Delhi Lottery + 2026-09-20 = allowed
 // Delhi Lottery + 2026-09-20 = duplicate ❌
-//
 // Delhi Lottery + 2026-09-21 = allowed
 // =====================================================
 
