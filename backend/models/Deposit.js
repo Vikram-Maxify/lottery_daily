@@ -31,20 +31,31 @@ const depositSchema = new mongoose.Schema(
       index: true,
     },
 
+    // ===============================================
+    // SINGLE LOTTERY NUMBER
+    // Exactly 7 alphanumeric characters
+    // Example: 70ab786
+    // ===============================================
+
     number: {
       type: String,
       default: null,
       validate: {
         validator: function (value) {
           if (value === null || value === "") return true;
-          return /^\d{6}$/.test(String(value));
+
+          return /^[a-zA-Z0-9]{7}$/.test(String(value).trim());
         },
-        message: "Lottery number must be exactly 6 digits",
+        message:
+          "Lottery number must be exactly 7 alphanumeric characters",
       },
     },
 
     // ===============================================
-    // MULTIPLE LOTTERY NUMBERS (for bulk ticket purchase)
+    // MULTIPLE LOTTERY NUMBERS
+    // Exactly 7 alphanumeric characters each
+    // Example:
+    // ["70ab786", "ABC1234", "a1b2c3d"]
     // ===============================================
 
     lotteryNumbers: {
@@ -53,9 +64,13 @@ const depositSchema = new mongoose.Schema(
       validate: {
         validator: function (arr) {
           if (!arr || arr.length === 0) return true;
-          return arr.every((n) => /^\d{6}$/.test(String(n)));
+
+          return arr.every((n) =>
+            /^[a-zA-Z0-9]{7}$/.test(String(n).trim())
+          );
         },
-        message: "All lottery numbers must be exactly 6 digits",
+        message:
+          "All lottery numbers must be exactly 7 alphanumeric characters",
       },
     },
 
@@ -63,9 +78,20 @@ const depositSchema = new mongoose.Schema(
     // USER DETAILS
     // ===============================================
 
-    uid: { type: String, default: "" },
-    phone: { type: String, required: true },
-    username: { type: String, default: "" },
+    uid: {
+      type: String,
+      default: "",
+    },
+
+    phone: {
+      type: String,
+      required: true,
+    },
+
+    username: {
+      type: String,
+      default: "",
+    },
 
     // ===============================================
     // ORDER
@@ -77,9 +103,20 @@ const depositSchema = new mongoose.Schema(
       required: true,
     },
 
-    paymentMethod: { type: String, default: "" },
-    type: { type: String, default: "" },
-    channel: { type: String, default: "" },
+    paymentMethod: {
+      type: String,
+      default: "",
+    },
+
+    type: {
+      type: String,
+      default: "",
+    },
+
+    channel: {
+      type: String,
+      default: "",
+    },
 
     // ===============================================
     // AMOUNT
@@ -91,16 +128,34 @@ const depositSchema = new mongoose.Schema(
       min: 0,
     },
 
-    exchangeRate: { type: Number, default: 0 },
+    exchangeRate: {
+      type: Number,
+      default: 0,
+    },
 
     // ===============================================
     // TRANSACTION
     // ===============================================
 
-    transactionId: { type: String, default: "" },
-    utr: { type: String, default: "" },
-    paymentProof: { type: String, default: "" },
-    paymentUrl: { type: String, default: "" },
+    transactionId: {
+      type: String,
+      default: "",
+    },
+
+    utr: {
+      type: String,
+      default: "",
+    },
+
+    paymentProof: {
+      type: String,
+      default: "",
+    },
+
+    paymentUrl: {
+      type: String,
+      default: "",
+    },
 
     // ===============================================
     // STATUS
@@ -117,14 +172,25 @@ const depositSchema = new mongoose.Schema(
       index: true,
     },
 
-    adminRemark: { type: String, default: "" },
+    adminRemark: {
+      type: String,
+      default: "",
+    },
 
     // ===============================================
     // CANCEL META
     // ===============================================
 
-    cancelReason: { type: String, default: "" },
-    cancelledAt: { type: Date, default: null },
+    cancelReason: {
+      type: String,
+      default: "",
+    },
+
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+
     cancelledBy: {
       type: String,
       enum: ["USER", "ADMIN", "SYSTEM", ""],
@@ -146,16 +212,33 @@ const depositSchema = new mongoose.Schema(
       default: null,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
 // =====================================================
 // INDEX
 // =====================================================
 
-depositSchema.index({ userId: 1, createdAt: -1 });
-depositSchema.index({ configId: 1, entryId: 1 });
-depositSchema.index({ status: 1, createdAt: -1 });
-depositSchema.index({ lotteryProcessed: 1, status: 1 });
+depositSchema.index({
+  userId: 1,
+  createdAt: -1,
+});
+
+depositSchema.index({
+  configId: 1,
+  entryId: 1,
+});
+
+depositSchema.index({
+  status: 1,
+  createdAt: -1,
+});
+
+depositSchema.index({
+  lotteryProcessed: 1,
+  status: 1,
+});
 
 module.exports = mongoose.model("Deposit", depositSchema);

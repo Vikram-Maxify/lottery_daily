@@ -196,8 +196,9 @@ const validateYear = (year) => {
   };
 };
 
+
 // =====================================================
-// VALIDATE 6 DIGIT NUMBER
+// VALIDATE 7 CHARACTER ALPHANUMERIC NUMBER
 // =====================================================
 
 const validateNumber = (number) => {
@@ -208,16 +209,19 @@ const validateNumber = (number) => {
   ) {
     return {
       valid: false,
-      message: "6 digit lottery number is required",
+      message: "7 character alphanumeric lottery number is required",
     };
   }
 
   const value = String(number).trim();
 
-  if (!/^\d{6}$/.test(value)) {
+  // Exactly 7 characters
+  // Only A-Z, a-z and 0-9 allowed
+  if (!/^[a-zA-Z0-9]{7}$/.test(value)) {
     return {
       valid: false,
-      message: "Lottery number must be exactly 6 digits",
+      message:
+        "Lottery number must be exactly 7 alphanumeric characters",
     };
   }
 
