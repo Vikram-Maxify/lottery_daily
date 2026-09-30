@@ -63,8 +63,8 @@ const getWithdrawalStatus = (withdrawal) => {
   return {
     label: "Pending",
     icon: Clock3,
-    wrapper: "border-yellow-200 bg-yellow-50",
-    text: "text-yellow-700",
+    wrapper: "border-[#e6c97c] bg-[#fff9e3]",
+    text: "text-[#a87900]",
   };
 };
 
@@ -167,32 +167,36 @@ const WithdrawHistory = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#EBF0F7] text-[#1b2a5c] px-4 sm:px-5 pt-4 pb-8">
+    <div className="min-h-screen bg-[#eef3fa] text-[#173e70] px-4 sm:px-5 pt-4 pb-8">
       <div className="max-w-[500px] mx-auto">
         {/* ==================================================
             HEADER
         ================================================== */}
-        <div className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#0f1c4d] via-[#1b2a5c] to-[#2c3a72] px-4 py-4 sm:px-5 shadow-[0_12px_30px_rgba(15,28,77,0.25)]">
-          <div className="absolute right-[-70px] top-[-80px] w-[190px] h-[190px] rounded-full bg-white/5 blur-3xl pointer-events-none" />
+        <div className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#3a0b17] via-[#2b0a16] to-[#1a0710] px-4 py-4 sm:px-5 shadow-[0_12px_30px_rgba(58,11,23,0.25)]">
+          <div className="absolute right-[-70px] top-[-80px] w-[190px] h-[190px] rounded-full bg-[#ff8a00]/10 blur-3xl pointer-events-none" />
+
+          <div className="absolute left-[-40px] bottom-[-50px] w-[140px] h-[140px] rounded-full bg-[#ff1744]/10 blur-3xl pointer-events-none" />
 
           <div className="relative flex items-center gap-3">
             {/* BACK */}
             <button
               type="button"
               onClick={() => navigate("/profile")}
-              className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center text-white active:scale-95 transition flex-shrink-0"
+              className="w-11 h-11 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-white active:scale-95 transition flex-shrink-0"
             >
               <ArrowLeft size={21} />
             </button>
 
             {/* ICON */}
-            <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
-              <HandCoins size={25} className="text-[#ffd84a]" />
+            <div className="w-12 h-12 rounded-full bg-white/10 border border-[#ffd34e]/20 flex items-center justify-center flex-shrink-0">
+              <HandCoins size={25} className="text-[#ffd34e]" />
             </div>
 
             {/* TITLE */}
             <div className="flex-1 min-w-0">
-              <p className="text-white/70 text-xs sm:text-sm">My Account</p>
+              <p className="text-white/70 text-xs sm:text-sm">
+                My Account
+              </p>
 
               <h1 className="text-white text-xl sm:text-2xl font-extrabold truncate">
                 Withdrawal History
@@ -208,10 +212,13 @@ const WithdrawHistory = () => {
               type="button"
               onClick={handleRefresh}
               disabled={loading}
-              className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center text-white active:scale-95 transition disabled:opacity-40 flex-shrink-0"
+              className="w-11 h-11 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-white active:scale-95 transition disabled:opacity-40 flex-shrink-0"
             >
               {loading ? (
-                <Loader2 size={19} className="animate-spin" />
+                <Loader2
+                  size={19}
+                  className="animate-spin text-[#ffd34e]"
+                />
               ) : (
                 <RefreshCcw size={19} />
               )}
@@ -224,15 +231,18 @@ const WithdrawHistory = () => {
         ================================================== */}
         <div className="grid grid-cols-2 gap-3 mt-4">
           {/* TOTAL WITHDRAWALS */}
-          <div className="rounded-[18px] border border-white bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,28,77,0.06)]">
+          <div className="rounded-[18px] border border-[#e2e5f0] bg-white px-4 py-4 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-xl bg-[#ed1d43] flex items-center justify-center flex-shrink-0">
                 <HandCoins size={22} className="text-white" />
               </div>
 
               <div>
-                <p className="text-[#5a6082] text-xs">Total Withdrawals</p>
-                <p className="text-[#1b2a5c] text-xl sm:text-2xl font-extrabold mt-0.5">
+                <p className="text-[#4b5563] text-xs">
+                  Total Withdrawals
+                </p>
+
+                <p className="text-[#173e70] text-xl sm:text-2xl font-extrabold mt-0.5">
                   {count}
                 </p>
               </div>
@@ -240,14 +250,17 @@ const WithdrawHistory = () => {
           </div>
 
           {/* HISTORY COUNT */}
-          <div className="rounded-[18px] border border-white bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,28,77,0.06)]">
+          <div className="rounded-[18px] border border-[#e2e5f0] bg-white px-4 py-4 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-[#1b2a5c] flex items-center justify-center flex-shrink-0">
-                <Wallet size={22} className="text-[#ffd84a]" />
+              <div className="w-11 h-11 rounded-xl bg-[#173e70] flex items-center justify-center flex-shrink-0">
+                <Wallet size={22} className="text-[#ffd34e]" />
               </div>
 
               <div>
-                <p className="text-[#5a6082] text-xs">History</p>
+                <p className="text-[#4b5563] text-xs">
+                  History
+                </p>
+
                 <p className="text-[#ed1d43] text-xl sm:text-2xl font-extrabold mt-0.5">
                   {count}
                 </p>
@@ -271,10 +284,11 @@ const WithdrawHistory = () => {
         <div className="mt-5">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="text-[#1b2a5c] text-xl font-extrabold">
+              <h2 className="text-[#173e70] text-xl font-extrabold">
                 Withdrawals
               </h2>
-              <p className="text-[#5a6082] text-xs mt-1">
+
+              <p className="text-[#4b5563] text-xs mt-1">
                 All your withdrawal transactions
               </p>
             </div>
@@ -288,9 +302,13 @@ const WithdrawHistory = () => {
               LOADING
           ================================================== */}
           {loading ? (
-            <div className="rounded-[20px] border border-white bg-white py-16 flex flex-col items-center justify-center shadow-[0_6px_18px_rgba(15,28,77,0.06)]">
-              <Loader2 size={34} className="text-[#ed1d43] animate-spin" />
-              <p className="text-[#5a6082] text-sm mt-4">
+            <div className="rounded-[20px] border border-[#e2e5f0] bg-white py-16 flex flex-col items-center justify-center shadow-sm">
+              <Loader2
+                size={34}
+                className="text-[#ed1d43] animate-spin"
+              />
+
+              <p className="text-[#4b5563] text-sm mt-4">
                 Loading withdrawal history...
               </p>
             </div>
@@ -298,16 +316,19 @@ const WithdrawHistory = () => {
             /* ==================================================
                 EMPTY
             ================================================== */
-            <div className="rounded-[20px] border border-white bg-white py-16 px-5 flex flex-col items-center justify-center text-center shadow-[0_6px_18px_rgba(15,28,77,0.06)]">
-              <div className="w-20 h-20 rounded-full bg-[#ed1d43] flex items-center justify-center">
-                <HandCoins size={35} className="text-white" />
+            <div className="rounded-[20px] border border-[#e2e5f0] bg-white py-16 px-5 flex flex-col items-center justify-center text-center shadow-sm">
+              <div className="w-20 h-20 rounded-full bg-[#fff0f2] border border-[#ed1d43]/20 flex items-center justify-center">
+                <HandCoins
+                  size={35}
+                  className="text-[#ed1d43]"
+                />
               </div>
 
-              <h3 className="text-[#1b2a5c] text-lg font-extrabold mt-5">
+              <h3 className="text-[#173e70] text-lg font-extrabold mt-5">
                 No Withdrawals Yet
               </h3>
 
-              <p className="text-[#5a6082] text-sm mt-2">
+              <p className="text-[#4b5563] text-sm mt-2">
                 Your withdrawal transactions will appear here.
               </p>
             </div>
@@ -324,20 +345,24 @@ const WithdrawHistory = () => {
                     withdrawal?.orderId ||
                     index
                   }
-                  className="rounded-[20px] border border-white bg-white p-4 sm:p-5 shadow-[0_6px_18px_rgba(15,28,77,0.06)]"
+                  className="rounded-[20px] border border-[#e2e5f0] bg-white p-4 sm:p-5 shadow-sm"
                 >
                   {/* TOP */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-12 h-12 rounded-xl bg-[#ed1d43] flex items-center justify-center flex-shrink-0">
-                        <HandCoins size={22} className="text-white" />
+                        <HandCoins
+                          size={22}
+                          className="text-white"
+                        />
                       </div>
 
                       <div className="min-w-0">
                         <p className="text-[#8a97ab] text-[10px] uppercase">
                           Withdrawal ID
                         </p>
-                        <p className="text-[#1b2a5c] text-sm font-bold truncate max-w-[190px] sm:max-w-[350px]">
+
+                        <p className="text-[#173e70] text-sm font-bold truncate max-w-[190px] sm:max-w-[350px]">
                           {getWithdrawalId(withdrawal)}
                         </p>
                       </div>
@@ -347,11 +372,12 @@ const WithdrawHistory = () => {
                   </div>
 
                   {/* AMOUNT */}
-                  <div className="mt-4 rounded-xl border border-[#e2e5f0] bg-[#f6f9fe] px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="mt-4 rounded-xl border border-[#e2e5f0] bg-[#f3f6fb] px-4 py-3 flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[#5a6082] text-xs">
+                      <p className="text-[#4b5563] text-xs">
                         Withdrawal Amount
                       </p>
+
                       <p className="text-[#ed1d43] text-2xl font-extrabold mt-0.5">
                         {formatAmount(withdrawal?.amount)}
                       </p>
@@ -361,7 +387,8 @@ const WithdrawHistory = () => {
                       <p className="text-[#8a97ab] text-[10px]">
                         #{index + 1}
                       </p>
-                      <p className="text-[#5a6082] text-xs mt-1">
+
+                      <p className="text-[#4b5563] text-xs mt-1">
                         {formatDate(withdrawal?.createdAt)}
                       </p>
                     </div>
@@ -377,7 +404,9 @@ const WithdrawHistory = () => {
                     <WithdrawalDetail
                       label="Transaction ID"
                       value={
-                        withdrawal?.transactionId || withdrawal?.txnId || "-"
+                        withdrawal?.transactionId ||
+                        withdrawal?.txnId ||
+                        "-"
                       }
                     />
 
@@ -408,12 +437,16 @@ const WithdrawHistory = () => {
         ================================================== */}
         <div className="mt-7 flex flex-col items-center">
           <div className="w-full flex items-center gap-4">
-            <div className="flex-1 h-px bg-gradient-to-r from-transparent to-[#1b2a5c]/30" />
-            <div className="text-[#1b2a5c] text-xl">✦</div>
-            <div className="flex-1 h-px bg-gradient-to-l from-transparent to-[#1b2a5c]/30" />
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent to-[#173e70]/30" />
+
+            <div className="text-[#ed1d43] text-xl">
+              ✦
+            </div>
+
+            <div className="flex-1 h-px bg-gradient-to-l from-transparent to-[#173e70]/30" />
           </div>
 
-          <p className="text-[#1b2a5c] text-[15px] mt-2 font-medium">
+          <p className="text-[#173e70] text-[15px] mt-2 font-medium">
             Play with trust
           </p>
         </div>
@@ -427,9 +460,12 @@ const WithdrawHistory = () => {
 // ==========================================================
 
 const WithdrawalDetail = ({ label, value }) => (
-  <div className="rounded-xl border border-[#e2e5f0] bg-[#f6f9fe] px-3 py-2.5 min-w-0">
-    <p className="text-[#8a97ab] text-[10px] uppercase">{label}</p>
-    <p className="text-[#1b2a5c] text-xs font-semibold mt-1 truncate">
+  <div className="rounded-xl border border-[#e2e5f0] bg-[#f3f6fb] px-3 py-2.5 min-w-0">
+    <p className="text-[#8a97ab] text-[10px] uppercase">
+      {label}
+    </p>
+
+    <p className="text-[#173e70] text-xs font-semibold mt-1 truncate">
       {value || "-"}
     </p>
   </div>
