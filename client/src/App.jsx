@@ -36,6 +36,8 @@ import FestivalLottery from "./Pages/FestivalLottery";
 import KycVarificationPage from "./Pages/KycVarificationPage";
 import VarifyTicket from "./Pages/VarifyTicket";
 import LeaderboardPage from "./Pages/LeaderboardPage";
+import AdminKycVerification from "./admin/adminPages/AdminKycVerification";
+import AdminFestivalLottery from "./admin/adminPages/AdminFestivalLottery";
 
 // ==========================================================
 // WHATSAPP SUPPORT NUMBER
@@ -128,11 +130,6 @@ function App() {
             />
 
             <Route
-              path="/kyc"
-              element={<KycVarificationPage />}
-            />
-
-            <Route
               path="/verify"
               element={<VarifyTicket />}
             />
@@ -185,7 +182,6 @@ function App() {
           element={<AdminLogin />}
         />
 
-
         {/* =====================================================
             ADMIN PRIVATE ROUTES
             Saare admin routes /admin/* prefix ke saath
@@ -212,6 +208,10 @@ function App() {
               path="/amount"
               element={<Amount />}
             />
+            <Route
+              path="/adminkyc"
+              element={<AdminKycVerification />}
+            />
 
             {/* ADMIN RESULTS */}
             <Route
@@ -223,6 +223,11 @@ function App() {
             <Route
               path="/lottery-config"
               element={<LotteryConfig />}
+            />
+            {/* lottery config */}
+            <Route
+              path="admin/festival_lottery"
+              element={<AdminFestivalLottery />}
             />
 
             {/* Admin Lottery */}

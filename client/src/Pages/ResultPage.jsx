@@ -145,7 +145,7 @@ const ResultPage = () => {
   const copyId = async (id) => {
     try {
       await navigator.clipboard.writeText(id);
-    } catch {}
+    } catch { }
   };
 
   // LOADING
@@ -169,7 +169,7 @@ const ResultPage = () => {
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#eef3fa] text-[#173e70]">
       <div
-        className="relative mx-auto w-full max-w-[450px] overflow-x-hidden"
+        className="relative mx-auto w-[calc(100%-0px)] max-w-[500px] overflow-x-hidden"
         style={{ paddingBottom: BOTTOM_NAV_HEIGHT + 24 }}
       >
         {/* ================= HERO ================= */}
@@ -328,9 +328,8 @@ const LotteryResultTicket = ({ ticket, copyId, marketName }) => {
 
   return (
     <div
-      className={`overflow-hidden rounded-[16px] bg-white shadow-sm ${
-        won ? "border-2 border-[#20a66a]/50" : "border border-[#e2e5f0]"
-      }`}
+      className={`overflow-hidden rounded-[16px] bg-white shadow-sm ${won ? "border-2 border-[#20a66a]/50" : "border border-[#e2e5f0]"
+        }`}
     >
       {/* ---------- Header ---------- */}
       <div className="relative flex items-center justify-between gap-2 overflow-hidden bg-gradient-to-r from-[#3a0b17] via-[#2b0a16] to-[#1a0710] px-3 py-3">
@@ -351,9 +350,8 @@ const LotteryResultTicket = ({ ticket, copyId, marketName }) => {
         </div>
 
         <span
-          className={`relative flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-[12px] font-extrabold text-white ${
-            won ? "bg-[#20a66a]" : "bg-[#ed1d43]"
-          }`}
+          className={`relative flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-[12px] font-extrabold text-white ${won ? "bg-[#20a66a]" : "bg-[#ed1d43]"
+            }`}
         >
           {won ? <CheckCircle2 size={14} strokeWidth={2.5} /> : <XCircle size={14} strokeWidth={2.5} />}
           {ticket.statusText}
@@ -375,16 +373,14 @@ const LotteryResultTicket = ({ ticket, copyId, marketName }) => {
           {ticket.number.map((ch, index) => (
             <div
               key={index}
-              className={`flex h-12 items-center justify-center rounded-xl border-2 ${
-                won
+              className={`flex h-12 items-center justify-center rounded-xl border-2 ${won
                   ? "border-[#20a66a] bg-[#e9f8f0]"
                   : "border-[#c9d3e3] bg-[#f6f9fe]"
-              }`}
+                }`}
             >
               <span
-                className={`text-[19px] font-black ${
-                  won ? "text-[#168052]" : "text-[#173e70]"
-                }`}
+                className={`text-[19px] font-black ${won ? "text-[#168052]" : "text-[#173e70]"
+                  }`}
               >
                 {ch}
               </span>
@@ -394,11 +390,10 @@ const LotteryResultTicket = ({ ticket, copyId, marketName }) => {
 
         {/* ---------- Message ---------- */}
         <div
-          className={`mt-3 rounded-lg px-3 py-2 text-center text-[12.5px] font-semibold ${
-            won
+          className={`mt-3 rounded-lg px-3 py-2 text-center text-[12.5px] font-semibold ${won
               ? "border border-[#bfe8d3] bg-[#e7f8ef] text-[#168052]"
               : "border border-red-200 bg-red-50 text-[#d7193f]"
-          }`}
+            }`}
         >
           {ticket.message}
         </div>

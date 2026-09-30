@@ -172,7 +172,7 @@ const KycVarificationPage = () => {
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#EBF0F7]">
       <div
-        className="mx-auto w-full max-w-[480px]"
+        className="mx-auto w-full max-w-[490px]"
         style={{ paddingBottom: BOTTOM_NAV_HEIGHT + 16 }}
       >
         {/* ================= BANNER ================= */}

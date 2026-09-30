@@ -76,6 +76,13 @@ const AdminLayout = () => {
     if (path === "/amount") {
       return "Amount";
     }
+    if (path === "/adminkyc") {
+      return "AdminKycVerification";
+    }
+
+    if (path === "admin/festival_lottery") {
+      return "Festival lottery";
+    }
 
     if (path === "/settings") {
       return "Settings";
@@ -208,8 +215,17 @@ const AdminLayout = () => {
             className={navClass}
             onClick={closeSidebar}
           >
-            <span className="text-lg">⚙️</span>
+            <span className="text-lg">🛠️</span>
             <span>Config</span>
+          </NavLink>
+
+          <NavLink
+            to="/admin/festival_lottery"
+            className={navClass}
+            onClick={closeSidebar}
+          >
+            <span className="text-lg">🎉</span>
+            <span>Festival Lottery</span>
           </NavLink>
 
           <NavLink
@@ -217,7 +233,7 @@ const AdminLayout = () => {
             className={navClass}
             onClick={closeSidebar}
           >
-            <span className="text-lg">⚙️</span>
+            <span className="text-lg">💳</span>
             <span>Deposit</span>
           </NavLink>
 
@@ -239,6 +255,15 @@ const AdminLayout = () => {
           >
             <span className="text-lg">💰</span>
             <span>Amount</span>
+          </NavLink>
+
+          <NavLink
+            to="/adminkyc"
+            className={navClass}
+            onClick={closeSidebar}
+          >
+            <span className="text-lg">🪪</span>
+            <span>KYC Verification</span>
           </NavLink>
 
           <NavLink
