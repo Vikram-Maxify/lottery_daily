@@ -38,9 +38,9 @@ const navItems = [
 const BottomNavbar = () => {
   return (
     <nav className="fixed bottom-0 left-1/2 z-50 w-full max-w-[490px] -translate-x-1/2 px-0">
-      <div className="relative overflow-hidden rounded-t-[28px] border border-b-0 border-white/10 bg-gradient-to-br from-[#3a0b17] via-[#2b0a16] to-[#1a0710] shadow-[0_-10px_35px_rgba(0,0,0,0.35)]">
+      <div className="relative overflow-hidden rounded-t-[28px] border border-b-0 border-white/10 bg-[#061b3d] shadow-[0_-10px_35px_rgba(0,0,0,0.35)]">
         {/* Top glow line */}
-        <div className="pointer-events-none absolute left-0 right-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[#ffd34e]/80 to-transparent" />
+        <div className="pointer-events-none absolute left-0 right-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[#ff3155]/70 to-transparent" />
 
         <div
           className="
@@ -63,7 +63,7 @@ const BottomNavbar = () => {
                 className={({ isActive }) =>
                   `relative flex h-full min-w-0 flex-col items-center justify-center gap-[5px] transition-all duration-200 ${
                     isActive
-                      ? "text-[#ffd34e]"
+                      ? "text-[#ff3155]"
                       : "text-white/80 hover:text-white"
                   }`
                 }
@@ -81,8 +81,8 @@ const BottomNavbar = () => {
                           w-[34px]
                           -translate-x-1/2
                           rounded-b-full
-                          bg-[#ffd34e]
-                          shadow-[0_0_12px_rgba(255,211,78,0.75)]
+                          bg-[#ff3155]
+                          shadow-[0_0_12px_rgba(255,49,85,0.75)]
                         "
                       />
                     )}
@@ -100,7 +100,7 @@ const BottomNavbar = () => {
                         duration-200
                         ${
                           isActive
-                            ? "bg-[#ffd34e]/10"
+                            ? "bg-[#ff3155]/10"
                             : "bg-transparent"
                         }
                       `}
@@ -124,7 +124,7 @@ const BottomNavbar = () => {
                         sm:text-[10px]
                         ${
                           isActive
-                            ? "font-bold text-[#ffd34e]"
+                            ? "font-bold text-[#ff3155]"
                             : "font-medium text-white/80"
                         }
                       `}
