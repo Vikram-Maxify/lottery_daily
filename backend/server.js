@@ -24,6 +24,7 @@ const depositRoutes = require("./routes/depositRoutes");
 const adminGatewayRoutes = require("./routes/adminGatewayRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const startLotteryDepositCron = require("./cron/lotteryDepositCron");
+const { startLotteryCron } = require("./cron/lotteryCron");
 
 // =======================
 // APP
@@ -105,6 +106,9 @@ app.use("/api", adminRoutes);
 app.use("/api/withdrawal", require("./routes/withdrawalRoutes"));
 
 // startLotteryDepositCron();
+
+    startLotteryCron();
+
 
 // =======================
 // HEALTH CHECK
