@@ -3,15 +3,43 @@ const fs = require("fs");
 const path = require("path");
 
 // =====================================================
+// DELETE LOCAL FILE SAFELY
+// =====================================================
+
+const deleteFile = (filePath) => {
+  try {
+    if (!filePath) return;
+
+    const fullPath = path.join(__dirname, "..", filePath);
+
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+    }
+  } catch (error) {
+    console.error("File delete error:", error.message);
+  }
+};
+
+// =====================================================
 // UPLOAD KYC DOCUMENT
 // POST /api/kyc/upload
+//
+// Aadhaar:
+//   front = Aadhaar front
+//   back  = Aadhaar back
+//
+// PAN:
+//   front = PAN card
 // =====================================================
 
 exports.uploadKycDocument = async (req, res) => {
   try {
     const userId = req.user._id;
-
     const { documentType } = req.body;
+
+    // -------------------------------------------------
+    // Validate document type
+    // -------------------------------------------------
 
     if (!documentType) {
       return res.status(400).json({
@@ -27,23 +55,74 @@ exports.uploadKycDocument = async (req, res) => {
       });
     }
 
-    if (!req.file) {
+    // -------------------------------------------------
+    // Get uploaded files
+    // -------------------------------------------------
+
+    const frontFile = req.files?.front?.[0];
+    const backFile = req.files?.back?.[0];
+
+    // -------------------------------------------------
+    // Front document required for both
+    // -------------------------------------------------
+
+    if (!frontFile) {
       return res.status(400).json({
         success: false,
-        message: "Please upload document",
+        message:
+          documentType === "aadhaar"
+            ? "Please upload Aadhaar front image"
+            : "Please upload PAN card image",
       });
     }
 
+    // -------------------------------------------------
+    // Aadhaar back is also required
+    // -------------------------------------------------
+
+    if (documentType === "aadhaar" && !backFile) {
+      // Delete front because request is incomplete
+      deleteFile(`/uploads/kyc/${frontFile.filename}`);
+
+      return res.status(400).json({
+        success: false,
+        message: "Please upload Aadhaar back image",
+      });
+    }
+
+    // -------------------------------------------------
+    // PAN should NOT have back
+    // -------------------------------------------------
+
+    if (documentType === "pan" && backFile) {
+      deleteFile(`/uploads/kyc/${frontFile.filename}`);
+      deleteFile(`/uploads/kyc/${backFile.filename}`);
+
+      return res.status(400).json({
+        success: false,
+        message: "PAN does not require back document",
+      });
+    }
+
+    // -------------------------------------------------
     // Check existing document
+    // -------------------------------------------------
+
     const existingDocument = await KycDocument.findOne({
       userId,
       documentType,
     });
 
-    // If already approved, don't allow replacement
+    // -------------------------------------------------
+    // Already approved
+    // -------------------------------------------------
+
     if (existingDocument?.status === "approved") {
-      // Remove newly uploaded file
-      fs.unlinkSync(req.file.path);
+      deleteFile(`/uploads/kyc/${frontFile.filename}`);
+
+      if (backFile) {
+        deleteFile(`/uploads/kyc/${backFile.filename}`);
+      }
 
       return res.status(400).json({
         success: false,
@@ -51,43 +130,71 @@ exports.uploadKycDocument = async (req, res) => {
       });
     }
 
-    // Delete old local file if replacing rejected/pending document
-    if (
-      existingDocument &&
-      existingDocument.documentUrl
-    ) {
-      const oldPath = path.join(
-        __dirname,
-        "..",
-        existingDocument.documentUrl
-      );
+    // -------------------------------------------------
+    // New file URLs
+    // -------------------------------------------------
 
-      if (fs.existsSync(oldPath)) {
-        fs.unlinkSync(oldPath);
-      }
-    }
+    const documentUrl = `/uploads/kyc/${frontFile.filename}`;
 
-    const documentUrl = `/uploads/kyc/${req.file.filename}`;
+    const backDocumentUrl = backFile
+      ? `/uploads/kyc/${backFile.filename}`
+      : null;
 
-    let document;
+    // -------------------------------------------------
+    // Delete old files if replacing document
+    // -------------------------------------------------
 
     if (existingDocument) {
+      if (existingDocument.documentUrl) {
+        deleteFile(existingDocument.documentUrl);
+      }
+
+      if (existingDocument.backDocumentUrl) {
+        deleteFile(existingDocument.backDocumentUrl);
+      }
+
+      // -------------------------------------------------
+      // Update existing document
+      // -------------------------------------------------
+
       existingDocument.documentUrl = documentUrl;
       existingDocument.documentPublicId = null;
+
+      existingDocument.backDocumentUrl = backDocumentUrl;
+      existingDocument.backDocumentPublicId = null;
+
       existingDocument.status = "pending";
       existingDocument.rejectionReason = null;
       existingDocument.reviewedBy = null;
       existingDocument.reviewedAt = null;
 
-      document = await existingDocument.save();
-    } else {
-      document = await KycDocument.create({
-        userId,
-        documentType,
-        documentUrl,
-        status: "pending",
+      const document = await existingDocument.save();
+
+      return res.status(200).json({
+        success: true,
+        message: `${documentType.toUpperCase()} uploaded successfully`,
+        data: document,
       });
     }
+
+    // -------------------------------------------------
+    // Create new document
+    // -------------------------------------------------
+
+    const document = await KycDocument.create({
+      userId,
+      documentType,
+
+      // Front
+      documentUrl,
+      documentPublicId: null,
+
+      // Back - Aadhaar only
+      backDocumentUrl,
+      backDocumentPublicId: null,
+
+      status: "pending",
+    });
 
     return res.status(201).json({
       success: true,
@@ -96,6 +203,15 @@ exports.uploadKycDocument = async (req, res) => {
     });
   } catch (error) {
     console.error("Upload KYC Error:", error);
+
+    // Cleanup uploaded files if DB operation fails
+    if (req.files?.front?.[0]) {
+      deleteFile(`/uploads/kyc/${req.files.front[0].filename}`);
+    }
+
+    if (req.files?.back?.[0]) {
+      deleteFile(`/uploads/kyc/${req.files.back[0].filename}`);
+    }
 
     return res.status(500).json({
       success: false,

@@ -11,15 +11,36 @@ const {
 
 const authMiddleware = require("../middleware/authMiddleware");
 
-// Upload Aadhaar/PAN
+// =====================================================
+// UPLOAD KYC
+// Aadhaar:
+//   front = Aadhaar Front
+//   back  = Aadhaar Back
+//
+// PAN:
+//   front = PAN Card
+// =====================================================
+
 router.post(
   "/upload",
   authMiddleware,
-  upload.single("document"),
+  upload.fields([
+    {
+      name: "front",
+      maxCount: 1,
+    },
+    {
+      name: "back",
+      maxCount: 1,
+    },
+  ]),
   uploadKycDocument
 );
 
-// User's KYC
+// =====================================================
+// USER'S KYC
+// =====================================================
+
 router.get(
   "/my",
   authMiddleware,

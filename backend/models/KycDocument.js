@@ -15,12 +15,24 @@ const kycDocumentSchema = new mongoose.Schema(
       required: true,
     },
 
+    // Aadhaar Front / PAN Document
     documentUrl: {
       type: String,
       required: true,
     },
 
     documentPublicId: {
+      type: String,
+      default: null,
+    },
+
+    // Only required for Aadhaar
+    backDocumentUrl: {
+      type: String,
+      default: null,
+    },
+
+    backDocumentPublicId: {
       type: String,
       default: null,
     },
