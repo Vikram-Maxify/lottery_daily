@@ -56,6 +56,8 @@ const QUICK_OPTIONS = [10, 20, 30, 50, 100];
 
 const MAX_TICKETS = 100;
 
+const MIN_TICKETS = 10;
+
 const ALL_DATES_COUNT = 30;
 
 const SLOT_PATTERN = ["D", "D", "L", "L", "D", "D", "D"];
@@ -228,7 +230,11 @@ const FestivalLottery = () => {
   const [selectedDateIndex, setSelectedDateIndex] = useState(0);
   const [showAllDates, setShowAllDates] = useState(false);
   const [showQuick, setShowQuick] = useState(true);
-  const [tickets, setTickets] = useState(() => generateUniqueTickets(10));
+
+  // IMPORTANT:
+  // Initially NO tickets are generated.
+  // Tickets will appear only after Quick Select / manual selection.
+  const [tickets, setTickets] = useState([]);
 
   const [draft, setDraft] = useState("");
   const [manualError, setManualError] = useState("");
@@ -281,8 +287,10 @@ const FestivalLottery = () => {
   // ---------------------------------------------------
 
   const setQuantity = (next) => {
+    // When increasing/selecting from Quick Select,
+    // minimum allowed quantity is 10.
     const quantity = Math.min(
-      Math.max(next, 1),
+      Math.max(next, MIN_TICKETS),
       MAX_TICKETS
     );
 
@@ -301,10 +309,16 @@ const FestivalLottery = () => {
         ),
       ];
     });
+
+    setManualError("");
   };
 
-  const handleClear = () =>
-    setTickets(generateUniqueTickets(1));
+  // Clear means completely empty selection.
+  // User can then use Quick Select again.
+  const handleClear = () => {
+    setTickets([]);
+    setManualError("");
+  };
 
   // ----- draft box handlers -----
 
@@ -457,7 +471,9 @@ const FestivalLottery = () => {
   };
 
   const handleRemoveTicket = (id) => {
-    if (tickets.length === 1) return;
+    // Do not allow selection to go below 10
+    // once tickets have been selected.
+    if (tickets.length <= MIN_TICKETS) return;
 
     setTickets((prev) =>
       prev.filter((t) => t.id !== id)
@@ -465,6 +481,14 @@ const FestivalLottery = () => {
   };
 
   const handlePurchase = () => {
+    // Minimum purchase condition.
+    if (tickets.length < MIN_TICKETS) {
+      setManualError(
+        `Minimum ${MIN_TICKETS} tickets are required to purchase.`
+      );
+      return;
+    }
+
     if (!isKycVerified) {
       navigate("/kyc");
       return;
@@ -517,7 +541,7 @@ const FestivalLottery = () => {
           paddingBottom:
             (festival
               ? BOTTOM_NAV_HEIGHT +
-              PURCHASE_BAR_HEIGHT
+                PURCHASE_BAR_HEIGHT
               : BOTTOM_NAV_HEIGHT) + 16,
         }}
       >
@@ -609,10 +633,11 @@ const FestivalLottery = () => {
                   onClick={() =>
                     setFestivalKey(f.key)
                   }
-                  className={`flex min-h-[72px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-2 text-center shadow-md transition active:scale-95 ${active
-                    ? "bg-gradient-to-b from-[#ff1744] to-[#c9102f] text-white"
-                    : "bg-[#fffaf4] text-[#173e70]"
-                    }`}
+                  className={`flex min-h-[72px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-2 text-center shadow-md transition active:scale-95 ${
+                    active
+                      ? "bg-gradient-to-b from-[#ff1744] to-[#c9102f] text-white"
+                      : "bg-[#fffaf4] text-[#173e70]"
+                  }`}
                 >
                   <Icon size={22} />
 
@@ -698,10 +723,11 @@ const FestivalLottery = () => {
 
                 <ArrowRight
                   size={12}
-                  className={`transition-transform ${showAllDates
-                    ? "rotate-90"
-                    : ""
-                    }`}
+                  className={`transition-transform ${
+                    showAllDates
+                      ? "rotate-90"
+                      : ""
+                  }`}
                 />
               </button>
             </div>
@@ -785,10 +811,11 @@ const FestivalLottery = () => {
                 >
                   <ChevronDown
                     size={18}
-                    className={`transition ${showQuick
-                      ? "rotate-180"
-                      : ""
-                      }`}
+                    className={`transition ${
+                      showQuick
+                        ? "rotate-180"
+                        : ""
+                    }`}
                   />
                 </button>
               </div>
@@ -803,7 +830,9 @@ const FestivalLottery = () => {
                       totalTickets - 1
                     )
                   }
-                  disabled={totalTickets <= 1}
+                  disabled={
+                    totalTickets <= MIN_TICKETS
+                  }
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e9eef7] text-[22px] font-bold text-[#173e70] disabled:opacity-50"
                 >
                   −
@@ -877,12 +906,13 @@ const FestivalLottery = () => {
             {/* ================= TICKET BOX INPUT ================= */}
 
             <div
-              className={`mt-3 rounded-2xl border p-3 ${manualError
-                ? "border-red-300 bg-red-50/50"
-                : TICKET_REGEX.test(draft)
-                  ? "border-emerald-300 bg-emerald-50/40"
-                  : "border-[#dfe5f0] bg-[#f9fbff]"
-                }`}
+              className={`mt-3 rounded-2xl border p-3 ${
+                manualError
+                  ? "border-red-300 bg-red-50/50"
+                  : TICKET_REGEX.test(draft)
+                    ? "border-emerald-300 bg-emerald-50/40"
+                    : "border-[#dfe5f0] bg-[#f9fbff]"
+              }`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0 leading-tight">
@@ -957,12 +987,14 @@ const FestivalLottery = () => {
                       placeholder={slotPlaceholder(
                         i
                       )}
-                      aria-label={`Ticket character ${i + 1
-                        }`}
-                      className={`h-12 w-full min-w-0 rounded-xl border-2 text-center text-[18px] font-extrabold outline-none transition placeholder:font-bold placeholder:text-[#c3c8de] focus:border-[#ed1d43] focus:shadow-[0_0_0_3px_rgba(237,29,67,0.15)] ${filled
-                        ? "border-[#173e70] bg-white text-[#173e70]"
-                        : "border-[#c9d3e3] bg-[#f1f3fa] text-[#173e70]"
-                        }`}
+                      aria-label={`Ticket character ${
+                        i + 1
+                      }`}
+                      className={`h-12 w-full min-w-0 rounded-xl border-2 text-center text-[18px] font-extrabold outline-none transition placeholder:font-bold placeholder:text-[#c3c8de] focus:border-[#ed1d43] focus:shadow-[0_0_0_3px_rgba(237,29,67,0.15)] ${
+                        filled
+                          ? "border-[#173e70] bg-white text-[#173e70]"
+                          : "border-[#c9d3e3] bg-[#f1f3fa] text-[#173e70]"
+                      }`}
                     />
                   );
                 })}
@@ -993,6 +1025,8 @@ const FestivalLottery = () => {
               </button>
             </div>
 
+            {/* ================= BULK / QUICK SELECT ================= */}
+
             {showQuick && (
               <div className="mt-3 grid grid-cols-5 gap-1.5">
                 {QUICK_OPTIONS.map(
@@ -1007,25 +1041,28 @@ const FestivalLottery = () => {
                         onClick={() =>
                           setQuantity(count)
                         }
-                        className={`relative min-w-0 rounded-lg border px-0.5 py-2 text-center transition active:scale-95 ${active
-                          ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
-                          : "border-[#dfe5f0] bg-white"
-                          }`}
+                        className={`relative min-w-0 rounded-lg border px-0.5 py-2 text-center transition active:scale-95 ${
+                          active
+                            ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
+                            : "border-[#dfe5f0] bg-white"
+                        }`}
                       >
                         <p
-                          className={`whitespace-nowrap text-[9.5px] font-semibold ${active
-                            ? "text-[#ed1d43]"
-                            : "text-[#26354b]"
-                            }`}
+                          className={`whitespace-nowrap text-[9.5px] font-semibold ${
+                            active
+                              ? "text-[#ed1d43]"
+                              : "text-[#26354b]"
+                          }`}
                         >
                           {count} Tickets
                         </p>
 
                         <p
-                          className={`whitespace-nowrap text-[12px] font-black ${active
-                            ? "text-[#ed1d43]"
-                            : "text-[#173e70]"
-                            }`}
+                          className={`whitespace-nowrap text-[12px] font-black ${
+                            active
+                              ? "text-[#ed1d43]"
+                              : "text-[#173e70]"
+                          }`}
                         >
                           ₹
                           {(
@@ -1072,54 +1109,65 @@ const FestivalLottery = () => {
             </div>
 
             <div className="mt-3 rounded-xl border border-[#e2e5f0] bg-[#f9fbff] p-2">
-              <div className="grid grid-cols-2 gap-2">
-                {tickets.map(
-                  (ticket, index) => {
-                    const color =
-                      CHIP_COLORS[
-                      index %
-                      CHIP_COLORS.length
-                      ];
+              {tickets.length === 0 ? (
+                <div className="flex min-h-[100px] items-center justify-center px-3 text-center">
+                  <p className="text-[12px] font-medium leading-relaxed text-[#6b7280]">
+                    No tickets selected yet. Use Quick
+                    Select to select your tickets.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {tickets.map(
+                    (ticket, index) => {
+                      const color =
+                        CHIP_COLORS[
+                          index %
+                            CHIP_COLORS.length
+                        ];
 
-                    return (
-                      <div
-                        key={ticket.id}
-                        className={`flex min-w-0 items-center gap-1.5 rounded-lg border-2 border-white px-1.5 py-2 shadow-sm ${color.row}`}
-                      >
-                        <span
-                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-black text-white ${color.badge}`}
+                      return (
+                        <div
+                          key={ticket.id}
+                          className={`flex min-w-0 items-center gap-1.5 rounded-lg border-2 border-white px-1.5 py-2 shadow-sm ${color.row}`}
                         >
-                          {index + 1}
-                        </span>
+                          <span
+                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-black text-white ${color.badge}`}
+                          >
+                            {index + 1}
+                          </span>
 
-                        <span className="min-w-0 flex-1 truncate text-[13px] font-bold tracking-wider text-[#26354b]">
-                          {ticket.code}
-                        </span>
+                          <span className="min-w-0 flex-1 truncate text-[13px] font-bold tracking-wider text-[#26354b]">
+                            {ticket.code}
+                          </span>
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleRemoveTicket(
-                              ticket.id
-                            )
-                          }
-                          disabled={
-                            tickets.length === 1
-                          }
-                          aria-label={`Remove ticket ${index + 1
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleRemoveTicket(
+                                ticket.id
+                              )
+                            }
+                            disabled={
+                              tickets.length <=
+                              MIN_TICKETS
+                            }
+                            aria-label={`Remove ticket ${
+                              index + 1
                             }`}
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#ed1d43] text-white disabled:opacity-40"
-                        >
-                          <X
-                            size={13}
-                            strokeWidth={3}
-                          />
-                        </button>
-                      </div>
-                    );
-                  }
-                )}
-              </div>
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#ed1d43] text-white disabled:opacity-40"
+                          >
+                            <X
+                              size={13}
+                              strokeWidth={3}
+                            />
+                          </button>
+                        </div>
+                      );
+                    }
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#bfe8d3] bg-[#e7f8ef] px-3 py-2">
@@ -1350,13 +1398,15 @@ const DateChip = ({
   <button
     type="button"
     onClick={onClick}
-    className={`relative flex h-[66px] ${fluid
-      ? "w-full"
-      : "w-[64px] shrink-0"
-      } flex-col items-center justify-center rounded-xl border text-center transition active:scale-95 ${active
+    className={`relative flex h-[66px] ${
+      fluid
+        ? "w-full"
+        : "w-[64px] shrink-0"
+    } flex-col items-center justify-center rounded-xl border text-center transition active:scale-95 ${
+      active
         ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
         : "border-transparent bg-[#e3e9f3]"
-      }`}
+    }`}
   >
     {today && (
       <span className="text-[10px] font-semibold text-[#ed1d43]">
@@ -1365,28 +1415,31 @@ const DateChip = ({
     )}
 
     <span
-      className={`whitespace-nowrap text-[13px] font-extrabold ${active
-        ? "text-[#ed1d43]"
-        : "text-[#26354b]"
-        }`}
+      className={`whitespace-nowrap text-[13px] font-extrabold ${
+        active
+          ? "text-[#ed1d43]"
+          : "text-[#26354b]"
+      }`}
     >
       {date.day} {date.month}
     </span>
 
     <span
-      className={`text-[10px] ${active
-        ? "text-[#ed1d43]"
-        : "text-[#6b7280]"
-        }`}
+      className={`text-[10px] ${
+        active
+          ? "text-[#ed1d43]"
+          : "text-[#6b7280]"
+      }`}
     >
       {date.weekday}
     </span>
 
     <span
-      className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${active
-        ? "bg-[#ed1d43]"
-        : "bg-[#20a66a]"
-        }`}
+      className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
+        active
+          ? "bg-[#ed1d43]"
+          : "bg-[#20a66a]"
+      }`}
     />
   </button>
 );

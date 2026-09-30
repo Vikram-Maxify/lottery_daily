@@ -30,7 +30,7 @@ import AdminLottery from "./admin/adminPages/AdminLottery";
 import AdminDeposits from "./admin/adminPages/AdminDeposits";
 import WithdrawalManagement from "./admin/adminPages/WithdrawalManagement";
 import Recharge from "./Pages/Rechagre";
-import Deposit from "./Pages/Deposit";
+// import Deposit from "./Pages/Deposit";
 import WithdrawHistory from "./Pages/WithdrawHistory";
 import FestivalLottery from "./Pages/FestivalLottery";
 import KycVarificationPage from "./Pages/KycVarificationPage";
@@ -156,10 +156,11 @@ function App() {
               element={<WithdrawHistory />}
             />
             <Route path="/recharge" element={<Recharge />} />
-            <Route
+
+            {/* <Route
               path="/deposit"
               element={<Deposit />}
-            />
+            /> */}
 
             {/* Payment Success */}
             <Route
@@ -237,10 +238,10 @@ function App() {
             />
 
             {/* Admin Deposits */}
-            <Route
+            {/* <Route
               path="/admin/deposits"
               element={<AdminDeposits />}
-            />
+            /> */}
 
             {/* Admin Withdrawals */}
             <Route

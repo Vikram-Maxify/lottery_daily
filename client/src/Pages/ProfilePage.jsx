@@ -289,7 +289,7 @@ const ProfilePage = () => {
             onClick={() => navigate("/leaderboard")}
           />
 
-          <ProfileMenu
+          {/* <ProfileMenu
             icon={<Wallet />}
             tone="navy"
             title="My Deposits"
@@ -299,7 +299,7 @@ const ProfilePage = () => {
                 : `View all ${totalDeposits} deposits`
             }
             onClick={handleOpenDeposits}
-          />
+          /> */}
 
           <ProfileMenu
             icon={<HandCoins />}
