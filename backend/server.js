@@ -94,6 +94,8 @@ app.use("/api", depositRoutes);
 // Lottery Config
 app.use("/api/lottery", lotteryConfigRoutes);
 
+app.use('/api/festival',require('./routes/fes_lottery_routes'))
+
 // Lottery Result
 app.use("/api/lottery-result", lotteryResultRoutes);
 
