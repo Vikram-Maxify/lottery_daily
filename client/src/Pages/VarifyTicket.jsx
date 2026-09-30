@@ -118,9 +118,8 @@ const VarifyTicket = () => {
   const handleDownload = () => {
     if (!result) return;
 
-    const text = `Ticket: ${result.ticketNumber}\nStatus: ${
-      result.status === "win" ? "Winner" : "Not a Winner"
-    }\nPrize: ${result.prizeAmount || "-"}`;
+    const text = `Ticket: ${result.ticketNumber}\nStatus: ${result.status === "win" ? "Winner" : "Not a Winner"
+      }\nPrize: ${result.prizeAmount || "-"}`;
 
     const blob = new Blob([text], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
@@ -133,16 +132,15 @@ const VarifyTicket = () => {
 
   const handleShare = async () => {
     if (!result) return;
-    const text = `Ticket ${result.ticketNumber} — ${
-      result.status === "win" ? `Winner! ${result.prizeAmount}` : "Not a winner"
-    }`;
+    const text = `Ticket ${result.ticketNumber} — ${result.status === "win" ? `Winner! ${result.prizeAmount}` : "Not a winner"
+      }`;
     try {
       if (navigator.share) {
         await navigator.share({ title: "Lottery Result", text });
       } else {
         await navigator.clipboard.writeText(text);
       }
-    } catch {}
+    } catch { }
   };
 
   // =====================================================
@@ -173,7 +171,7 @@ const VarifyTicket = () => {
             className="pointer-events-none absolute bottom-[30%] left-[4%] text-[#ffb82e]/70"
           />
 
-          <div className="relative grid grid-cols-[1.1fr_1fr] items-center gap-2 px-3 pb-12 pt-5">
+          <div className="relative grid grid-cols-[1.1fr_1fr] items-center gap-2 px-3 pb-9 pt-5">
             <div className="min-w-0">
               <h1 className="bg-gradient-to-b from-[#fff1a8] to-[#e0a11b] bg-clip-text font-serif text-[30px] font-black leading-[0.95] text-transparent">
                 VERIFY
@@ -352,19 +350,21 @@ const VarifyTicket = () => {
           )}
 
           {/* ================= ACTION GRID ================= */}
-          <section className="grid grid-cols-4 gap-1.5">
+          <section className="grid grid-cols-2 min-[401px]:grid-cols-4 gap-1.5">
             <ActionTile
               icon={<Calendar size={18} />}
               title="View All Results"
               sub="Check past draw results"
               tone="bg-[#ed1d43]"
             />
+
             <ActionTile
               icon={<Trophy size={18} />}
               title="Prize Structure"
               sub="See winning rules"
               tone="bg-[#8c4bd6]"
             />
+
             <ActionTile
               icon={<FileText size={18} />}
               title="Download Result PDF"
@@ -372,6 +372,7 @@ const VarifyTicket = () => {
               tone="bg-[#20a66a]"
               onClick={handleDownload}
             />
+
             <ActionTile
               icon={<Share2 size={18} />}
               title="Share Results"
@@ -416,7 +417,7 @@ const TrustBadge = ({ icon, label, sub }) => (
       {icon}
     </span>
     <span className="text-[9px] font-black leading-tight text-white">{label}</span>
-    <span className="text-[8px] leading-tight text-white/80">{sub}</span>
+    <span className="text-[9px] leading-tight text-white/80">{sub}</span>
   </div>
 );
 
@@ -424,11 +425,10 @@ const TabButton = ({ active, onClick, icon, label }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-1.5 py-3 text-center text-[11px] font-extrabold leading-tight shadow-md transition active:scale-[0.98] ${
-      active
-        ? "bg-gradient-to-b from-[#ff1744] to-[#c9102f] text-white"
-        : "bg-[#fffaf4] text-[#173e70]"
-    }`}
+    className={`flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-1.5 py-3 text-center text-[11px] font-extrabold leading-tight shadow-md transition active:scale-[0.98] ${active
+      ? "bg-gradient-to-b from-[#ff1744] to-[#c9102f] text-white"
+      : "bg-[#fffaf4] text-[#173e70]"
+      }`}
   >
     <span className={`shrink-0 ${active ? "text-[#ffd34e]" : "text-[#ed1d43]"}`}>
       {icon}
@@ -468,11 +468,10 @@ const ResultCard = ({ result, onDownload, onShare }) => {
 
   return (
     <section
-      className={`overflow-hidden rounded-[16px] shadow-sm ${
-        isWin
-          ? "border-2 border-[#20a66a]/50 bg-gradient-to-br from-[#e9f8f0] via-white to-[#f2fff7]"
-          : "border-2 border-[#ed1d43]/30 bg-gradient-to-br from-[#fff0f2] via-white to-[#fff5f6]"
-      }`}
+      className={`overflow-hidden rounded-[16px] shadow-sm ${isWin
+        ? "border-2 border-[#20a66a]/50 bg-gradient-to-br from-[#e9f8f0] via-white to-[#f2fff7]"
+        : "border-2 border-[#ed1d43]/30 bg-gradient-to-br from-[#fff0f2] via-white to-[#fff5f6]"
+        }`}
     >
       {isWin ? <WinnerContent result={result} /> : <LoserContent result={result} />}
 
@@ -578,9 +577,8 @@ const LoserContent = ({ result }) => (
 
 const TicketStub = ({ number, faded = false }) => (
   <div
-    className={`relative w-[104px] shrink-0 -rotate-3 rounded-lg border-2 bg-gradient-to-br from-[#fff8e6] to-[#ffe9b8] p-2 shadow-md ${
-      faded ? "border-[#e5c8a4]" : "border-[#e0b24a]"
-    }`}
+    className={`relative w-[104px] shrink-0 -rotate-3 rounded-lg border-2 bg-gradient-to-br from-[#fff8e6] to-[#ffe9b8] p-2 shadow-md ${faded ? "border-[#e5c8a4]" : "border-[#e0b24a]"
+      }`}
   >
     <p className="text-[16px] font-black leading-none text-[#d7193f]">DEAR</p>
     <p className="text-[7.5px] font-bold text-[#153c78]">DAILY LOTTERY</p>
@@ -608,9 +606,8 @@ const MetaItem = ({ label, value, sub, highlight = false }) => (
       {label}
     </p>
     <p
-      className={`mt-0.5 break-words text-[10px] font-extrabold leading-tight ${
-        highlight ? "text-[#d7193f]" : "text-[#173e70]"
-      }`}
+      className={`mt-0.5 break-words text-[10px] font-extrabold leading-tight ${highlight ? "text-[#d7193f]" : "text-[#173e70]"
+        }`}
     >
       {value}
     </p>

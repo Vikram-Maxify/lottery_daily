@@ -723,7 +723,7 @@ const HomeLotterySection = () => {
             TOP WINNERS (INFINITE SCROLL)
         ===================================================== */}
 
-        <section className="px-2.5 pt-3">
+        <section className="px-2.5 pt-2">
 
           <div className="overflow-hidden rounded-2xl border border-[#ff3155]/40 bg-gradient-to-br from-[#5d1028] via-[#461025] to-[#27102a] py-3 shadow-[0_10px_28px_rgba(0,0,0,0.25)]">
 

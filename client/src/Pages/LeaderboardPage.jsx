@@ -38,34 +38,38 @@ const TICKET_TABS = [
 ];
 
 const PRIZE_TIERS = [
-  { no: 1, rank: "1st Prize", amount: "₹1 CRORE", ticket: "10F 68057", tickets: "10 Tickets", badge: "bg-[#ffd34e] text-[#7a0f1e]" },
-  { no: 2, rank: "2nd Prize", amount: "₹30 LAKH", ticket: "11F 68057", tickets: "10 Tickets", badge: "bg-[#2e7dd7] text-white" },
-  { no: 3, rank: "3rd Prize", amount: "₹20,000", ticket: "99F 68057", tickets: "10 Tickets", badge: "bg-[#f08a25] text-white" },
-  { no: 4, rank: "4th Prize", amount: "₹20,000", ticket: "10F6XXXX", tickets: "10 Tickets", badge: "bg-[#20a66a] text-white" },
-  { no: 5, rank: "5th Prize", amount: "₹900", ticket: "10AXXXXX", tickets: "10 Tickets", badge: "bg-[#8c4bd6] text-white" },
+  { no: 1, rank: "1st Prize", amount: "₹1 CRORE", ticket: "28FC200", tickets: "10 Tickets", badge: "bg-[#ffd34e] text-[#7a0f1e]" },
+  { no: 2, rank: "2nd Prize", amount: "₹30 LAKH", ticket: "28FC201", tickets: "10 Tickets", badge: "bg-[#2e7dd7] text-white" },
+  { no: 3, rank: "3rd Prize", amount: "₹20,000", ticket: "28FC202", tickets: "10 Tickets", badge: "bg-[#f08a25] text-white" },
+  { no: 4, rank: "4th Prize", amount: "₹20,000", ticket: "28FC2XX", tickets: "10 Tickets", badge: "bg-[#20a66a] text-white" },
+  { no: 5, rank: "5th Prize", amount: "₹900", ticket: "28FCXXX", tickets: "10 Tickets", badge: "bg-[#8c4bd6] text-white" },
 ];
 
 const TOP_WINNERS = [
-  { name: "Rakesh Kumar", location: "West Bengal", prize: "₹1,00,00,000", ticket: "10F 68057" },
-  { name: "Sunita Devi", location: "Assam", prize: "₹1,00,00,000", ticket: "10F 68057" },
-  { name: "Md. Irfan", location: "Kolkata", prize: "₹1,00,00,000", ticket: "10F 68057" },
-  { name: "Suresh Patel", location: "Guwahati", prize: "₹1,00,00,000", ticket: "10F 68057" },
+  { name: "Rakesh Kumar", location: "West Bengal", prize: "₹1,00,00,000", ticket: "28FC200" },
+  { name: "Sunita Devi", location: "Assam", prize: "₹1,00,00,000", ticket: "28FC201" },
+  { name: "Md. Irfan", location: "Kolkata", prize: "₹1,00,00,000", ticket: "28FC202" },
+  { name: "Suresh Patel", location: "Guwahati", prize: "₹1,00,00,000", ticket: "28FC203" },
 ];
 
 const PAST_DRAWS = [
-  { no: 1, date: "26 Sep 2026", day: "Sat", time: "8:00 PM", drawNumber: "DL-6824", ticket: "10F 68057" },
-  { no: 2, date: "25 Sep 2026", day: "Fri", time: "8:00 PM", drawNumber: "DL-6823", ticket: "77C 34682" },
-  { no: 3, date: "24 Sep 2026", day: "Thu", time: "8:00 PM", drawNumber: "DL-6822", ticket: "32B 90814" },
-  { no: 4, date: "23 Sep 2026", day: "Wed", time: "8:00 PM", drawNumber: "DL-6821", ticket: "19A 55237" },
-  { no: 5, date: "22 Sep 2026", day: "Tue", time: "8:00 PM", drawNumber: "DL-6820", ticket: "91D 44732" },
+  { no: 1, date: "26 Sep 2026", day: "Sat", time: "8:00 PM", drawNumber: "DL-6824", ticket: "28FC200" },
+  { no: 2, date: "25 Sep 2026", day: "Fri", time: "8:00 PM", drawNumber: "DL-6823", ticket: "77CC682" },
+  { no: 3, date: "24 Sep 2026", day: "Thu", time: "8:00 PM", drawNumber: "DL-6822", ticket: "32BB814" },
+  { no: 4, date: "23 Sep 2026", day: "Wed", time: "8:00 PM", drawNumber: "DL-6821", ticket: "19AA237" },
+  { no: 5, date: "22 Sep 2026", day: "Tue", time: "8:00 PM", drawNumber: "DL-6820", ticket: "91DD732" },
 ];
 
 const WINNING_RULES = [
-  { no: 1, condition: "All digits/characters match", example: "10F68057", prize: "₹50 Lakh", total: "₹5 Crore", badge: "bg-[#ed1d43]", row: "bg-[#ffe4e8]" },
-  { no: 2, condition: "Alphabet does not match but all remaining digits match", example: "11F68057", prize: "₹30 Lakh", total: "₹3 Crore", badge: "bg-[#2e7dd7]", row: "bg-[#e3f0ff]" },
-  { no: 3, condition: "All numbers after the alphabet match", example: "99F68057", prize: "₹20,000", total: "₹2 Lakh", badge: "bg-[#f08a25]", row: "bg-[#ffefdc]" },
-  { no: 4, condition: "Left-most 4 digits match", example: "10F6XXXX", prize: "₹20,000", total: "₹2 Lakh", badge: "bg-[#20a66a]", row: "bg-[#dcf8ea]" },
-  { no: 5, condition: "Left-most 3 digits match", example: "10AXXXXX", prize: "₹900", total: "₹9,000", badge: "bg-[#8c4bd6]", row: "bg-[#f0e4ff]" },
+  { no: 1, condition: "All digits/characters match", example: "28FC200", prize: "₹50 Lakh", total: "₹5 Crore", badge: "bg-[#ed1d43]", row: "bg-[#ffe4e8]" },
+
+  { no: 2, condition: "Alphabet does not match but all remaining digits match", example: "28FC201", prize: "₹30 Lakh", total: "₹3 Crore", badge: "bg-[#2e7dd7]", row: "bg-[#e3f0ff]" },
+
+  { no: 3, condition: "All numbers after the alphabet match", example: "28FC202", prize: "₹20,000", total: "₹2 Lakh", badge: "bg-[#f08a25]", row: "bg-[#ffefdc]" },
+
+  { no: 4, condition: "Left-most 4 digits match", example: "28FC2XX", prize: "₹20,000", total: "₹2 Lakh", badge: "bg-[#20a66a]", row: "bg-[#dcf8ea]" },
+
+  { no: 5, condition: "Left-most 3 digits match", example: "28FCXXX", prize: "₹900", total: "₹9,000", badge: "bg-[#8c4bd6]", row: "bg-[#f0e4ff]" },
 ];
 
 // =====================================================

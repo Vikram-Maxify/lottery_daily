@@ -971,7 +971,7 @@ const BuyTicket = () => {
 
       {/* ================= PURCHASE BAR (above bottom navbar) ================= */}
       <div
-        className="fixed inset-x-3 z-[70] mx-auto w-auto max-w-[450px] rounded-lg bg-[#0f1c4d] px-3 py-3 shadow-[0_-4px_14px_rgba(0,0,0,0.22)]"
+        className="fixed inset-x-3 z-[100] mx-auto w-auto max-w-[450px] rounded-lg bg-[#0f1c4d] px-3 py-3 shadow-[0_-4px_14px_rgba(0,0,0,0.22)] mb-1 sm:mb-2"
         style={{ bottom: BOTTOM_NAV_HEIGHT + 8 }}
       >
         {displayError && (

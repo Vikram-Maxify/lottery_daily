@@ -1288,12 +1288,12 @@ const FestivalLottery = () => {
 
       {festival && (
         <div
-          className="fixed left-1/2 z-[70] mb-3 w-[calc(100%-16px)] max-w-[450px] -translate-x-1/2 overflow-hidden rounded-lg border-t border-[#ff3155]/20 bg-gradient-to-b from-[#2b0a16] to-[#160610] shadow-[0_-4px_14px_rgba(0,0,0,0.4)]"
+          className="fixed left-1/2 z-[70] mb-[11px] sm:mb-4 w-[calc(100%-16px)] max-w-[450px] -translate-x-1/2 overflow-hidden rounded-lg border-t border-[#ff3155]/20 bg-gradient-to-b from-[#2b0a16] to-[#160610] shadow-[0_-4px_14px_rgba(0,0,0,0.4)]"
           style={{
             bottom: BOTTOM_NAV_HEIGHT + 8,
           }}
         >
-          <div className="flex w-full items-center gap-2 px-3 py-3 sm:gap-3 sm:px-4">
+          <div className="flex w-full items-center gap-2 px-3 py-3 sm:gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-medium leading-none text-white/90 sm:text-[11px]">
                 Total Amount
