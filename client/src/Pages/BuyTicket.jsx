@@ -62,11 +62,36 @@ const BADGES = ["bg-red-500", "bg-sky-500", "bg-orange-400", "bg-emerald-500", "
 const ROW_TINTS = ["bg-red-50", "bg-sky-50", "bg-orange-50", "bg-emerald-50", "bg-violet-50"];
 
 const RULES = [
-  { cond: "All digits/characters match", ex: "7A 45823", per: "₹10 Lakh", total: "₹1 Crore" },
-  { cond: "Alphabet does not match but all remaining digits match", ex: "1A 45823", per: "₹5 Lakh", total: "₹50 Lakh" },
-  { cond: "All numbers after the alphabet match", ex: "9A 45823", per: "₹50,000", total: "₹5 Lakh" },
-  { cond: "Left-most 4 digits match", ex: "7A 45XXX", per: "₹10,000", total: "₹1 Lakh" },
-  { cond: "Left-most 3 digits match", ex: "7A 4XXXX", per: "₹2,000", total: "₹20,000" },
+  {
+    cond: "All digits/characters match",
+    ex: "10AB123",
+    per: "₹10 Lakh",
+    total: "₹1 Crore",
+  },
+  {
+    cond: "Alphabet does not match but all remaining digits match",
+    ex: "10XY123",
+    per: "₹5 Lakh",
+    total: "₹50 Lakh",
+  },
+  {
+    cond: "All numbers after the alphabet match",
+    ex: "99AB123",
+    per: "₹50,000",
+    total: "₹5 Lakh",
+  },
+  {
+    cond: "Left-most 4 digits match",
+    ex: "10AB670",
+    per: "₹10,000",
+    total: "₹1 Lakh",
+  },
+  {
+    cond: "Left-most 3 digits match",
+    ex: "10AP912",
+    per: "₹2,000",
+    total: "₹20,000",
+  },
 ];
 
 // =====================================================
@@ -886,7 +911,7 @@ const BuyTicket = () => {
                   Example Winning Number
                 </span>
                 <span className="whitespace-nowrap rounded-md bg-white px-2 py-1 text-[15px] font-black text-[#0b1a4a] min-[360px]:text-[17px]">
-                  <span className="text-red-600">7A</span> 45823
+                  <span className="text-red-600">70AB</span>823
                 </span>
               </div>
 
@@ -946,7 +971,7 @@ const BuyTicket = () => {
 
       {/* ================= PURCHASE BAR (above bottom navbar) ================= */}
       <div
-        className="fixed inset-x-3 z-[70] mx-auto w-auto max-w-[400px] rounded-xl bg-[#0f1c4d] px-3 py-3 shadow-[0_-4px_14px_rgba(0,0,0,0.22)]"
+        className="fixed inset-x-3 z-[70] mx-auto w-auto max-w-[450px] rounded-lg bg-[#0f1c4d] px-3 py-3 shadow-[0_-4px_14px_rgba(0,0,0,0.22)]"
         style={{ bottom: BOTTOM_NAV_HEIGHT + 8 }}
       >
         {displayError && (
@@ -965,7 +990,7 @@ const BuyTicket = () => {
 
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[10px] leading-none text-white/80">Total Amount</p>
+            <p className="text-[12px] leading-none text-white/80">Total Amount</p>
             <p className="mt-1 whitespace-nowrap text-[19px] font-extrabold leading-none text-emerald-400">
               ₹{totalTicketPrice}/-
             </p>

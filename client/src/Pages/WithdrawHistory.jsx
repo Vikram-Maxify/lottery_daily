@@ -168,7 +168,7 @@ const WithdrawHistory = () => {
 
   return (
     <div className="min-h-screen bg-[#EBF0F7] text-[#1b2a5c] px-4 sm:px-5 pt-4 pb-8">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-[500px] mx-auto">
         {/* ==================================================
             HEADER
         ================================================== */}

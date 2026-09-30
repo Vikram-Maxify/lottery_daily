@@ -166,7 +166,7 @@ export default function QwackPayDeposit() {
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#eef3fa] text-[#173e70]">
       <div
-        className="relative mx-auto w-full max-w-[450px] overflow-x-hidden"
+        className="relative mx-auto w-full max-w-[500px] overflow-x-hidden"
         style={{ paddingBottom: BOTTOM_NAV_HEIGHT + 24 }}
       >
         {/* ================= HERO ================= */}

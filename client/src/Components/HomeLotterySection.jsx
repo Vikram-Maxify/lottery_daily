@@ -249,7 +249,7 @@ const RULES = [
   {
     n: "1",
     condition: "All digits/characters match",
-    example: "10F68057",
+    example: "10AB123",
     prize: "₹50 Lakh",
     total: "₹5 Crore",
     badge: "bg-[#ed1d43]",
@@ -258,7 +258,7 @@ const RULES = [
   {
     n: "2",
     condition: "Alphabet does not match but all remaining digits match",
-    example: "11F68057",
+    example: "10XY123",
     prize: "₹30 Lakh",
     total: "₹3 Crore",
     badge: "bg-[#2e7dd7]",
@@ -267,7 +267,7 @@ const RULES = [
   {
     n: "3",
     condition: "All numbers after the alphabet match",
-    example: "99F68057",
+    example: "99AB123",
     prize: "₹20,000",
     total: "₹2 Lakh",
     badge: "bg-[#f08a25]",
@@ -276,7 +276,7 @@ const RULES = [
   {
     n: "4",
     condition: "Left-most 4 digits match",
-    example: "10F6XXXX",
+    example: "10AB786",
     prize: "₹20,000",
     total: "₹2 Lakh",
     badge: "bg-[#20a66a]",
@@ -285,7 +285,7 @@ const RULES = [
   {
     n: "5",
     condition: "Left-most 3 digits match",
-    example: "10AXXXXX",
+    example: "10AZ543",
     prize: "₹900",
     total: "₹9,000",
     badge: "bg-[#8c4bd6]",
@@ -911,7 +911,7 @@ const HomeLotterySection = () => {
             WINNING RULES
         ===================================================== */}
 
-        <section className="px-2.5 pt-3">
+        <section className="px-2.5 pt-3 pb-24">
 
           <div className="overflow-hidden rounded-[20px] bg-[#fffaf4] shadow-[0_12px_35px_rgba(0,0,0,0.2)]">
 
@@ -919,7 +919,7 @@ const HomeLotterySection = () => {
 
               <div className="min-w-0">
 
-                <h2 className="font-serif text-[27px] font-black leading-none tracking-tight text-[#173e70]">
+                <h2 className="font-serif text-[22px] font-black leading-none tracking-tight text-[#173e70]">
                   Winning{" "}
                   <span className="text-[#d7193f]">
                     Rules
@@ -939,9 +939,9 @@ const HomeLotterySection = () => {
                 </p>
 
                 <p className="px-2 py-1.5 text-[17px] font-black tracking-[2px] text-[#d7193f]">
-                  10F{" "}
+                  10FD{" "}
                   <span className="text-[#173e70]">
-                    68057
+                    8057
                   </span>
                 </p>
 
@@ -1016,7 +1016,7 @@ const HomeLotterySection = () => {
             BOTTOM NAV
         ===================================================== */}
 
-        <nav className="fixed bottom-0 left-1/2 z-50 w-full max-w-[500px] -translate-x-1/2 border-t border-white/10 bg-[#061b3d]/95 backdrop-blur">
+        <nav className="fixed bottom-0 left-1/2 z-50 w-full max-w-[500px] -translate-x-1/2 border-t border-white/10 backdrop-blur">
 
           <div className="grid h-[68px] grid-cols-5">
 

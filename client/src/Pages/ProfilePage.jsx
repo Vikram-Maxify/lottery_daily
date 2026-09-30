@@ -160,7 +160,7 @@ const ProfilePage = () => {
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#eef3fa] text-[#173e70]">
       <div
-        className="relative mx-auto w-full max-w-[450px] overflow-x-hidden"
+        className="relative mx-auto w-full max-w-[500px] overflow-x-hidden"
         style={{ paddingBottom: BOTTOM_NAV_HEIGHT + 24 }}
       >
         {/* ================= HERO / PROFILE ================= */}
@@ -361,7 +361,7 @@ const ProfilePage = () => {
         </section>
 
         {/* ================= FOOTER ================= */}
-        <div className="mt-6 flex flex-col items-center px-6">
+        <div className="mt-3 flex flex-col items-center px-6 mb-2">
           <div className="flex w-full items-center gap-3">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent to-[#173e70]/30" />
             <ShieldCheck size={22} className="text-[#173e70]" />
