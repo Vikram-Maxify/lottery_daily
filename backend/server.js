@@ -103,6 +103,15 @@ app.use("/api", adminGatewayRoutes);
 // Admin
 app.use("/api", adminRoutes);
 
+const kycRoutes = require("./routes/kycRoutes");
+const adminKycRoutes = require("./routes/adminKycRoutes");
+
+app.use("/uploads", express.static("uploads"));
+
+app.use("/api/kyc", kycRoutes);
+
+app.use("/api/admin/kyc", adminKycRoutes);
+
 app.use("/api/withdrawal", require("./routes/withdrawalRoutes"));
 
 // startLotteryDepositCron();
