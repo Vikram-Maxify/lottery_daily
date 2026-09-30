@@ -34,7 +34,7 @@ const deleteFile = (filePath) => {
 
 exports.uploadKycDocument = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user.id;
     const { documentType } = req.body;
 
     // -------------------------------------------------
@@ -227,14 +227,17 @@ exports.uploadKycDocument = async (req, res) => {
 
 exports.getMyKyc = async (req, res) => {
   try {
+    const userId = req.user.id;
+
     const documents = await KycDocument.find({
-      userId: req.user._id,
+      userId,
     }).sort({
       createdAt: -1,
     });
 
     return res.status(200).json({
       success: true,
+      count: documents.length,
       data: documents,
     });
   } catch (error) {

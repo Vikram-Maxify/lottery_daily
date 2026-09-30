@@ -41,22 +41,91 @@ export const getMyKyc = createAsyncThunk(
 // ==========================================================
 // UPLOAD KYC DOCUMENT
 // POST /api/kyc/upload
+//
+// Aadhaar:
+//   documentType = aadhaar
+//   front = Aadhaar Front
+//   back  = Aadhaar Back
+//
+// PAN:
+//   documentType = pan
+//   front = PAN Card
 // ==========================================================
 
 export const uploadKycDocument = createAsyncThunk(
     "kyc/uploadKycDocument",
-    async ({ documentType, document }, { rejectWithValue }) => {
+    async (
+        { documentType, front, back = null },
+        { rejectWithValue }
+    ) => {
         try {
+            // ----------------------------------------------
+            // Validate document type
+            // ----------------------------------------------
+
+            if (!["aadhaar", "pan"].includes(documentType)) {
+                return rejectWithValue("Invalid document type");
+            }
+
+            // ----------------------------------------------
+            // Front is required for both
+            // ----------------------------------------------
+
+            if (!front) {
+                return rejectWithValue(
+                    documentType === "aadhaar"
+                        ? "Please upload Aadhaar front image"
+                        : "Please upload PAN card image"
+                );
+            }
+
+            // ----------------------------------------------
+            // Aadhaar back is required
+            // ----------------------------------------------
+
+            if (documentType === "aadhaar" && !back) {
+                return rejectWithValue(
+                    "Please upload Aadhaar back image"
+                );
+            }
+
+            // ----------------------------------------------
+            // PAN should not have back
+            // ----------------------------------------------
+
+            if (documentType === "pan" && back) {
+                return rejectWithValue(
+                    "PAN does not require back document"
+                );
+            }
+
+            // ----------------------------------------------
+            // Create FormData
+            // ----------------------------------------------
+
             const formData = new FormData();
 
             formData.append("documentType", documentType);
-            formData.append("document", document);
+            formData.append("front", front);
 
-            const response = await api.post("/kyc/upload", formData, {
-                headers: {
-                    "Content-Type": "multipart/form-data",
-                },
-            });
+            // Aadhaar only
+            if (documentType === "aadhaar" && back) {
+                formData.append("back", back);
+            }
+
+            // ----------------------------------------------
+            // API request
+            // ----------------------------------------------
+
+            const response = await api.post(
+                "/kyc/upload",
+                formData,
+                {
+                    headers: {
+                        "Content-Type": "multipart/form-data",
+                    },
+                }
+            );
 
             return response.data;
         } catch (error) {
@@ -79,16 +148,28 @@ const kycSlice = createSlice({
     initialState,
 
     reducers: {
+        // --------------------------------------------------
+        // CLEAR ERRORS
+        // --------------------------------------------------
+
         clearKycError: (state) => {
             state.error = null;
             state.uploadError = null;
         },
+
+        // --------------------------------------------------
+        // CLEAR SUCCESS
+        // --------------------------------------------------
 
         clearKycSuccess: (state) => {
             state.success = false;
             state.uploadSuccess = false;
             state.message = "";
         },
+
+        // --------------------------------------------------
+        // CLEAR UPLOAD STATE
+        // --------------------------------------------------
 
         clearUploadState: (state) => {
             state.uploadLoading = false;
@@ -97,13 +178,17 @@ const kycSlice = createSlice({
             state.message = "";
         },
 
+        // --------------------------------------------------
+        // RESET KYC
+        // --------------------------------------------------
+
         resetKycState: () => initialState,
     },
 
     extraReducers: (builder) => {
-        // ======================================================
+        // ==================================================
         // GET MY KYC
-        // ======================================================
+        // ==================================================
 
         builder
             .addCase(getMyKyc.pending, (state) => {
@@ -125,12 +210,13 @@ const kycSlice = createSlice({
                 state.success = false;
 
                 state.error =
-                    action.payload || "Failed to fetch KYC details";
+                    action.payload ||
+                    "Failed to fetch KYC details";
             });
 
-        // ======================================================
+        // ==================================================
         // UPLOAD KYC DOCUMENT
-        // ======================================================
+        // ==================================================
 
         builder
             .addCase(uploadKycDocument.pending, (state) => {
@@ -149,17 +235,23 @@ const kycSlice = createSlice({
                     action.payload?.message ||
                     "Document uploaded successfully";
 
-                const uploadedDocument = action.payload?.data;
+                const uploadedDocument =
+                    action.payload?.data;
 
                 if (uploadedDocument) {
-                    const existingIndex = state.documents.findIndex(
-                        (item) => item._id === uploadedDocument._id
-                    );
+                    const existingIndex =
+                        state.documents.findIndex(
+                            (item) =>
+                                item._id === uploadedDocument._id
+                        );
 
                     if (existingIndex !== -1) {
-                        state.documents[existingIndex] = uploadedDocument;
+                        state.documents[existingIndex] =
+                            uploadedDocument;
                     } else {
-                        state.documents.unshift(uploadedDocument);
+                        state.documents.unshift(
+                            uploadedDocument
+                        );
                     }
                 }
             })
@@ -169,7 +261,8 @@ const kycSlice = createSlice({
                 state.uploadSuccess = false;
 
                 state.uploadError =
-                    action.payload || "Failed to upload KYC document";
+                    action.payload ||
+                    "Failed to upload KYC document";
             });
     },
 });
@@ -189,7 +282,8 @@ export const {
 // SELECTORS
 // ==========================================================
 
-export const selectKyc = (state) => state.kyc;
+export const selectKyc = (state) =>
+    state.kyc;
 
 export const selectKycDocuments = (state) =>
     state.kyc?.documents || [];

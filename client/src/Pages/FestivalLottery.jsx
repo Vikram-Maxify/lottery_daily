@@ -541,7 +541,7 @@ const FestivalLottery = () => {
           paddingBottom:
             (festival
               ? BOTTOM_NAV_HEIGHT +
-                PURCHASE_BAR_HEIGHT
+              PURCHASE_BAR_HEIGHT
               : BOTTOM_NAV_HEIGHT) + 16,
         }}
       >
@@ -633,11 +633,10 @@ const FestivalLottery = () => {
                   onClick={() =>
                     setFestivalKey(f.key)
                   }
-                  className={`flex min-h-[72px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-2 text-center shadow-md transition active:scale-95 ${
-                    active
+                  className={`flex min-h-[72px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-2 text-center shadow-md transition active:scale-95 ${active
                       ? "bg-gradient-to-b from-[#ff1744] to-[#c9102f] text-white"
                       : "bg-[#fffaf4] text-[#173e70]"
-                  }`}
+                    }`}
                 >
                   <Icon size={22} />
 
@@ -723,11 +722,10 @@ const FestivalLottery = () => {
 
                 <ArrowRight
                   size={12}
-                  className={`transition-transform ${
-                    showAllDates
+                  className={`transition-transform ${showAllDates
                       ? "rotate-90"
                       : ""
-                  }`}
+                    }`}
                 />
               </button>
             </div>
@@ -811,11 +809,10 @@ const FestivalLottery = () => {
                 >
                   <ChevronDown
                     size={18}
-                    className={`transition ${
-                      showQuick
+                    className={`transition ${showQuick
                         ? "rotate-180"
                         : ""
-                    }`}
+                      }`}
                   />
                 </button>
               </div>
@@ -906,13 +903,12 @@ const FestivalLottery = () => {
             {/* ================= TICKET BOX INPUT ================= */}
 
             <div
-              className={`mt-3 rounded-2xl border p-3 ${
-                manualError
+              className={`mt-3 rounded-2xl border p-3 ${manualError
                   ? "border-red-300 bg-red-50/50"
                   : TICKET_REGEX.test(draft)
                     ? "border-emerald-300 bg-emerald-50/40"
                     : "border-[#dfe5f0] bg-[#f9fbff]"
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0 leading-tight">
@@ -987,14 +983,12 @@ const FestivalLottery = () => {
                       placeholder={slotPlaceholder(
                         i
                       )}
-                      aria-label={`Ticket character ${
-                        i + 1
-                      }`}
-                      className={`h-12 w-full min-w-0 rounded-xl border-2 text-center text-[18px] font-extrabold outline-none transition placeholder:font-bold placeholder:text-[#c3c8de] focus:border-[#ed1d43] focus:shadow-[0_0_0_3px_rgba(237,29,67,0.15)] ${
-                        filled
+                      aria-label={`Ticket character ${i + 1
+                        }`}
+                      className={`h-12 w-full min-w-0 rounded-xl border-2 text-center text-[18px] font-extrabold outline-none transition placeholder:font-bold placeholder:text-[#c3c8de] focus:border-[#ed1d43] focus:shadow-[0_0_0_3px_rgba(237,29,67,0.15)] ${filled
                           ? "border-[#173e70] bg-white text-[#173e70]"
                           : "border-[#c9d3e3] bg-[#f1f3fa] text-[#173e70]"
-                      }`}
+                        }`}
                     />
                   );
                 })}
@@ -1041,28 +1035,25 @@ const FestivalLottery = () => {
                         onClick={() =>
                           setQuantity(count)
                         }
-                        className={`relative min-w-0 rounded-lg border px-0.5 py-2 text-center transition active:scale-95 ${
-                          active
+                        className={`relative min-w-0 rounded-lg border px-0.5 py-2 text-center transition active:scale-95 ${active
                             ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
                             : "border-[#dfe5f0] bg-white"
-                        }`}
+                          }`}
                       >
                         <p
-                          className={`whitespace-nowrap text-[9.5px] font-semibold ${
-                            active
+                          className={`whitespace-nowrap text-[9.5px] font-semibold ${active
                               ? "text-[#ed1d43]"
                               : "text-[#26354b]"
-                          }`}
+                            }`}
                         >
                           {count} Tickets
                         </p>
 
                         <p
-                          className={`whitespace-nowrap text-[12px] font-black ${
-                            active
+                          className={`whitespace-nowrap text-[12px] font-black ${active
                               ? "text-[#ed1d43]"
                               : "text-[#173e70]"
-                          }`}
+                            }`}
                         >
                           ₹
                           {(
@@ -1122,8 +1113,8 @@ const FestivalLottery = () => {
                     (ticket, index) => {
                       const color =
                         CHIP_COLORS[
-                          index %
-                            CHIP_COLORS.length
+                        index %
+                        CHIP_COLORS.length
                         ];
 
                       return (
@@ -1152,9 +1143,8 @@ const FestivalLottery = () => {
                               tickets.length <=
                               MIN_TICKETS
                             }
-                            aria-label={`Remove ticket ${
-                              index + 1
-                            }`}
+                            aria-label={`Remove ticket ${index + 1
+                              }`}
                             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#ed1d43] text-white disabled:opacity-40"
                           >
                             <X
@@ -1398,15 +1388,13 @@ const DateChip = ({
   <button
     type="button"
     onClick={onClick}
-    className={`relative flex h-[66px] ${
-      fluid
+    className={`relative flex h-[66px] ${fluid
         ? "w-full"
         : "w-[64px] shrink-0"
-    } flex-col items-center justify-center rounded-xl border text-center transition active:scale-95 ${
-      active
+      } flex-col items-center justify-center rounded-xl border text-center transition active:scale-95 ${active
         ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
         : "border-transparent bg-[#e3e9f3]"
-    }`}
+      }`}
   >
     {today && (
       <span className="text-[10px] font-semibold text-[#ed1d43]">
@@ -1415,31 +1403,28 @@ const DateChip = ({
     )}
 
     <span
-      className={`whitespace-nowrap text-[13px] font-extrabold ${
-        active
+      className={`whitespace-nowrap text-[13px] font-extrabold ${active
           ? "text-[#ed1d43]"
           : "text-[#26354b]"
-      }`}
+        }`}
     >
       {date.day} {date.month}
     </span>
 
     <span
-      className={`text-[10px] ${
-        active
+      className={`text-[10px] ${active
           ? "text-[#ed1d43]"
           : "text-[#6b7280]"
-      }`}
+        }`}
     >
       {date.weekday}
     </span>
 
     <span
-      className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
-        active
+      className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${active
           ? "bg-[#ed1d43]"
           : "bg-[#20a66a]"
-      }`}
+        }`}
     />
   </button>
 );

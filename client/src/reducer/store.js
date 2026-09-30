@@ -17,6 +17,7 @@ import gatewayReducer from './slice/gatewaySlice';
 import adminReducer from './slice/adminSlice';
 import withdrawalReducer from './slice/withdrawalSlice'
 import kycReducer from './slice/kycReducer'
+import adminKycReducer from './slice/adminKycReducer'
 
 export const store = configureStore({
   reducer: {
@@ -33,6 +34,7 @@ export const store = configureStore({
     admin: adminReducer,
     withdrawal: withdrawalReducer,
     kyc: kycReducer,
+    adminKyc : adminKycReducer
 
   },
 });
