@@ -25,7 +25,7 @@ const AdminLogin = () => {
   } = useSelector(
     (state) => state.adminAuth
   );
-  console.log(admin)
+  console.log(admin);
 
   const [formData, setFormData] = useState({
     mobile: "",
@@ -78,7 +78,10 @@ const AdminLogin = () => {
         loggedAdmin?.role || ""
       ).toLowerCase();
 
-      console.log("ADMIN LOGIN RESPONSE:", result.payload);
+      console.log(
+        "ADMIN LOGIN RESPONSE:",
+        result.payload
+      );
       console.log("ADMIN ROLE:", role);
 
       if (role === "admin") {
@@ -90,26 +93,26 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#FFFDF7] flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="rounded-2xl border border-[#F3E7C4] bg-white p-8 shadow-[0_10px_30px_-12px_rgba(247,181,0,0.35)]">
 
           {/* Header */}
-          <div className="text-center mb-8">
+          <div className="mb-8 text-center">
 
-            <div className="mx-auto mb-4 h-14 w-14 rounded-xl bg-slate-900 flex items-center justify-center">
-              <span className="text-white text-xl font-bold">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-b from-[#FFD83D] via-[#F7B500] to-[#E39A00] text-[#1A1204] shadow-[0_4px_10px_-3px_rgba(227,154,0,0.55),inset_0_1px_0_rgba(255,255,255,0.55)]">
+              <span className="text-xl font-extrabold">
                 A
               </span>
             </div>
 
-            <h1 className="text-2xl font-bold text-slate-900">
+            <h1 className="text-2xl font-bold text-[#1A1A1A]">
               Admin Login
             </h1>
 
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-2 text-sm text-[#6B7280]">
               Login to access your admin panel
             </p>
 
@@ -117,7 +120,7 @@ const AdminLogin = () => {
 
           {/* Error */}
           {error && (
-            <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+            <div className="mb-5 rounded-xl border border-[#F5C7C3] bg-[#FDE8E6] px-4 py-3 text-sm font-medium text-[#B3261E]">
               {error}
             </div>
           )}
@@ -130,7 +133,7 @@ const AdminLogin = () => {
 
             {/* Mobile */}
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
+              <label className="mb-2 block text-sm font-semibold text-[#1A1A1A]">
                 Mobile Number
               </label>
 
@@ -142,13 +145,13 @@ const AdminLogin = () => {
                 placeholder="Enter mobile number"
                 autoComplete="username"
                 required
-                className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                className="w-full rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] px-4 py-3 text-sm text-[#1A1A1A] outline-none transition placeholder:text-[#8A8F98] focus:border-[#F2B705] focus:ring-2 focus:ring-[#FFEFA8] disabled:bg-[#F5F1E4] disabled:text-[#8A8F98]"
               />
             </div>
 
             {/* Password */}
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
+              <label className="mb-2 block text-sm font-semibold text-[#1A1A1A]">
                 Password
               </label>
 
@@ -160,7 +163,7 @@ const AdminLogin = () => {
                 placeholder="Enter password"
                 autoComplete="current-password"
                 required
-                className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                className="w-full rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] px-4 py-3 text-sm text-[#1A1A1A] outline-none transition placeholder:text-[#8A8F98] focus:border-[#F2B705] focus:ring-2 focus:ring-[#FFEFA8] disabled:bg-[#F5F1E4] disabled:text-[#8A8F98]"
               />
             </div>
 
@@ -168,7 +171,7 @@ const AdminLogin = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-xl bg-gradient-to-b from-[#FFD83D] via-[#F7B500] to-[#E39A00] px-4 py-3 text-sm font-extrabold text-[#1A1204] shadow-[0_4px_10px_-3px_rgba(227,154,0,0.55),inset_0_1px_0_rgba(255,255,255,0.55)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading
                 ? "Logging in..."
@@ -179,7 +182,7 @@ const AdminLogin = () => {
         </div>
 
         {/* Footer */}
-        <p className="mt-6 text-center text-xs text-slate-400">
+        <p className="mt-6 text-center text-xs text-[#8A8F98]">
           Admin Panel
         </p>
 

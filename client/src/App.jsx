@@ -38,6 +38,7 @@ import VarifyTicket from "./Pages/VarifyTicket";
 import LeaderboardPage from "./Pages/LeaderboardPage";
 import AdminKycVerification from "./admin/adminPages/AdminKycVerification";
 import AdminFestivalLottery from "./admin/adminPages/AdminFestivalLottery";
+import AdminHomeBanner from "./admin/adminPages/AdminHomeBanner";
 
 // ==========================================================
 // WHATSAPP SUPPORT NUMBER
@@ -209,6 +210,12 @@ function App() {
               path="/amount"
               element={<Amount />}
             />
+
+            <Route
+              path="/home_banner"
+              element={<AdminHomeBanner />}
+            />
+
             <Route
               path="/adminkyc"
               element={<AdminKycVerification />}

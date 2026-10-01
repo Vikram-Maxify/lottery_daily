@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   XCircle,
   Settings2,
+  Eye,
 } from "lucide-react";
 
 import {
@@ -23,7 +24,46 @@ import {
   activateLotteryConfig,
   deactivateLotteryConfig,
   deleteLotteryConfig,
-} from "../../reducer/slice/adminLotteryReducer";
+  clearCreateLotteryError,
+  clearCreateLotterySuccess,
+  clearUpdateLotteryError,
+  clearUpdateLotterySuccess,
+  clearActivateLotteryError,
+  clearDeactivateLotteryError,
+  clearDeleteLotteryError,
+} from "../../reducer/slice/festivalLotteryReducer";
+
+/* =========================================================
+   WINZOX THEME TOKENS  (Bright Gold + White)
+   bg          #FFFDF7
+   border      #F3E7C4
+   gold        #FFD83D -> #F7B500 -> #E39A00
+   gold-soft   #FFEFA8
+   gold-line   #F2B705
+   on-gold     #1A1204  (text on gold is DARK)
+   text        #1A1A1A
+   muted       #6B7280
+   brown       #9A5B00
+   success     #12A36B
+   danger      #D93025
+========================================================= */
+
+const GOLD_BTN =
+  "bg-gradient-to-b from-[#FFD83D] via-[#F7B500] to-[#E39A00] text-[#1A1204] font-extrabold shadow-[0_4px_10px_-3px_rgba(227,154,0,0.55),inset_0_1px_0_rgba(255,255,255,0.55)] hover:brightness-105";
+
+const OUTLINE_BTN =
+  "border border-[#F2B705] bg-white font-bold text-[#9A5B00] hover:bg-[#FFEFA8]/60";
+
+const INPUT_CLS =
+  "w-full rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] py-2.5 text-[#1A1A1A] outline-none transition placeholder:text-[#8A8F98] focus:border-[#F2B705] focus:ring-2 focus:ring-[#FFEFA8] disabled:bg-[#F5F1E4] disabled:text-[#8A8F98]";
+
+const LABEL_CLS = "mb-2 block text-sm font-semibold text-[#1A1A1A]";
+
+const CARD_CLS =
+  "rounded-2xl border border-[#F3E7C4] bg-white shadow-[0_6px_18px_-10px_rgba(247,181,0,0.35)]";
+
+const TH_CLS =
+  "whitespace-nowrap px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#9A5B00]";
 
 // =====================================================
 // HELPERS
@@ -31,66 +71,27 @@ import {
 
 const getToday = () => {
   const now = new Date();
-
-  return [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-  ].join("-");
-};
-
-const parseLocalDate = (dateString) => {
-  if (!dateString) return null;
-
-  const value = String(dateString).slice(0, 10);
-
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-
-  if (!match) return null;
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-
-  const date = new Date(year, month - 1, day);
-
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
-    return null;
-  }
-
-  return date;
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 };
 
 const formatDate = (date) => {
-  const parsed = parseLocalDate(date);
-
-  if (!parsed) return "-";
-
-  return parsed.toLocaleDateString("en-IN", {
+  if (!date) return "-";
+  const value = String(date).slice(0, 10);
+  const d = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
 };
 
-const getMonthYearFromDate = (date) => {
-  const parsed = parseLocalDate(date);
-
-  if (!parsed) {
-    return {
-      month: "-",
-      year: "-",
-    };
-  }
-
-  return {
-    month: parsed.getMonth() + 1,
-    year: parsed.getFullYear(),
-  };
+const getMonthName = (month) => {
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  return months[Number(month) - 1] || "-";
 };
 
 const getDefaultForm = () => ({
@@ -102,101 +103,20 @@ const getDefaultForm = () => ({
   thirdPrize: "",
 });
 
-const getErrorMessage = (
-  error,
-  fallback = "Something went wrong."
-) => {
+const getErrorMessage = (error, fallback) => {
   if (!error) return fallback;
-
-  if (typeof error === "string") {
-    return error;
-  }
-
-  if (
-    error?.message &&
-    typeof error.message === "string"
-  ) {
-    return error.message;
-  }
-
-  if (
-    error?.error &&
-    typeof error.error === "string"
-  ) {
-    return error.error;
-  }
-
-  if (
-    error?.data?.message &&
-    typeof error.data.message === "string"
-  ) {
-    return error.data.message;
-  }
-
-  if (
-    error?.data?.error &&
-    typeof error.data.error === "string"
-  ) {
-    return error.data.error;
-  }
-
-  if (error?.response?.data?.message) {
-    return error.response.data.message;
-  }
-
-  if (error?.response?.data?.error) {
-    return error.response.data.error;
-  }
-
-  return fallback;
+  if (typeof error === "string") return error;
+  return (
+    error?.message ||
+    error?.error ||
+    error?.data?.message ||
+    error?.data?.error ||
+    fallback
+  );
 };
 
 const getConfigFromResponse = (result) => {
-  if (!result) return null;
-
-  if (
-    result?._id ||
-    result?.id ||
-    result?.marketName
-  ) {
-    return result;
-  }
-
-  if (result?.data) {
-    if (Array.isArray(result.data)) {
-      return result.data[0] || null;
-    }
-
-    if (
-      result.data?._id ||
-      result.data?.id ||
-      result.data?.marketName
-    ) {
-      return result.data;
-    }
-
-    if (result.data?.data) {
-      if (Array.isArray(result.data.data)) {
-        return result.data.data[0] || null;
-      }
-
-      return result.data.data;
-    }
-  }
-
-  if (result?.config) {
-    return result.config;
-  }
-
-  if (result?.lottery) {
-    return result.lottery;
-  }
-
-  return null;
-};
-
-const getConfigId = (lottery) => {
-  return lottery?._id || lottery?.id || null;
+  return result?.data || result?.config || result?.lottery || result;
 };
 
 // =====================================================
@@ -206,325 +126,168 @@ const getConfigId = (lottery) => {
 const AdminFestivalLottery = () => {
   const dispatch = useDispatch();
 
-  // ===================================================
-  // REDUX STATE
-  // ===================================================
-
+  // ---------- REDUX STATE ----------
   const {
-    lotteries = [],
-    lottery = null,
-
+    configs = [],
+    config = null,
     loading = false,
+    configLoading = false,
     createLoading = false,
     updateLoading = false,
+    activateLoading = false,
+    deactivateLoading = false,
     deleteLoading = false,
-    actionLoading = false,
-
     error = null,
-    success = false,
-    message = "",
-  } = useSelector(
-    (state) => state.festivalLottery || {}
-  );
+    configError = null,
+    createError = null,
+    updateError = null,
+    activateError = null,
+    deactivateError = null,
+    deleteError = null,
+    createSuccess = null,
+    updateSuccess = null,
+    activateSuccess = null,
+    deactivateSuccess = null,
+    deleteSuccess = null,
+  } = useSelector((state) => state.festivalLottery || {});
 
-  // ===================================================
-  // LOCAL STATE
-  // ===================================================
+  const lotteries = Array.isArray(configs) ? configs : [];
 
-  const [formData, setFormData] = useState(
-    getDefaultForm()
-  );
+  // ---------- LOCAL UI STATE ----------
+  const [formData, setFormData] = useState(getDefaultForm());
+  const [validationError, setValidationError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [deleteModal, setDeleteModal] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+  const [viewingId, setViewingId] = useState(null);
 
-  const [validationError, setValidationError] =
-    useState("");
-
-  const [successMessage, setSuccessMessage] =
-    useState("");
-
-  const [editingId, setEditingId] =
-    useState(null);
-
-  const [deleteModal, setDeleteModal] =
-    useState(false);
-
-  const [deleteId, setDeleteId] =
-    useState(null);
-
-  const [actionId, setActionId] =
-    useState(null);
-
-  // ===================================================
-  // NORMALIZED LOTTERIES
-  // ===================================================
-
-  const allLotteries = useMemo(() => {
-    return Array.isArray(lotteries)
-      ? lotteries
-      : [];
-  }, [lotteries]);
-
-  // ===================================================
-  // COUNTS
-  // ===================================================
-
-  const activeCount = useMemo(() => {
-    return allLotteries.filter(
-      (item) => Boolean(item?.isActive)
-    ).length;
-  }, [allLotteries]);
-
-  const inactiveCount = useMemo(() => {
-    return allLotteries.filter(
-      (item) => !item?.isActive
-    ).length;
-  }, [allLotteries]);
-
-  // ===================================================
-  // FORM BUSY
-  // ===================================================
-
-  const isFormBusy =
+  const busy =
+    loading ||
+    configLoading ||
     createLoading ||
     updateLoading ||
-    (loading && editingId);
+    activateLoading ||
+    deactivateLoading ||
+    deleteLoading;
 
-  // ===================================================
-  // INITIAL LOAD
-  // ===================================================
+  const apiError =
+    createError ||
+    updateError ||
+    activateError ||
+    deactivateError ||
+    deleteError ||
+    configError ||
+    error;
 
+  const apiSuccess =
+    createSuccess || updateSuccess || activateSuccess || deactivateSuccess || deleteSuccess;
+
+  // ---------- INITIAL FETCH ----------
   useEffect(() => {
     dispatch(getAllLotteryConfigs());
   }, [dispatch]);
 
-  // ===================================================
-  // REDUX ERROR
-  // ===================================================
-
+  // ---------- SURFACE API ERROR ----------
   useEffect(() => {
-    if (!error) return;
+    if (!apiError) return;
+    setValidationError(getErrorMessage(apiError, "Something went wrong."));
+  }, [apiError]);
 
-    setValidationError(
-      getErrorMessage(
-        error,
-        "Something went wrong."
-      )
+  // ---------- SURFACE API SUCCESS ----------
+  useEffect(() => {
+    if (!apiSuccess) return;
+    setSuccessMessage(
+      typeof apiSuccess === "string" ? apiSuccess : "Operation successful."
     );
-  }, [error]);
+  }, [apiSuccess]);
 
-  // ===================================================
-  // REDUX SUCCESS MESSAGE
-  // ===================================================
-
-  useEffect(() => {
-    if (!message) return;
-
-    setSuccessMessage(message);
-  }, [message]);
-
-  // ===================================================
-  // FORM CHANGE
-  // ===================================================
-
+  // =====================================================
+  // FORM HANDLERS
+  // =====================================================
   const handleFormChange = (e) => {
     const { name, value } = e.target;
-
     setValidationError("");
     setSuccessMessage("");
-
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ===================================================
-  // VALIDATION
-  // ===================================================
-
   const validateForm = () => {
-    const marketName =
-      formData.marketName.trim();
+    if (!formData.marketName.trim()) return "Market name is required.";
+    if (!formData.drawDate) return "Draw date is required.";
+    if (!formData.drawTime) return "Draw time is required.";
 
-    if (!marketName) {
-      return "Market name is required.";
-    }
+    const selectedDate = new Date(`${formData.drawDate}T00:00:00`);
+    if (Number.isNaN(selectedDate.getTime())) return "Invalid draw date.";
 
-    if (marketName.length > 100) {
-      return "Market name cannot exceed 100 characters.";
-    }
-
-    if (!formData.drawDate) {
-      return "Draw date is required.";
-    }
-
-    const selectedDate =
-      parseLocalDate(formData.drawDate);
-
-    if (!selectedDate) {
-      return "Invalid draw date.";
-    }
-
-    const today =
-      parseLocalDate(getToday());
-
-    if (!today) {
-      return "Unable to validate today's date.";
-    }
-
-    if (selectedDate < today) {
-      return "Past draw date cannot be selected.";
-    }
-
-    if (!formData.drawTime) {
-      return "Draw time is required.";
-    }
-
-    const timePattern =
-      /^([01]\d|2[0-3]):([0-5]\d)$/;
-
-    if (
-      !timePattern.test(
-        formData.drawTime
-      )
-    ) {
-      return "Invalid draw time.";
-    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
+    if (selectedDate < today) return "Past draw date cannot be selected.";
 
     const prizes = [
       ["First", formData.firstPrize],
       ["Second", formData.secondPrize],
       ["Third", formData.thirdPrize],
     ];
-
     for (const [label, value] of prizes) {
-      if (
-        value === "" ||
-        value === null ||
-        value === undefined
-      ) {
+      if (value === "" || value === null || value === undefined) {
         return `${label} prize is required.`;
       }
-
       const amount = Number(value);
-
-      if (
-        !Number.isFinite(amount) ||
-        amount < 0
-      ) {
+      if (!Number.isFinite(amount) || amount < 0) {
         return `Invalid ${label.toLowerCase()} prize.`;
       }
-
-      if (!Number.isInteger(amount)) {
-        return `${label} prize must be a whole number.`;
-      }
     }
-
     return "";
   };
 
-  // ===================================================
-  // RESET FORM
-  // ===================================================
-
-  const resetForm = () => {
-    setFormData(getDefaultForm());
-    setEditingId(null);
-  };
-
-  // ===================================================
-  // SUBMIT
-  // ===================================================
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (isFormBusy) return;
-
     setValidationError("");
     setSuccessMessage("");
 
-    const validation =
-      validateForm();
-
+    const validation = validateForm();
     if (validation) {
       setValidationError(validation);
       return;
     }
 
-    const selectedDate =
-      parseLocalDate(formData.drawDate);
-
-    if (!selectedDate) {
-      setValidationError(
-        "Invalid draw date."
-      );
-      return;
-    }
-
+    const selectedDate = new Date(`${formData.drawDate}T00:00:00`);
     const payload = {
-      marketName:
-        formData.marketName.trim(),
-
-      month:
-        selectedDate.getMonth() + 1,
-
-      year:
-        selectedDate.getFullYear(),
-
-      drawDate:
-        formData.drawDate,
-
-      drawTime:
-        formData.drawTime,
-
+      marketName: formData.marketName.trim(),
+      month: selectedDate.getMonth() + 1,
+      year: selectedDate.getFullYear(),
+      drawDate: formData.drawDate,
+      drawTime: formData.drawTime,
       prizes: {
-        first:
-          Number(formData.firstPrize),
-
-        second:
-          Number(formData.secondPrize),
-
-        third:
-          Number(formData.thirdPrize),
+        first: Number(formData.firstPrize),
+        second: Number(formData.secondPrize),
+        third: Number(formData.thirdPrize),
       },
     };
 
-    const currentEditingId =
-      editingId;
-
     try {
-      if (currentEditingId) {
+      if (editingId) {
         await dispatch(
-          updateLotteryConfig({
-            id: currentEditingId,
-            lotteryData: payload,
-          })
+          updateLotteryConfig({ id: editingId, lotteryData: payload })
         ).unwrap();
-
-        setSuccessMessage(
-          "Festival lottery updated successfully."
-        );
+        await dispatch(getAllLotteryConfigs()).unwrap();
+        setSuccessMessage("Festival lottery updated successfully.");
       } else {
-        await dispatch(
-          createLotteryConfig(payload)
-        ).unwrap();
-
+        await dispatch(createLotteryConfig(payload)).unwrap();
+        await dispatch(getAllLotteryConfigs()).unwrap();
         setSuccessMessage(
-          "Festival lottery created successfully."
+          "Festival lottery created successfully. It is inactive until you activate it."
         );
       }
-
-      // Always get latest data from backend.
-      await dispatch(
-        getAllLotteryConfigs()
-      ).unwrap();
-
-      resetForm();
+      setFormData(getDefaultForm());
+      setEditingId(null);
     } catch (err) {
       setValidationError(
         getErrorMessage(
           err,
-          currentEditingId
+          editingId
             ? "Failed to update festival lottery."
             : "Failed to create festival lottery."
         )
@@ -532,1299 +295,750 @@ const AdminFestivalLottery = () => {
     }
   };
 
-  // ===================================================
-  // EDIT
-  // ===================================================
-
-  const handleEdit = async (lotteryItem) => {
-    if (
-      loading ||
-      createLoading ||
-      updateLoading ||
-      actionLoading ||
-      deleteLoading
-    ) {
-      return;
-    }
-
-    const id =
-      getConfigId(lotteryItem);
-
+  const handleEdit = async (lottery) => {
+    const id = lottery?._id || lottery?.id;
     if (!id) {
-      setValidationError(
-        "Lottery configuration ID is missing."
-      );
+      setValidationError("Invalid lottery configuration.");
       return;
     }
 
     setValidationError("");
     setSuccessMessage("");
-    setActionId(id);
 
     try {
-      const result =
-        await dispatch(
-          getLotteryConfigById(id)
-        ).unwrap();
-
-      const config =
-        getConfigFromResponse(result) ||
-        lotteryItem;
-
-      const configDate =
-        config?.drawDate
-          ? String(
-              config.drawDate
-            ).slice(0, 10)
-          : getToday();
-
-      const parsedDate =
-        parseLocalDate(configDate);
-
-      const drawDate = parsedDate
-        ? [
-            parsedDate.getFullYear(),
-            String(
-              parsedDate.getMonth() + 1
-            ).padStart(2, "0"),
-            String(
-              parsedDate.getDate()
-            ).padStart(2, "0"),
-          ].join("-")
+      const result = await dispatch(getLotteryConfigById(id)).unwrap();
+      const fetched = getConfigFromResponse(result);
+      const drawDate = fetched?.drawDate
+        ? String(fetched.drawDate).slice(0, 10)
         : getToday();
 
-      setEditingId(
-        config?._id ||
-          config?.id ||
-          id
-      );
-
+      setEditingId(fetched?._id || id);
       setFormData({
-        marketName:
-          config?.marketName || "",
-
+        marketName: fetched?.marketName || "",
         drawDate,
-
-        drawTime:
-          config?.drawTime ||
-          "18:30",
-
-        firstPrize: String(
-          config?.prizes?.first ??
-            ""
-        ),
-
-        secondPrize: String(
-          config?.prizes?.second ??
-            ""
-        ),
-
-        thirdPrize: String(
-          config?.prizes?.third ??
-            ""
-        ),
+        drawTime: fetched?.drawTime || "18:30",
+        firstPrize: String(fetched?.prizes?.first ?? ""),
+        secondPrize: String(fetched?.prizes?.second ?? ""),
+        thirdPrize: String(fetched?.prizes?.third ?? ""),
       });
 
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth",
-      });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       setValidationError(
-        getErrorMessage(
-          err,
-          "Failed to load lottery configuration."
-        )
+        getErrorMessage(err, "Failed to load lottery configuration.")
       );
-    } finally {
-      setActionId(null);
     }
   };
 
-  // ===================================================
-  // CANCEL EDIT
-  // ===================================================
+  const handleView = async (lottery) => {
+    const id = lottery?._id || lottery?.id;
+    if (!id) {
+      setValidationError("Invalid lottery configuration.");
+      return;
+    }
+    setValidationError("");
+    setSuccessMessage("");
+
+    try {
+      await dispatch(getLotteryConfigById(id)).unwrap();
+      setViewingId(id);
+    } catch (err) {
+      setValidationError(
+        getErrorMessage(err, "Failed to load lottery details.")
+      );
+    }
+  };
 
   const handleCancelEdit = () => {
-    resetForm();
-
+    setEditingId(null);
+    setFormData(getDefaultForm());
     setValidationError("");
     setSuccessMessage("");
+    dispatch(clearCreateLotteryError());
+    dispatch(clearCreateLotterySuccess());
+    dispatch(clearUpdateLotteryError());
+    dispatch(clearUpdateLotterySuccess());
   };
 
-  // ===================================================
+  // =====================================================
   // ACTIVATE / DEACTIVATE
-  // ===================================================
-
-  const handleToggleStatus = async (
-    lotteryItem
-  ) => {
-    if (
-      actionLoading ||
-      loading ||
-      deleteLoading
-    ) {
-      return;
-    }
-
-    const id =
-      getConfigId(lotteryItem);
-
+  // =====================================================
+  const handleToggleStatus = async (lottery) => {
+    const id = lottery?._id || lottery?.id;
     if (!id) {
-      setValidationError(
-        "Lottery configuration ID is missing."
-      );
+      setValidationError("Invalid lottery configuration.");
       return;
     }
 
     setValidationError("");
     setSuccessMessage("");
-    setActionId(id);
-
-    const currentlyActive =
-      Boolean(
-        lotteryItem?.isActive
-      );
 
     try {
-      if (currentlyActive) {
-        await dispatch(
-          deactivateLotteryConfig(id)
-        ).unwrap();
-
-        setSuccessMessage(
-          "Festival lottery deactivated successfully."
-        );
+      if (lottery.isActive) {
+        await dispatch(deactivateLotteryConfig(id)).unwrap();
+        setSuccessMessage("Festival lottery deactivated successfully.");
       } else {
-        await dispatch(
-          activateLotteryConfig(id)
-        ).unwrap();
-
-        setSuccessMessage(
-          "Festival lottery activated successfully."
-        );
+        await dispatch(activateLotteryConfig(id)).unwrap();
+        setSuccessMessage("Festival lottery activated successfully.");
       }
-
-      await dispatch(
-        getAllLotteryConfigs()
-      ).unwrap();
+      await dispatch(getAllLotteryConfigs()).unwrap();
     } catch (err) {
       setValidationError(
-        getErrorMessage(
-          err,
-          "Failed to update lottery status."
-        )
+        getErrorMessage(err, "Failed to update lottery status.")
       );
-    } finally {
-      setActionId(null);
     }
   };
 
-  // ===================================================
+  // =====================================================
   // REFRESH
-  // ===================================================
-
+  // =====================================================
   const handleRefresh = async () => {
-    if (loading) return;
-
     setValidationError("");
     setSuccessMessage("");
-
     try {
-      await dispatch(
-        getAllLotteryConfigs()
-      ).unwrap();
-
-      setSuccessMessage(
-        "Festival lottery list refreshed successfully."
-      );
+      await dispatch(getAllLotteryConfigs()).unwrap();
+      setSuccessMessage("Festival lottery list refreshed successfully.");
     } catch (err) {
       setValidationError(
-        getErrorMessage(
-          err,
-          "Failed to refresh festival lotteries."
-        )
+        getErrorMessage(err, "Failed to refresh festival lotteries.")
       );
     }
   };
 
-  // ===================================================
-  // DELETE MODAL
-  // ===================================================
-
+  // =====================================================
+  // DELETE
+  // =====================================================
   const handleOpenDelete = (id) => {
-    if (!id) {
-      setValidationError(
-        "Lottery configuration ID is missing."
-      );
-      return;
-    }
-
-    if (
-      deleteLoading ||
-      actionLoading
-    ) {
-      return;
-    }
-
-    setValidationError("");
-    setSuccessMessage("");
-
     setDeleteId(id);
     setDeleteModal(true);
   };
 
   const handleCloseDelete = () => {
-    if (deleteLoading) return;
-
     setDeleteId(null);
     setDeleteModal(false);
   };
 
-  // ===================================================
-  // DELETE
-  // ===================================================
-
   const handleDelete = async () => {
-    if (
-      !deleteId ||
-      deleteLoading
-    ) {
-      return;
-    }
-
-    const currentDeleteId =
-      deleteId;
+    if (!deleteId) return;
 
     setValidationError("");
     setSuccessMessage("");
 
     try {
-      await dispatch(
-        deleteLotteryConfig(
-          currentDeleteId
-        )
-      ).unwrap();
+      await dispatch(deleteLotteryConfig(deleteId)).unwrap();
+      await dispatch(getAllLotteryConfigs()).unwrap();
 
-      await dispatch(
-        getAllLotteryConfigs()
-      ).unwrap();
+      if (editingId === deleteId) handleCancelEdit();
+      if (viewingId === deleteId) setViewingId(null);
 
-      if (
-        editingId ===
-        currentDeleteId
-      ) {
-        resetForm();
-      }
-
-      setDeleteId(null);
-      setDeleteModal(false);
-
-      setSuccessMessage(
-        "Festival lottery deleted successfully."
-      );
+      setSuccessMessage("Festival lottery deleted successfully.");
+      handleCloseDelete();
     } catch (err) {
       setValidationError(
-        getErrorMessage(
-          err,
-          "Failed to delete festival lottery."
-        )
+        getErrorMessage(err, "Failed to delete festival lottery.")
       );
     }
   };
 
-  // ===================================================
-  // RESET
-  // ===================================================
-
   const handleReset = () => {
-    if (isFormBusy) return;
-
-    resetForm();
-
+    setFormData(getDefaultForm());
+    setEditingId(null);
     setValidationError("");
     setSuccessMessage("");
   };
 
-  // ===================================================
+  // =====================================================
+  // SELECTED / VIEWED CONFIG
+  // =====================================================
+  const viewedConfig = useMemo(() => {
+    if (!config) return null;
+    const id = config?._id || config?.id;
+    if (!viewingId || id !== viewingId) return null;
+    return config;
+  }, [config, viewingId]);
+
+  // =====================================================
   // RENDER
-  // ===================================================
-
+  // =====================================================
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-
-      {/* =================================================
-          HEADER
-      ================================================= */}
-
-      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-
-        <div>
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-7xl">
+        {/* ================= HEADER ================= */}
+        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
-
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <Ticket size={23} />
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FFEFA8] text-[#1A1204] ring-2 ring-[#F2B705]">
+              <Ticket size={22} strokeWidth={2.3} />
             </div>
-
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-black tracking-tight text-[#1A1A1A]">
                 Festival Lottery
               </h1>
-
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-[#6B7280]">
                 Create and manage festival lottery draws and prize settings.
               </p>
             </div>
-
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleRefresh}
-          disabled={loading}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RefreshCw
-            size={16}
-            className={
-              loading
-                ? "animate-spin"
-                : ""
-            }
-          />
-
-          {loading
-            ? "Refreshing..."
-            : "Refresh"}
-        </button>
-      </div>
-
-      {/* =================================================
-          SUCCESS
-      ================================================= */}
-
-      {successMessage && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700">
-          <CheckCircle2 size={17} />
-
-          <span>
-            {successMessage}
-          </span>
-        </div>
-      )}
-
-      {/* =================================================
-          ERROR
-      ================================================= */}
-
-      {validationError && (
-        <div className="mb-4 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-
-          <div className="flex items-center gap-2">
-            <XCircle size={17} />
-
-            <span>
-              {validationError}
-            </span>
           </div>
 
           <button
             type="button"
-            onClick={() =>
-              setValidationError("")
-            }
-            className="text-lg font-bold"
+            onClick={handleRefresh}
+            disabled={busy}
+            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${OUTLINE_BTN}`}
           >
-            ×
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            Refresh
           </button>
         </div>
-      )}
 
-      {/* =================================================
-          CREATE / EDIT FORM
-      ================================================= */}
-
-      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-
-        <div className="mb-6 flex flex-col gap-3 border-b border-gray-100 pb-5 md:flex-row md:items-center md:justify-between">
-
-          <div>
-            <div className="flex items-center gap-2">
-
-              <Settings2
-                size={19}
-                className="text-blue-600"
-              />
-
-              <h2 className="text-lg font-semibold text-gray-900">
-                {editingId
-                  ? "Festival Lottery Details"
-                  : "Create Festival Lottery"}
-              </h2>
-            </div>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Configure only the fields currently supported by the Festival backend.
-            </p>
+        {/* ================= SUCCESS / ERROR BANNERS ================= */}
+        {successMessage && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-[#12A36B]/30 bg-[#E6F6EF] px-4 py-3 text-sm font-medium text-[#0E7A52]">
+            <CheckCircle2 size={17} />
+            {successMessage}
           </div>
+        )}
 
-          {editingId && (
+        {validationError && (
+          <div className="mb-4 flex items-center justify-between rounded-xl border border-[#D93025]/30 bg-[#FDE8E6] px-4 py-3 text-sm font-medium text-[#B3261E]">
+            <div className="flex items-center gap-2">
+              <XCircle size={17} />
+              {validationError}
+            </div>
             <button
               type="button"
-              onClick={
-                handleCancelEdit
-              }
-              disabled={isFormBusy}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => setValidationError("")}
+              className="text-lg font-bold"
             >
-              <X size={16} />
-              Cancel
+              ×
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit}>
-
-          {/* =================================================
-              DRAW INFORMATION
-          ================================================= */}
-
-          <div className="mb-7">
-
-            <div className="mb-4 flex items-center gap-2">
-              <CalendarDays
-                size={18}
-                className="text-blue-600"
-              />
-
-              <h3 className="text-sm font-semibold text-gray-900">
-                Draw Information
-              </h3>
+        {/* ================= CREATE / EDIT FORM ================= */}
+        <div className={`mb-6 p-5 ${CARD_CLS}`}>
+          <div className="mb-6 flex flex-col gap-3 border-b border-[#F3E7C4] pb-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <Settings2 size={19} className="text-[#F7B500]" />
+                <h2 className="text-lg font-black text-[#1A1A1A]">
+                  {editingId
+                    ? "Edit Festival Lottery"
+                    : "Create Festival Lottery"}
+                </h2>
+              </div>
+              <p className="mt-1 text-sm text-[#6B7280]">
+                Configure draw date, time and prize amounts.
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {editingId && (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm transition ${OUTLINE_BTN}`}
+              >
+                <X size={16} />
+                Cancel
+              </button>
+            )}
+          </div>
 
-              {/* MARKET */}
-
-              <div className="lg:col-span-2">
-
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Market Name
-                </label>
-
-                <input
-                  type="text"
-                  name="marketName"
-                  value={
-                    formData.marketName
-                  }
-                  onChange={
-                    handleFormChange
-                  }
-                  placeholder="Enter market name"
-                  maxLength={100}
-                  disabled={isFormBusy}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
-                />
+          <form onSubmit={handleSubmit}>
+            {/* ---------- DRAW INFO ---------- */}
+            <div className="mb-7">
+              <div className="mb-4 flex items-center gap-2">
+                <CalendarDays size={18} className="text-[#F7B500]" />
+                <h3 className="text-sm font-bold text-[#1A1A1A]">
+                  Draw Information
+                </h3>
               </div>
 
-              {/* DATE */}
-
-              <div>
-
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Draw Date
-                </label>
-
-                <input
-                  type="date"
-                  name="drawDate"
-                  value={
-                    formData.drawDate
-                  }
-                  min={getToday()}
-                  onChange={
-                    handleFormChange
-                  }
-                  disabled={isFormBusy}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
-                />
-
-                <p className="mt-1 text-xs text-gray-500">
-                  Past dates are not allowed.
-                </p>
-              </div>
-
-              {/* TIME */}
-
-              <div>
-
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Draw Time
-                </label>
-
-                <div className="relative">
-
-                  <Clock3
-                    size={16}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="lg:col-span-2">
+                  <label className={LABEL_CLS}>Market Name</label>
                   <input
-                    type="time"
-                    name="drawTime"
-                    value={
-                      formData.drawTime
-                    }
-                    onChange={
-                      handleFormChange
-                    }
-                    disabled={isFormBusy}
-                    className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-9 pr-3 text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
+                    type="text"
+                    name="marketName"
+                    value={formData.marketName}
+                    onChange={handleFormChange}
+                    placeholder="Enter market name"
+                    maxLength={100}
+                    disabled={busy}
+                    className={`${INPUT_CLS} px-3`}
                   />
                 </div>
-              </div>
 
-            </div>
-          </div>
+                <div>
+                  <label className={LABEL_CLS}>Draw Date</label>
+                  <input
+                    type="date"
+                    name="drawDate"
+                    value={formData.drawDate}
+                    min={getToday()}
+                    onChange={handleFormChange}
+                    disabled={busy}
+                    className={`${INPUT_CLS} px-3`}
+                  />
+                  <p className="mt-1 text-xs text-[#6B7280]">
+                    Past dates are not allowed.
+                  </p>
+                </div>
 
-          {/* =================================================
-              CALENDAR CONFIGURATION
-          ================================================= */}
-
-          <div className="mb-7 border-t border-gray-100 pt-6">
-
-            <div className="mb-4 flex items-center gap-2">
-
-              <CalendarDays
-                size={18}
-                className="text-blue-600"
-              />
-
-              <h3 className="text-sm font-semibold text-gray-900">
-                Calendar Configuration
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-
-              {/* MONTH */}
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Month
-                </p>
-
-                <p className="mt-1 text-lg font-semibold text-gray-900">
-                  {formData.drawDate
-                    ? parseLocalDate(
-                        formData.drawDate
-                      )?.toLocaleDateString(
-                        "en-IN",
-                        {
-                          month: "long",
-                        }
-                      ) || "-"
-                    : "-"}
-                </p>
-
-                <p className="mt-1 text-xs text-gray-500">
-                  Automatically sent from Draw Date.
-                </p>
-              </div>
-
-              {/* YEAR */}
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Year
-                </p>
-
-                <p className="mt-1 text-lg font-semibold text-gray-900">
-                  {formData.drawDate
-                    ? parseLocalDate(
-                        formData.drawDate
-                      )?.getFullYear() ||
-                      "-"
-                    : "-"}
-                </p>
-
-                <p className="mt-1 text-xs text-gray-500">
-                  Automatically sent from Draw Date.
-                </p>
-              </div>
-
-            </div>
-          </div>
-
-          {/* =================================================
-              PRIZES
-          ================================================= */}
-
-          <div className="mb-7 border-t border-gray-100 pt-6">
-
-            <div className="mb-4 flex items-center gap-2">
-
-              <Trophy
-                size={18}
-                className="text-blue-600"
-              />
-
-              <h3 className="text-sm font-semibold text-gray-900">
-                Prize Configuration
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-
-              {[
-                {
-                  name: "firstPrize",
-                  label: "1st Prize",
-                  badge: "Winner 1",
-                  badgeClass:
-                    "bg-yellow-50 text-yellow-700",
-                },
-                {
-                  name: "secondPrize",
-                  label: "2nd Prize",
-                  badge: "Winner 2",
-                  badgeClass:
-                    "bg-blue-50 text-blue-700",
-                },
-                {
-                  name: "thirdPrize",
-                  label: "3rd Prize",
-                  badge: "Winner 3",
-                  badgeClass:
-                    "bg-purple-50 text-purple-700",
-                },
-              ].map((prize) => (
-                <div
-                  key={prize.name}
-                  className="rounded-lg border border-gray-200 p-4"
-                >
-
-                  <div className="mb-3 flex items-center justify-between">
-
-                    <span className="text-sm font-semibold text-gray-700">
-                      {prize.label}
-                    </span>
-
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${prize.badgeClass}`}
-                    >
-                      {prize.badge}
-                    </span>
-                  </div>
-
+                <div>
+                  <label className={LABEL_CLS}>Draw Time</label>
                   <div className="relative">
-
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-gray-500">
-                      ₹
-                    </span>
-
+                    <Clock3
+                      size={16}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A5B00]"
+                    />
                     <input
-                      type="number"
-                      name={prize.name}
-                      value={
-                        formData[
-                          prize.name
-                        ]
-                      }
-                      min="0"
-                      step="1"
-                      inputMode="numeric"
-                      placeholder={`Enter ${prize.label.toLowerCase()}`}
-                      onChange={
-                        handleFormChange
-                      }
-                      disabled={isFormBusy}
-                      className="w-full rounded-lg border border-gray-300 py-2.5 pl-8 pr-3 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
+                      type="time"
+                      name="drawTime"
+                      value={formData.drawTime}
+                      onChange={handleFormChange}
+                      disabled={busy}
+                      className={`${INPUT_CLS} pl-9 pr-3`}
                     />
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* =================================================
-              BACKEND INFO
-          ================================================= */}
-
-          <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
-
-            <div className="flex items-start gap-3">
-
-              <Ticket
-                size={19}
-                className="mt-0.5 text-blue-600"
-              />
-
-              <div>
-
-                <p className="text-sm font-semibold text-blue-800">
-                  Backend-supported configuration
-                </p>
-
-                <p className="mt-1 text-xs leading-5 text-blue-700">
-                  This admin form sends marketName,
-                  month, year, drawDate, drawTime
-                  and first/second/third prizes.
-                  Ticket price, packages and
-                  ticket-format settings were
-                  removed because the current
-                  Festival MongoDB model does not
-                  store them.
-                </p>
               </div>
             </div>
-          </div>
 
-          {/* =================================================
-              FORM ACTIONS
-          ================================================= */}
+            {/* ---------- PRIZES ---------- */}
+            <div className="mb-7 border-t border-[#F3E7C4] pt-6">
+              <div className="mb-4 flex items-center gap-2">
+                <Trophy size={18} className="text-[#F7B500]" />
+                <h3 className="text-sm font-bold text-[#1A1A1A]">
+                  Prize Configuration
+                </h3>
+              </div>
 
-          <div className="mt-6 flex flex-col-reverse gap-3 border-t border-gray-100 pt-5 sm:flex-row sm:justify-end">
-
-            <button
-              type="button"
-              onClick={handleReset}
-              disabled={isFormBusy}
-              className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Reset
-            </button>
-
-            <button
-              type="submit"
-              disabled={isFormBusy}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isFormBusy ? (
-                <RefreshCw
-                  size={17}
-                  className="animate-spin"
-                />
-              ) : (
-                <Ticket size={17} />
-              )}
-
-              {editingId
-                ? updateLoading
-                  ? "Updating..."
-                  : "Update Festival Lottery"
-                : createLoading
-                  ? "Creating..."
-                  : "Create Festival Lottery"}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* =================================================
-          ALL LOTTERIES TABLE
-      ================================================= */}
-
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-
-        {/* TABLE HEADER */}
-
-        <div className="flex flex-col gap-3 border-b border-gray-200 p-5 md:flex-row md:items-center md:justify-between">
-
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              All Festival Lotteries
-            </h2>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Total: {allLotteries.length}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-
-            <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
-              {activeCount} Active
-            </span>
-
-            <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
-              {inactiveCount} Inactive
-            </span>
-          </div>
-        </div>
-
-        {/* =================================================
-            LOADING
-        ================================================= */}
-
-        {loading &&
-        allLotteries.length === 0 ? (
-          <div className="p-12 text-center">
-
-            <RefreshCw
-              size={26}
-              className="mx-auto animate-spin text-blue-600"
-            />
-
-            <h3 className="mt-4 text-lg font-semibold text-gray-700">
-              Loading festival lotteries...
-            </h3>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Please wait while the lottery configurations are loaded.
-            </p>
-          </div>
-        ) : allLotteries.length === 0 ? (
-
-          /* =================================================
-              EMPTY
-          ================================================= */
-
-          <div className="p-12 text-center">
-
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-              <Ticket size={25} />
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                {[
+                  { name: "firstPrize", label: "1st Prize", badge: "Winner 1" },
+                  { name: "secondPrize", label: "2nd Prize", badge: "Winner 2" },
+                  { name: "thirdPrize", label: "3rd Prize", badge: "Winner 3" },
+                ].map((prize) => (
+                  <div
+                    key={prize.name}
+                    className="rounded-xl border border-[#F3E7C4] bg-[#FFF9E3] p-4"
+                  >
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="text-sm font-bold text-[#1A1A1A]">
+                        {prize.label}
+                      </span>
+                      <span className="rounded-full bg-[#FFEFA8] px-2.5 py-1 text-xs font-bold text-[#9A5B00] ring-1 ring-[#F2B705]/60">
+                        {prize.badge}
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-[#9A5B00]">
+                        ₹
+                      </span>
+                      <input
+                        type="number"
+                        name={prize.name}
+                        value={formData[prize.name]}
+                        min="0"
+                        step="1"
+                        placeholder={`Enter ${prize.label.toLowerCase()}`}
+                        onChange={handleFormChange}
+                        disabled={busy}
+                        className={`${INPUT_CLS} bg-white pl-8 pr-3`}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <h3 className="mt-4 text-lg font-semibold text-gray-700">
-              No festival lotteries found
-            </h3>
+            {/* ---------- ACTIONS ---------- */}
+            <div className="flex flex-col-reverse gap-3 border-t border-[#F3E7C4] pt-5 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={handleReset}
+                disabled={busy}
+                className={`rounded-xl px-5 py-2.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${OUTLINE_BTN}`}
+              >
+                Reset
+              </button>
 
-            <p className="mt-1 text-sm text-gray-500">
-              Create your first festival lottery using the form above.
-            </p>
+              <button
+                type="submit"
+                disabled={busy}
+                className={`inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${GOLD_BTN}`}
+              >
+                <Ticket size={17} />
+                {editingId
+                  ? updateLoading
+                    ? "Updating..."
+                    : "Update Festival Lottery"
+                  : createLoading
+                    ? "Creating..."
+                    : "Create Festival Lottery"}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* ================= VIEWED CONFIG ENTRIES ================= */}
+        {viewedConfig && (
+          <div className="mb-8 rounded-2xl border border-[#F2B705]/60 bg-[#FFF9E3] shadow-[0_6px_18px_-10px_rgba(247,181,0,0.35)]">
+            <div className="flex flex-col gap-3 border-b border-[#F3E7C4] px-5 py-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#9A5B00]">
+                  Viewing Entries
+                </p>
+                <h2 className="mt-1 text-lg font-black text-[#1A1A1A]">
+                  {viewedConfig.marketName}
+                </h2>
+                <p className="mt-1 text-sm text-[#6B7280]">
+                  {getMonthName(viewedConfig.month)} {viewedConfig.year} •{" "}
+                  {viewedConfig.users?.length || 0} Users
+                </p>
+
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {viewedConfig.drawDate && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#1A1A1A] ring-1 ring-[#F3E7C4]">
+                      <CalendarDays size={13} className="text-[#9A5B00]" />
+                      {formatDate(viewedConfig.drawDate)}
+                    </span>
+                  )}
+                  {viewedConfig.drawTime && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#1A1A1A] ring-1 ring-[#F3E7C4]">
+                      <Clock3 size={13} className="text-[#9A5B00]" />
+                      {viewedConfig.drawTime}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewingId(null)}
+                className={`rounded-xl px-4 py-2 text-sm transition ${OUTLINE_BTN}`}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              {viewedConfig.users?.length > 0 ? (
+                <table className="min-w-full">
+                  <thead className="bg-white">
+                    <tr>
+                      <th className={TH_CLS}>#</th>
+                      <th className={TH_CLS}>Number</th>
+                      <th className={TH_CLS}>Amount</th>
+                      <th className={TH_CLS}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#F3E7C4]">
+                    {viewedConfig.users.map((entry, index) => (
+                      <tr
+                        key={entry._id || index}
+                        className="bg-white hover:bg-[#FFFDF7]"
+                      >
+                        <td className="px-5 py-4 text-sm text-[#8A8F98]">
+                          {index + 1}
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="inline-flex rounded-full bg-[#FFEFA8] px-3 py-1 text-sm font-black tracking-wider text-[#1A1204] ring-1 ring-[#F2B705]/60">
+                            {entry.number}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-sm font-semibold text-[#1A1A1A]">
+                          ₹{Number(entry.amount || 0).toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-5 py-4">
+                          {entry.status === "win" ? (
+                            <span className="rounded-full bg-[#E6F6EF] px-3 py-1 text-xs font-bold text-[#12A36B]">
+                              Win
+                            </span>
+                          ) : entry.status === "lost" ? (
+                            <span className="rounded-full bg-[#FDE8E6] px-3 py-1 text-xs font-bold text-[#D93025]">
+                              Lost
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-[#FFEFA8] px-3 py-1 text-xs font-bold text-[#9A5B00]">
+                              Pending
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="bg-white p-8 text-center text-sm text-[#6B7280]">
+                  No user entries found.
+                </div>
+              )}
+            </div>
           </div>
-        ) : (
+        )}
 
-          /* =================================================
-              TABLE
-          ================================================= */
+        {/* ================= ALL MARKETS ================= */}
+        <div className={CARD_CLS}>
+          <div className="flex flex-col gap-3 border-b border-[#F3E7C4] p-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-black text-[#1A1A1A]">
+                All Festival Lotteries
+              </h2>
+              <p className="mt-1 text-sm text-[#6B7280]">
+                Total: {lotteries.length}
+              </p>
+            </div>
 
-          <div className="overflow-x-auto">
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-[#E6F6EF] px-3 py-1 text-xs font-bold text-[#12A36B]">
+                {lotteries.filter((l) => l.isActive).length} Active
+              </span>
+              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-[#6B7280]">
+                {lotteries.filter((l) => !l.isActive).length} Inactive
+              </span>
+            </div>
+          </div>
 
-            <table className="w-full min-w-[1150px]">
-
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    #
-                  </th>
-
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Market
-                  </th>
-
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Draw Date
-                  </th>
-
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Time
-                  </th>
-
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Month / Year
-                  </th>
-
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Prizes
-                  </th>
-
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Entries
-                  </th>
-
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Status
-                  </th>
-
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Action
-                  </th>
-
-                </tr>
-              </thead>
-
-              <tbody>
-
-                {allLotteries.map(
-                  (lotteryItem, index) => {
-                    const id =
-                      getConfigId(
-                        lotteryItem
-                      );
-
-                    const drawDate =
-                      lotteryItem?.drawDate
-                        ? String(
-                            lotteryItem.drawDate
-                          ).slice(0, 10)
-                        : "";
-
-                    const derived =
-                      getMonthYearFromDate(
-                        drawDate
-                      );
-
+          {loading && lotteries.length === 0 ? (
+            <div className="flex min-h-[200px] items-center justify-center text-sm text-[#6B7280]">
+              Loading festival lotteries...
+            </div>
+          ) : lotteries.length === 0 ? (
+            <div className="p-12 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#FFEFA8] text-[#1A1204] ring-2 ring-[#F2B705]">
+                <Ticket size={25} />
+              </div>
+              <h3 className="mt-4 text-lg font-bold text-[#1A1A1A]">
+                No festival lotteries found
+              </h3>
+              <p className="mt-1 text-sm text-[#6B7280]">
+                Create your first festival lottery using the form above.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1050px]">
+                <thead>
+                  <tr className="border-b border-[#F3E7C4] bg-[#FFF9E3]">
+                    <th className={TH_CLS}>#</th>
+                    <th className={TH_CLS}>Market</th>
+                    <th className={TH_CLS}>Draw Date</th>
+                    <th className={TH_CLS}>Time</th>
+                    <th className={TH_CLS}>Month / Year</th>
+                    <th className={TH_CLS}>Prizes</th>
+                    <th className={TH_CLS}>Entries</th>
+                    <th className={TH_CLS}>Status</th>
+                    <th
+                      className={`${TH_CLS} !text-right`}
+                    >
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lotteries.map((lotteryItem, index) => {
+                    const id = lotteryItem?._id || lotteryItem?.id;
+                    const drawDate = lotteryItem?.drawDate
+                      ? String(lotteryItem.drawDate).slice(0, 10)
+                      : "";
+                    const derivedDate = drawDate
+                      ? new Date(`${drawDate}T00:00:00`)
+                      : null;
                     const month =
-                      lotteryItem?.month ??
-                      derived.month;
-
+                      lotteryItem?.month ||
+                      (derivedDate ? derivedDate.getMonth() + 1 : "-");
                     const year =
-                      lotteryItem?.year ??
-                      derived.year;
-
-                    const entries =
-                      Array.isArray(
-                        lotteryItem?.users
-                      )
-                        ? lotteryItem.users
-                            .length
-                        : Number(
-                            lotteryItem?.entriesCount ??
-                              lotteryItem?.totalEntries ??
-                              0
-                          ) || 0;
-
-                    const rowBusy =
-                      actionId === id;
+                      lotteryItem?.year ||
+                      (derivedDate ? derivedDate.getFullYear() : "-");
 
                     return (
                       <tr
-                        key={
-                          id ||
-                          `lottery-${index}`
-                        }
-                        className="border-b border-gray-100 last:border-0 hover:bg-gray-50"
+                        key={id || index}
+                        className="border-b border-[#F3E7C4] last:border-0 hover:bg-[#FFFDF7]"
                       >
-
-                        {/* INDEX */}
-
-                        <td className="px-4 py-4 text-sm text-gray-600">
+                        <td className="px-5 py-4 text-sm text-[#8A8F98]">
                           {index + 1}
                         </td>
 
-                        {/* MARKET */}
-
-                        <td className="px-4 py-4">
-
-                          <div className="font-semibold text-gray-900">
-                            {lotteryItem?.marketName ||
-                              "-"}
+                        <td className="px-5 py-4">
+                          <div className="font-semibold text-[#1A1A1A]">
+                            {lotteryItem.marketName || "-"}
                           </div>
-
-                          <div className="mt-1 max-w-[220px] truncate text-xs text-gray-400">
+                          <div className="mt-1 max-w-[220px] truncate text-xs text-[#8A8F98]">
                             ID: {id || "-"}
                           </div>
                         </td>
 
-                        {/* DATE */}
-
-                        <td className="px-4 py-4 text-sm font-medium text-gray-900">
-                          {formatDate(
-                            drawDate
-                          )}
+                        <td className="px-5 py-4 text-sm font-medium text-[#1A1A1A]">
+                          {formatDate(drawDate)}
                         </td>
 
-                        {/* TIME */}
-
-                        <td className="px-4 py-4">
-
-                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700">
-
+                        <td className="px-5 py-4">
+                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#FFEFA8] px-3 py-1.5 text-sm font-bold text-[#9A5B00] ring-1 ring-[#F2B705]/60">
                             <Clock3 size={14} />
-
-                            {lotteryItem?.drawTime ||
-                              "-"}
+                            {lotteryItem.drawTime || "-"}
                           </span>
                         </td>
 
-                        {/* MONTH YEAR */}
-
-                        <td className="px-4 py-4 text-sm text-gray-700">
-
+                        <td className="px-5 py-4 text-sm text-[#1A1A1A]">
                           <div className="font-semibold">
-                            {month}
+                            {getMonthName(month)}
                           </div>
-
-                          <div className="text-xs text-gray-400">
-                            {year}
-                          </div>
+                          <div className="text-xs text-[#8A8F98]">{year}</div>
                         </td>
 
-                        {/* PRIZES */}
-
-                        <td className="px-4 py-4">
-
-                          <div className="space-y-1 text-xs">
-
+                        <td className="px-5 py-4">
+                          <div className="space-y-1 text-xs text-[#1A1A1A]">
                             <div>
-                              <span className="font-semibold text-gray-500">
+                              <span className="font-bold text-[#9A5B00]">
                                 1st:
                               </span>{" "}
                               ₹
                               {Number(
-                                lotteryItem
-                                  ?.prizes
-                                  ?.first ?? 0
-                              ).toLocaleString(
-                                "en-IN"
-                              )}
+                                lotteryItem.prizes?.first || 0
+                              ).toLocaleString("en-IN")}
                             </div>
-
                             <div>
-                              <span className="font-semibold text-gray-500">
+                              <span className="font-bold text-[#9A5B00]">
                                 2nd:
                               </span>{" "}
                               ₹
                               {Number(
-                                lotteryItem
-                                  ?.prizes
-                                  ?.second ?? 0
-                              ).toLocaleString(
-                                "en-IN"
-                              )}
+                                lotteryItem.prizes?.second || 0
+                              ).toLocaleString("en-IN")}
                             </div>
-
                             <div>
-                              <span className="font-semibold text-gray-500">
+                              <span className="font-bold text-[#9A5B00]">
                                 3rd:
                               </span>{" "}
                               ₹
                               {Number(
-                                lotteryItem
-                                  ?.prizes
-                                  ?.third ?? 0
-                              ).toLocaleString(
-                                "en-IN"
-                              )}
+                                lotteryItem.prizes?.third || 0
+                              ).toLocaleString("en-IN")}
                             </div>
-
                           </div>
                         </td>
 
-                        {/* ENTRIES */}
-
-                        <td className="px-4 py-4 text-sm font-semibold text-gray-700">
-                          {entries}
+                        <td className="px-5 py-4 text-sm font-semibold text-[#1A1A1A]">
+                          {Array.isArray(lotteryItem.users)
+                            ? lotteryItem.users.length
+                            : 0}
                         </td>
 
-                        {/* STATUS */}
-
-                        <td className="px-4 py-4">
-
-                          {lotteryItem?.isActive ? (
-
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-
-                              <CheckCircle2
-                                size={13}
-                              />
-
+                        <td className="px-5 py-4">
+                          {lotteryItem.isActive ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E6F6EF] px-3 py-1 text-xs font-bold text-[#12A36B]">
+                              <CheckCircle2 size={13} />
                               Active
                             </span>
-
                           ) : (
-
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-200 px-3 py-1 text-xs font-semibold text-gray-600">
-
-                              <XCircle
-                                size={13}
-                              />
-
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-[#6B7280]">
+                              <XCircle size={13} />
                               Inactive
                             </span>
                           )}
                         </td>
 
-                        {/* ACTIONS */}
-
-                        <td className="px-4 py-4">
-
+                        <td className="px-5 py-4">
                           <div className="flex justify-end gap-2">
-
-                            {/* EDIT */}
-
+                            {/* VIEW */}
                             <button
                               type="button"
-                              onClick={() =>
-                                handleEdit(
-                                  lotteryItem
-                                )
-                              }
-                              disabled={
-                                loading ||
-                                createLoading ||
-                                updateLoading ||
-                                actionLoading ||
-                                deleteLoading
-                              }
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-600 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                              title="View / Edit"
+                              onClick={() => handleView(lotteryItem)}
+                              disabled={busy}
+                              className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs transition disabled:cursor-not-allowed disabled:opacity-50 ${GOLD_BTN}`}
+                              title="View entries"
                             >
+                              <Eye size={15} />
+                              View
+                            </button>
 
-                              {loading &&
-                              rowBusy ? (
-
-                                <RefreshCw
-                                  size={15}
-                                  className="animate-spin"
-                                />
-
-                              ) : (
-
-                                <Pencil
-                                  size={15}
-                                />
-                              )}
-
+                            {/* EDIT */}
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(lotteryItem)}
+                              disabled={busy}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#F2B705] bg-white text-[#9A5B00] transition hover:bg-[#FFEFA8]/60 disabled:cursor-not-allowed disabled:opacity-50"
+                              title="Edit"
+                            >
+                              <Pencil size={15} />
                             </button>
 
                             {/* ACTIVATE / DEACTIVATE */}
-
                             <button
                               type="button"
-                              onClick={() =>
-                                handleToggleStatus(
-                                  lotteryItem
-                                )
-                              }
-                              disabled={
-                                actionLoading
-                              }
-                              className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                                lotteryItem?.isActive
-                                  ? "border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100"
-                                  : "border-green-200 bg-green-50 text-green-600 hover:bg-green-100"
+                              onClick={() => handleToggleStatus(lotteryItem)}
+                              disabled={activateLoading || deactivateLoading}
+                              className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                                lotteryItem.isActive
+                                  ? "border-[#F2B705] bg-[#FFEFA8] text-[#9A5B00] hover:bg-[#FFE680]"
+                                  : "border-[#12A36B]/40 bg-[#E6F6EF] text-[#12A36B] hover:bg-[#D3EFE2]"
                               }`}
                               title={
-                                lotteryItem?.isActive
-                                  ? "Deactivate"
-                                  : "Activate"
+                                lotteryItem.isActive ? "Deactivate" : "Activate"
                               }
                             >
-
-                              {actionLoading &&
-                              rowBusy ? (
-
-                                <RefreshCw
-                                  size={15}
-                                  className="animate-spin"
-                                />
-
-                              ) : (
-
-                                <Power
-                                  size={15}
-                                />
-                              )}
-
+                              <Power size={14} />
+                              {lotteryItem.isActive ? "Deactivate" : "Activate"}
                             </button>
 
                             {/* DELETE */}
-
                             <button
                               type="button"
-                              onClick={() =>
-                                handleOpenDelete(
-                                  id
-                                )
-                              }
-                              disabled={
-                                deleteLoading ||
-                                !id
-                              }
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              onClick={() => handleOpenDelete(id)}
+                              disabled={deleteLoading}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D93025]/30 bg-[#FDE8E6] text-[#D93025] transition hover:bg-[#FAD2CE] disabled:cursor-not-allowed disabled:opacity-50"
                               title="Delete"
                             >
-                              <Trash2
-                                size={15}
-                              />
+                              <Trash2 size={15} />
                             </button>
-
                           </div>
                         </td>
-
                       </tr>
                     );
-                  }
-                )}
-
-              </tbody>
-            </table>
-          </div>
-        )}
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* =================================================
-          DELETE MODAL
-      ================================================= */}
-
+      {/* ================= DELETE MODAL ================= */}
       {deleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-600">
+          <div className="w-full max-w-md rounded-2xl border border-[#F3E7C4] bg-white p-6 shadow-xl">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FDE8E6] text-[#D93025]">
               <Trash2 size={20} />
             </div>
 
-            <h2 className="mt-4 text-lg font-bold text-gray-900">
+            <h2 className="mt-4 text-lg font-black text-[#1A1A1A]">
               Delete Festival Lottery
             </h2>
-
-            <p className="mt-2 text-sm leading-6 text-gray-500">
-              Are you sure you want to delete this
-              festival lottery? This action cannot
-              be undone and its stored entries will
-              also be removed with the configuration.
+            <p className="mt-2 text-sm leading-6 text-[#6B7280]">
+              Are you sure you want to delete this festival lottery? This action
+              cannot be undone and its stored entries will also be removed with
+              the configuration.
             </p>
 
             <div className="mt-6 flex justify-end gap-3">
-
               <button
                 type="button"
-                onClick={
-                  handleCloseDelete
-                }
-                disabled={
-                  deleteLoading
-                }
-                className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={handleCloseDelete}
+                disabled={deleteLoading}
+                className={`rounded-xl px-4 py-2.5 text-sm transition disabled:opacity-50 ${OUTLINE_BTN}`}
               >
                 Cancel
               </button>
-
               <button
                 type="button"
-                onClick={
-                  handleDelete
-                }
-                disabled={
-                  deleteLoading ||
-                  !deleteId
-                }
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleDelete}
+                disabled={deleteLoading}
+                className="rounded-xl bg-[#D93025] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#B3261E] disabled:cursor-not-allowed disabled:opacity-60"
               >
-
-                {deleteLoading && (
-                  <RefreshCw
-                    size={15}
-                    className="animate-spin"
-                  />
-                )}
-
-                {deleteLoading
-                  ? "Deleting..."
-                  : "Delete"}
-s
+                {deleteLoading ? "Deleting..." : "Delete"}
               </button>
-
             </div>
           </div>
         </div>

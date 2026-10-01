@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { ClipboardList, RefreshCw, Plus, X } from "lucide-react";
 
 import {
   getAllResults,
@@ -11,6 +12,38 @@ import {
 } from "../../reducer/slice/lotteryResultReducer";
 
 import { getAllLotteryConfigs } from "../../reducer/slice/lotteryConfigSlice";
+
+/* =========================================================
+   WINZOX THEME TOKENS  (Bright Gold + White)
+   bg          #FFFDF7
+   border      #F3E7C4
+   gold        #FFD83D -> #F7B500 -> #E39A00
+   gold-soft   #FFEFA8
+   gold-line   #F2B705
+   on-gold     #1A1204  (text on gold is DARK)
+   text        #1A1A1A
+   muted       #6B7280
+   brown       #9A5B00
+   success     #12A36B
+   danger      #D93025
+========================================================= */
+
+const GOLD_BTN =
+  "bg-gradient-to-b from-[#FFD83D] via-[#F7B500] to-[#E39A00] text-[#1A1204] font-extrabold shadow-[0_4px_10px_-3px_rgba(227,154,0,0.55),inset_0_1px_0_rgba(255,255,255,0.55)] hover:brightness-105";
+
+const OUTLINE_BTN =
+  "border border-[#F2B705] bg-white font-bold text-[#9A5B00] hover:bg-[#FFEFA8]/60";
+
+const INPUT_CLS =
+  "w-full rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] px-4 py-3 text-sm text-[#1A1A1A] outline-none transition placeholder:text-[#8A8F98] focus:border-[#F2B705] focus:ring-2 focus:ring-[#FFEFA8] disabled:bg-[#F5F1E4] disabled:text-[#8A8F98]";
+
+const LABEL_CLS = "mb-2 block text-sm font-semibold text-[#1A1A1A]";
+
+const CARD_CLS =
+  "rounded-2xl border border-[#F3E7C4] bg-white shadow-[0_6px_18px_-10px_rgba(247,181,0,0.35)]";
+
+const TH_CLS =
+  "px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#9A5B00]";
 
 // =====================================================
 // SAFE DATE-ONLY STRING (YYYY-MM-DD)
@@ -330,10 +363,10 @@ const Results = () => {
       {/* HEADER */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl font-black tracking-tight text-[#1A1A1A]">
             Lottery Results
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-[#6B7280]">
             Manage date-wise lottery results.
           </p>
         </div>
@@ -346,8 +379,9 @@ const Results = () => {
               dispatch(getAllLotteryConfigs());
             }}
             disabled={loading}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm transition disabled:opacity-50 ${OUTLINE_BTN}`}
           >
+            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
             {loading ? "Refreshing..." : "Refresh"}
           </button>
 
@@ -357,34 +391,44 @@ const Results = () => {
               setShowCreate((prev) => !prev);
               setFormError("");
             }}
-            className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm transition ${GOLD_BTN}`}
           >
-            {showCreate ? "Close" : "+ Create Result"}
+            {showCreate ? (
+              <>
+                <X size={16} strokeWidth={2.8} />
+                Close
+              </>
+            ) : (
+              <>
+                <Plus size={16} strokeWidth={2.8} />
+                Create Result
+              </>
+            )}
           </button>
         </div>
       </div>
 
       {/* SUCCESS */}
       {success && (
-        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700">
+        <div className="rounded-xl border border-[#12A36B]/30 bg-[#E6F6EF] px-4 py-3 text-sm font-medium text-[#0E7A52]">
           {message}
         </div>
       )}
 
       {/* ERROR */}
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <div className="rounded-xl border border-[#D93025]/30 bg-[#FDE8E6] px-4 py-3 text-sm font-medium text-[#B3261E]">
           {error}
         </div>
       )}
 
       {/* CREATE FORM */}
       {showCreate && (
-        <div className="rounded-2xl bg-white p-6 shadow-sm">
-          <h2 className="mb-2 text-lg font-semibold text-slate-900">
+        <div className={`p-6 ${CARD_CLS}`}>
+          <h2 className="mb-2 text-lg font-black text-[#1A1A1A]">
             Create Lottery Result
           </h2>
-          <p className="mb-6 text-sm text-slate-500">
+          <p className="mb-6 text-sm text-[#6B7280]">
             Select the date-wise lottery config, then enter the 6 digit
             winning number.
           </p>
@@ -395,10 +439,7 @@ const Results = () => {
           >
             {/* CONFIG */}
             <div>
-              <label
-                htmlFor="lotteryConfigId"
-                className="mb-2 block text-sm font-medium text-slate-700"
-              >
+              <label htmlFor="lotteryConfigId" className={LABEL_CLS}>
                 Lottery Config (Date-wise)
               </label>
 
@@ -408,7 +449,7 @@ const Results = () => {
                 value={formData.lotteryConfigId}
                 onChange={handleChange}
                 disabled={configLoading}
-                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                className={INPUT_CLS}
               >
                 <option value="">
                   {configLoading
@@ -424,7 +465,7 @@ const Results = () => {
               </select>
 
               {activeConfigs.length === 0 && !configLoading && (
-                <p className="mt-2 text-xs text-red-500">
+                <p className="mt-2 text-xs font-medium text-[#D93025]">
                   No active lottery config found.
                 </p>
               )}
@@ -432,10 +473,7 @@ const Results = () => {
 
             {/* DATE */}
             <div>
-              <label
-                htmlFor="date"
-                className="mb-2 block text-sm font-medium text-slate-700"
-              >
+              <label htmlFor="date" className={LABEL_CLS}>
                 Result Date
               </label>
 
@@ -445,7 +483,7 @@ const Results = () => {
                 value={formData.date}
                 onChange={handleChange}
                 disabled={!selectedConfig}
-                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100"
+                className={INPUT_CLS}
               >
                 <option value="">
                   {!selectedConfig
@@ -467,13 +505,13 @@ const Results = () => {
               </select>
 
               {selectedConfig && (
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-[#6B7280]">
                   {availableDates.length} date(s) available in this config.
                 </p>
               )}
 
               {selectedConfig && availableDates.length === 0 && (
-                <p className="mt-2 text-xs text-red-500">
+                <p className="mt-2 text-xs font-medium text-[#D93025]">
                   No dates available for this config.
                 </p>
               )}
@@ -481,10 +519,7 @@ const Results = () => {
 
             {/* WINNING NUMBER */}
             <div>
-              <label
-                htmlFor="winningNumber"
-                className="mb-2 block text-sm font-medium text-slate-700"
-              >
+              <label htmlFor="winningNumber" className={LABEL_CLS}>
                 Winning Number
               </label>
 
@@ -497,10 +532,10 @@ const Results = () => {
                 onChange={handleChange}
                 maxLength={6}
                 placeholder="Enter 6 digit number"
-                className="w-full rounded-lg border border-slate-300 px-4 py-3 font-mono text-sm tracking-widest outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                className={`${INPUT_CLS} font-mono font-bold tracking-widest`}
               />
 
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-[#6B7280]">
                 {formData.winningNumber.length}/6 digits
               </p>
             </div>
@@ -508,39 +543,49 @@ const Results = () => {
             {/* SELECTED CONFIG INFO */}
             {selectedConfig && (
               <div className="md:col-span-3">
-                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <div className="rounded-xl border border-[#F3E7C4] bg-[#FFF9E3] p-4">
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
                     <div>
-                      <p className="text-xs text-slate-500">Market</p>
-                      <p className="mt-1 font-semibold text-slate-900">
+                      <p className="text-xs font-semibold text-[#8A8F98]">
+                        Market
+                      </p>
+                      <p className="mt-1 font-bold text-[#1A1A1A]">
                         {selectedConfig.marketName || "-"}
                       </p>
                     </div>
 
                     <div>
-                      <p className="text-xs text-slate-500">Draw Date</p>
-                      <p className="mt-1 font-semibold text-slate-900">
+                      <p className="text-xs font-semibold text-[#8A8F98]">
+                        Draw Date
+                      </p>
+                      <p className="mt-1 font-bold text-[#1A1A1A]">
                         {formatDate(selectedConfig.drawDate)}
                       </p>
                     </div>
 
                     <div>
-                      <p className="text-xs text-slate-500">Draw Time</p>
-                      <p className="mt-1 font-semibold text-slate-900">
+                      <p className="text-xs font-semibold text-[#8A8F98]">
+                        Draw Time
+                      </p>
+                      <p className="mt-1 font-bold text-[#1A1A1A]">
                         {selectedConfig.drawTime || "-"}
                       </p>
                     </div>
 
                     <div>
-                      <p className="text-xs text-slate-500">Month</p>
-                      <p className="mt-1 font-semibold text-slate-900">
+                      <p className="text-xs font-semibold text-[#8A8F98]">
+                        Month
+                      </p>
+                      <p className="mt-1 font-bold text-[#1A1A1A]">
                         {selectedConfig.month || "-"}
                       </p>
                     </div>
 
                     <div>
-                      <p className="text-xs text-slate-500">Year</p>
-                      <p className="mt-1 font-semibold text-slate-900">
+                      <p className="text-xs font-semibold text-[#8A8F98]">
+                        Year
+                      </p>
+                      <p className="mt-1 font-bold text-[#1A1A1A]">
                         {selectedConfig.year || "-"}
                       </p>
                     </div>
@@ -552,7 +597,7 @@ const Results = () => {
             {/* VALIDATION ERROR */}
             {formError && (
               <div className="md:col-span-3">
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                <div className="rounded-xl border border-[#D93025]/30 bg-[#FDE8E6] px-4 py-3 text-sm font-medium text-[#B3261E]">
                   {formError}
                 </div>
               </div>
@@ -563,7 +608,7 @@ const Results = () => {
               <button
                 type="submit"
                 disabled={createLoading}
-                className="rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                className={`rounded-xl px-6 py-3 text-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${GOLD_BTN}`}
               >
                 {createLoading ? "Creating..." : "Create Result"}
               </button>
@@ -573,12 +618,12 @@ const Results = () => {
       )}
 
       {/* RESULTS TABLE */}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-6 py-4">
+      <div className={`overflow-hidden ${CARD_CLS}`}>
+        <div className="border-b border-[#F3E7C4] px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-semibold text-slate-900">All Results</h2>
-              <p className="mt-1 text-xs text-slate-500">
+              <h2 className="font-black text-[#1A1A1A]">All Results</h2>
+              <p className="mt-1 text-xs text-[#6B7280]">
                 {results?.length || 0} result(s)
               </p>
             </div>
@@ -587,55 +632,37 @@ const Results = () => {
 
         {loading ? (
           <div className="p-10 text-center">
-            <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
-            <p className="text-sm text-slate-500">Loading results...</p>
+            <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-[#FFEFA8] border-t-[#F7B500]" />
+            <p className="text-sm text-[#6B7280]">Loading results...</p>
           </div>
         ) : results?.length === 0 ? (
           <div className="p-10 text-center">
-            <div className="mb-3 text-4xl">📋</div>
-            <h3 className="font-semibold text-slate-900">
-              No Results Found
-            </h3>
-            <p className="mt-1 text-sm text-slate-500">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#FFEFA8] text-[#1A1204] ring-2 ring-[#F2B705]">
+              <ClipboardList size={24} />
+            </div>
+            <h3 className="font-bold text-[#1A1A1A]">No Results Found</h3>
+            <p className="mt-1 text-sm text-[#6B7280]">
               Create your first lottery result.
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1000px]">
-              <thead className="bg-slate-50">
+              <thead className="bg-[#FFF9E3]">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    #
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Market
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Draw Date
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Draw Time
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Result Date
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Winning Number
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Status
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Created
-                  </th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Actions
-                  </th>
+                  <th className={TH_CLS}>#</th>
+                  <th className={TH_CLS}>Market</th>
+                  <th className={TH_CLS}>Draw Date</th>
+                  <th className={TH_CLS}>Draw Time</th>
+                  <th className={TH_CLS}>Result Date</th>
+                  <th className={TH_CLS}>Winning Number</th>
+                  <th className={TH_CLS}>Status</th>
+                  <th className={TH_CLS}>Created</th>
+                  <th className={`${TH_CLS} !text-right`}>Actions</th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[#F3E7C4]">
                 {results.map((item, index) => {
                   const published = item?.isPublished === true;
                   const config = item?.lotteryConfigId;
@@ -646,49 +673,50 @@ const Results = () => {
                   return (
                     <tr
                       key={item?._id || index}
-                      className="transition hover:bg-slate-50"
+                      className="transition hover:bg-[#FFFDF7]"
                     >
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-[#8A8F98]">
                         {index + 1}
                       </td>
 
                       <td className="whitespace-nowrap px-6 py-4">
-                        <span className="font-semibold text-slate-900">
+                        <span className="font-semibold text-[#1A1A1A]">
                           {config?.marketName || item?.marketName || "-"}
                         </span>
                       </td>
 
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-700">
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-[#1A1A1A]">
                         {formatDate(config?.drawDate)}
                       </td>
 
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-700">
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-[#1A1A1A]">
                         {config?.drawTime || "-"}
                       </td>
 
-                      <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-900">
+                      <td className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-[#1A1A1A]">
                         {formatDate(item?.date)}
                       </td>
 
                       <td className="whitespace-nowrap px-6 py-4">
-                        <span className="rounded-lg bg-slate-100 px-3 py-1.5 font-mono text-sm font-bold tracking-widest text-slate-900">
+                        <span className="rounded-full bg-[#FFEFA8] px-3.5 py-1.5 font-mono text-sm font-black tracking-widest text-[#1A1204] ring-1 ring-[#F2B705]/60">
                           {item?.winningNumber || "-"}
                         </span>
                       </td>
 
                       <td className="whitespace-nowrap px-6 py-4">
                         {published ? (
-                          <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E6F6EF] px-3 py-1 text-xs font-bold text-[#12A36B]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#12A36B]" />
                             Published
                           </span>
                         ) : (
-                          <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700">
+                          <span className="rounded-full bg-[#FFEFA8] px-3 py-1 text-xs font-bold text-[#9A5B00]">
                             Unpublished
                           </span>
                         )}
                       </td>
 
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-[#6B7280]">
                         {formatDate(item?.createdAt)}
                       </td>
 
@@ -699,7 +727,7 @@ const Results = () => {
                               type="button"
                               onClick={() => handleUnpublish(item._id)}
                               disabled={isPublishing}
-                              className="rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-700 hover:bg-yellow-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="rounded-lg border border-[#F2B705] bg-[#FFEFA8] px-3 py-2 text-xs font-bold text-[#9A5B00] transition hover:bg-[#FFE680] disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {isPublishing ? "..." : "Unpublish"}
                             </button>
@@ -708,7 +736,7 @@ const Results = () => {
                               type="button"
                               onClick={() => handlePublish(item._id)}
                               disabled={isPublishing}
-                              className="rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="rounded-lg border border-[#12A36B]/40 bg-[#E6F6EF] px-3 py-2 text-xs font-bold text-[#12A36B] transition hover:bg-[#D3EFE2] disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {isPublishing ? "..." : "Publish"}
                             </button>
@@ -723,7 +751,7 @@ const Results = () => {
                                 ? "Unpublish result before deleting"
                                 : "Delete result"
                             }
-                            className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="rounded-lg border border-[#D93025]/30 bg-[#FDE8E6] px-3 py-2 text-xs font-bold text-[#D93025] transition hover:bg-[#FAD2CE] disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {isDeleting ? "..." : "Delete"}
                           </button>
