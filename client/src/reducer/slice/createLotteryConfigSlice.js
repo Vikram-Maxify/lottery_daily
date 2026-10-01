@@ -141,11 +141,13 @@ export const getActiveLotteryConfig = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await api.get("/lottery/active");
+
       return response.data;
     } catch (error) {
-      if (error.response?.status === 404) {
-        return { success: true, data: null };
-      }
+      console.error(
+        "getActiveLotteryConfig error:",
+        error
+      );
 
       return rejectWithValue(
         error.response?.data?.message ||
@@ -154,6 +156,7 @@ export const getActiveLotteryConfig = createAsyncThunk(
     }
   }
 );
+
 
 // =====================================================
 // GET MY LOTTERY ENTRIES

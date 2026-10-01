@@ -34,23 +34,11 @@ const app = express();
 // =======================
 // TRUST PROXY
 // =======================
-// Required when running behind nginx/any reverse proxy so that
-// req.ip and the X-Forwarded-For header resolve to the real
-// client IP instead of the proxy's own address. The deposit
-// callback controller's getCallbackIp() relies on this being
-// correct.
 app.set("trust proxy", 1);
 
 // =======================
-// RAW REQUEST LOGGER (FIRST MIDDLEWARE - BEFORE EVERYTHING)
+// RAW REQUEST LOGGER
 // =======================
-// Logs every single request that reaches this Node process,
-// before CORS, before body parsing, before routing. This is the
-// ultimate reachability check: if a real QwackPay webhook never
-// shows up here in the logs, the request is dying somewhere
-// between QwackPay and this process (DNS, SSL, firewall, or the
-// nginx/reverse-proxy config) - not in application code, since
-// nothing in the app has even run yet at this point.
 app.use((req, res, next) => {
   console.log(
     `[RAW HIT] ${new Date().toISOString()} ${req.method} ${req.originalUrl} ip=${req.ip} ua=${req.headers["user-agent"] || ""}`
@@ -71,6 +59,7 @@ app.use(
     credentials: true,
   })
 );
+
 // =======================
 // MIDDLEWARE
 // =======================
@@ -91,10 +80,26 @@ app.use("/api", amountRoutes);
 // Deposit
 app.use("/api", depositRoutes);
 
+// =======================
+// LOTTERY ROUTE TEST
+// =======================
+// IMPORTANT:
+// This test route must come BEFORE the lotteryConfigRoutes
+// because lotteryConfigRoutes has /:id route.
+app.get("/api/lottery/test", (req, res) => {
+  console.log("🔥 LOTTERY TEST ROUTE HIT");
+
+  res.status(200).json({
+    success: true,
+    message: "LOTTERY ROUTE IS WORKING",
+  });
+});
+
 // Lottery Config
 app.use("/api/lottery", lotteryConfigRoutes);
 
-app.use('/api/festival',require('./routes/fes_lottery_routes'))
+// Festival Lottery
+app.use("/api/festival", require("./routes/fes_lottery_routes"));
 
 // Lottery Result
 app.use("/api/lottery-result", lotteryResultRoutes);
@@ -116,10 +121,10 @@ app.use("/api/admin/kyc", adminKycRoutes);
 
 app.use("/api/withdrawal", require("./routes/withdrawalRoutes"));
 
-// startLotteryDepositCron();
-
-    startLotteryCron();
-
+// =======================
+// LOTTERY CRON
+// =======================
+startLotteryCron();
 
 // =======================
 // HEALTH CHECK
@@ -168,7 +173,7 @@ app.use((err, req, res, next) => {
 // =======================
 // PORT
 // =======================
-const PORT = process.env.PORT || 5099;
+const PORT = process.env.PORT || 6099;
 
 // =======================
 // DATABASE + SERVER
@@ -176,6 +181,9 @@ const PORT = process.env.PORT || 5099;
 const startServer = async () => {
   try {
     await connectDB();
+
+    console.log("🔥🔥🔥 THIS SERVER.JS IS RUNNING 🔥🔥🔥");
+    console.log(`🔥 PORT CONFIG: ${PORT}`);
 
     app.listen(PORT, "0.0.0.0", () => {
       console.log("=================================");

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
 import {
@@ -23,7 +23,6 @@ const AdminKycVerification = () => {
     // =====================================================
 
     const kycList = useSelector(selectAdminKycDocuments);
-
     const loading = useSelector(selectAdminKycLoading);
     const actionLoading = useSelector(selectAdminKycActionLoading);
     const actionError = useSelector(selectAdminKycActionError);
@@ -35,11 +34,13 @@ const AdminKycVerification = () => {
     const [showModal, setShowModal] = useState(false);
     const [showRejectBox, setShowRejectBox] = useState(false);
     const [rejectionReason, setRejectionReason] = useState("");
-
     const [statusFilter, setStatusFilter] = useState("");
 
     // Selected grouped user
     const [selectedKyc, setSelectedKyc] = useState(null);
+
+    // Reject section reference
+    const rejectBoxRef = useRef(null);
 
     // =====================================================
     // API ORIGIN
@@ -89,14 +90,10 @@ const AdminKycVerification = () => {
             if (!grouped[userId]) {
                 grouped[userId] = {
                     userId: kyc.userId,
-
                     aadhaar: null,
                     pan: null,
-
                     documents: [],
-
                     createdAt: kyc.createdAt,
-
                     statuses: [],
                 };
             }
@@ -133,7 +130,7 @@ const AdminKycVerification = () => {
                 kyc.createdAt &&
                 (!group.createdAt ||
                     new Date(kyc.createdAt) <
-                    new Date(group.createdAt))
+                        new Date(group.createdAt))
             ) {
                 group.createdAt = kyc.createdAt;
             }
@@ -148,9 +145,7 @@ const AdminKycVerification = () => {
         });
 
         return Object.values(grouped).map((group) => {
-            const uniqueStatuses = [
-                ...new Set(group.statuses),
-            ];
+            const uniqueStatuses = [...new Set(group.statuses)];
 
             let status = "pending";
 
@@ -158,13 +153,9 @@ const AdminKycVerification = () => {
                 status = uniqueStatuses[0];
             } else if (uniqueStatuses.includes("rejected")) {
                 status = "rejected";
-            } else if (
-                uniqueStatuses.includes("pending")
-            ) {
+            } else if (uniqueStatuses.includes("pending")) {
                 status = "pending";
-            } else if (
-                uniqueStatuses.includes("approved")
-            ) {
+            } else if (uniqueStatuses.includes("approved")) {
                 status = "approved";
             }
 
@@ -189,8 +180,7 @@ const AdminKycVerification = () => {
             return url;
         }
 
-        return `${API_ORIGIN}${url.startsWith("/") ? "" : "/"
-            }${url}`;
+        return `${API_ORIGIN}${url.startsWith("/") ? "" : "/"}${url}`;
     };
 
     // =====================================================
@@ -347,7 +337,7 @@ const AdminKycVerification = () => {
     };
 
     // =====================================================
-    // OPEN REJECT BOX
+    // OPEN REJECT BOX + SCROLL
     // =====================================================
 
     const handleOpenReject = () => {
@@ -357,6 +347,26 @@ const AdminKycVerification = () => {
 
         setShowRejectBox(true);
         setRejectionReason("");
+
+        // Wait until the reject section is rendered
+        setTimeout(() => {
+            if (!rejectBoxRef.current) return;
+
+            rejectBoxRef.current.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+            });
+
+            // Focus textarea after scroll starts
+            setTimeout(() => {
+                const textarea =
+                    rejectBoxRef.current?.querySelector(
+                        "textarea"
+                    );
+
+                textarea?.focus();
+            }, 300);
+        }, 100);
     };
 
     // =====================================================
@@ -486,15 +496,15 @@ const AdminKycVerification = () => {
     return (
         <>
             {/* =====================================================
-          MAIN PAGE
-      ===================================================== */}
+                MAIN PAGE
+            ===================================================== */}
 
             <div className="min-h-screen bg-gray-100 p-4 sm:p-6 lg:p-8">
                 <div className="mx-auto max-w-8xl">
 
                     {/* =================================================
-              HEADER
-          ================================================= */}
+                        HEADER
+                    ================================================= */}
 
                     <div className="mb-6">
                         <h1 className="text-2xl font-bold text-gray-900">
@@ -508,14 +518,14 @@ const AdminKycVerification = () => {
                     </div>
 
                     {/* =================================================
-              TABLE CARD
-          ================================================= */}
+                        TABLE CARD
+                    ================================================= */}
 
                     <div className="rounded-2xl bg-white shadow-sm">
 
                         {/* =================================================
-                TABLE HEADER
-            ================================================= */}
+                            TABLE HEADER
+                        ================================================= */}
 
                         <div className="flex flex-col gap-4 border-b border-gray-100 p-6 sm:flex-row sm:items-center sm:justify-between">
 
@@ -531,8 +541,8 @@ const AdminKycVerification = () => {
                             </div>
 
                             {/* =================================================
-                  STATUS FILTER
-              ================================================= */}
+                                STATUS FILTER
+                            ================================================= */}
 
                             <div className="flex items-center gap-2">
                                 <label
@@ -570,12 +580,11 @@ const AdminKycVerification = () => {
                         </div>
 
                         {/* =================================================
-                TABLE
-            ================================================= */}
+                            TABLE
+                        ================================================= */}
 
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[850px] text-left">
-
                                 <thead>
                                     <tr className="border-b border-gray-200 bg-gray-50">
 
@@ -602,131 +611,127 @@ const AdminKycVerification = () => {
                                         <th className="px-6 py-4 text-right text-sm font-semibold text-gray-700">
                                             Action
                                         </th>
-
                                     </tr>
                                 </thead>
 
                                 <tbody>
-
                                     {loading
                                         ? renderLoading()
                                         : groupedKycList.length > 0
-                                            ? groupedKycList.map(
-                                                (kyc, index) => (
-                                                    <tr
-                                                        key={
-                                                            kyc.userId?._id ||
-                                                            index
-                                                        }
-                                                        className="border-b border-gray-100 last:border-0 hover:bg-gray-50"
-                                                    >
+                                        ? groupedKycList.map(
+                                              (kyc, index) => (
+                                                  <tr
+                                                      key={
+                                                          kyc.userId?._id ||
+                                                          index
+                                                      }
+                                                      className="border-b border-gray-100 last:border-0 hover:bg-gray-50"
+                                                  >
+                                                      {/* NUMBER */}
 
-                                                        {/* NUMBER */}
+                                                      <td className="px-6 py-4 text-sm text-gray-600">
+                                                          {index + 1}
+                                                      </td>
 
-                                                        <td className="px-6 py-4 text-sm text-gray-600">
-                                                            {index + 1}
-                                                        </td>
+                                                      {/* USER */}
 
-                                                        {/* USER */}
+                                                      <td className="px-6 py-4">
+                                                          <div>
+                                                              <div className="text-sm font-semibold text-gray-900">
+                                                                  {kyc.userId?.name ||
+                                                                      "Unknown User"}
+                                                              </div>
 
-                                                        <td className="px-6 py-4">
-                                                            <div>
-                                                                <div className="text-sm font-semibold text-gray-900">
-                                                                    {kyc.userId?.name ||
-                                                                        "Unknown User"}
-                                                                </div>
+                                                              {kyc.userId?.email && (
+                                                                  <div className="mt-1 text-xs text-gray-500">
+                                                                      {
+                                                                          kyc
+                                                                              .userId
+                                                                              .email
+                                                                      }
+                                                                  </div>
+                                                              )}
 
-                                                                {kyc.userId?.email && (
-                                                                    <div className="mt-1 text-xs text-gray-500">
-                                                                        {
-                                                                            kyc.userId
-                                                                                .email
-                                                                        }
-                                                                    </div>
-                                                                )}
+                                                              {kyc.userId?.phone && (
+                                                                  <div className="mt-1 text-xs text-gray-500">
+                                                                      {
+                                                                          kyc
+                                                                              .userId
+                                                                              .phone
+                                                                      }
+                                                                  </div>
+                                                              )}
+                                                          </div>
+                                                      </td>
 
-                                                                {kyc.userId?.phone && (
-                                                                    <div className="mt-1 text-xs text-gray-500">
-                                                                        {
-                                                                            kyc.userId
-                                                                                .phone
-                                                                        }
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </td>
+                                                      {/* DOCUMENTS */}
 
-                                                        {/* DOCUMENTS */}
+                                                      <td className="px-6 py-4">
+                                                          <div className="flex flex-wrap gap-2">
+                                                              {getDocumentLabels(
+                                                                  kyc
+                                                              ).map(
+                                                                  (document) => (
+                                                                      <span
+                                                                          key={
+                                                                              document
+                                                                          }
+                                                                          className="inline-flex rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-700"
+                                                                      >
+                                                                          {
+                                                                              document
+                                                                          }
+                                                                      </span>
+                                                                  )
+                                                              )}
+                                                          </div>
+                                                      </td>
 
-                                                        <td className="px-6 py-4">
-                                                            <div className="flex flex-wrap gap-2">
+                                                      {/* STATUS */}
 
-                                                                {getDocumentLabels(
-                                                                    kyc
-                                                                ).map(
-                                                                    (document) => (
-                                                                        <span
-                                                                            key={
-                                                                                document
-                                                                            }
-                                                                            className="inline-flex rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-700"
-                                                                        >
-                                                                            {document}
-                                                                        </span>
-                                                                    )
-                                                                )}
+                                                      <td className="px-6 py-4">
+                                                          <span
+                                                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(
+                                                                  kyc.status
+                                                              )}`}
+                                                          >
+                                                              {formatStatus(
+                                                                  kyc.status
+                                                              )}
+                                                          </span>
+                                                      </td>
 
-                                                            </div>
-                                                        </td>
+                                                      {/* DATE */}
 
-                                                        {/* STATUS */}
+                                                      <td className="px-6 py-4 text-sm text-gray-500">
+                                                          {formatDate(
+                                                              kyc.createdAt
+                                                          )}
+                                                      </td>
 
-                                                        <td className="px-6 py-4">
-                                                            <span
-                                                                className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(
-                                                                    kyc.status
-                                                                )}`}
-                                                            >
-                                                                {formatStatus(
-                                                                    kyc.status
-                                                                )}
-                                                            </span>
-                                                        </td>
+                                                      {/* ACTION */}
 
-                                                        {/* DATE */}
-
-                                                        <td className="px-6 py-4 text-sm text-gray-500">
-                                                            {formatDate(
-                                                                kyc.createdAt
-                                                            )}
-                                                        </td>
-
-                                                        {/* ACTION */}
-
-                                                        <td className="px-6 py-4 text-right">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    handleView(
-                                                                        kyc
-                                                                    )
-                                                                }
-                                                                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                                                disabled={
-                                                                    actionLoading
-                                                                }
-                                                            >
-                                                                View
-                                                            </button>
-                                                        </td>
-
-                                                    </tr>
-                                                )
-                                            )
-                                            : renderEmpty()}
-
+                                                      <td className="px-6 py-4 text-right">
+                                                          <button
+                                                              type="button"
+                                                              onClick={() =>
+                                                                  handleView(
+                                                                      kyc
+                                                                  )
+                                                              }
+                                                              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                                              disabled={
+                                                                  actionLoading
+                                                              }
+                                                          >
+                                                              View
+                                                          </button>
+                                                      </td>
+                                                  </tr>
+                                              )
+                                          )
+                                        : renderEmpty()}
                                 </tbody>
-
                             </table>
                         </div>
                     </div>
@@ -734,8 +739,8 @@ const AdminKycVerification = () => {
             </div>
 
             {/* =====================================================
-          KYC VIEW MODAL
-      ===================================================== */}
+                KYC VIEW MODAL
+            ===================================================== */}
 
             {showModal && selectedKyc && (
                 <div
@@ -744,14 +749,11 @@ const AdminKycVerification = () => {
                 >
                     <div
                         className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
-                        onClick={(e) =>
-                            e.stopPropagation()
-                        }
+                        onClick={(e) => e.stopPropagation()}
                     >
-
                         {/* =================================================
-                MODAL HEADER
-            ================================================= */}
+                            MODAL HEADER
+                        ================================================= */}
 
                         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-5 py-4 sm:px-6">
 
@@ -774,18 +776,17 @@ const AdminKycVerification = () => {
                             >
                                 ✕
                             </button>
-
                         </div>
 
                         {/* =================================================
-                MODAL CONTENT
-            ================================================= */}
+                            MODAL CONTENT
+                        ================================================= */}
 
                         <div className="p-5 sm:p-6">
 
                             {/* =================================================
-                  PERSONAL INFORMATION
-              ================================================= */}
+                                PERSONAL INFORMATION
+                            ================================================= */}
 
                             <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-5">
 
@@ -804,7 +805,6 @@ const AdminKycVerification = () => {
                                             selectedKyc.status
                                         )}
                                     </span>
-
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -861,7 +861,7 @@ const AdminKycVerification = () => {
                                             ).map((document) => (
                                                 <span
                                                     key={document}
-                                                    className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-gray-700 border border-gray-200"
+                                                    className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-700"
                                                 >
                                                     {document}
                                                 </span>
@@ -897,25 +897,21 @@ const AdminKycVerification = () => {
                                             }
                                         </p>
                                     </div>
-
                                 </div>
                             </div>
 
                             {/* =================================================
-                  DOCUMENTS
-              ================================================= */}
+                                DOCUMENTS
+                            ================================================= */}
 
                             <div>
-
                                 <h3 className="mb-4 text-lg font-semibold text-gray-900">
                                     Submitted Documents
                                 </h3>
 
                                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
 
-                                    {/* =================================================
-                      AADHAAR FRONT
-                  ================================================= */}
+                                    {/* AADHAAR FRONT */}
 
                                     {selectedKyc.aadhaar && (
                                         <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -931,13 +927,10 @@ const AdminKycVerification = () => {
                                                     "Aadhaar Front"
                                                 )}
                                             </div>
-
                                         </div>
                                     )}
 
-                                    {/* =================================================
-                      AADHAAR BACK
-                  ================================================= */}
+                                    {/* AADHAAR BACK */}
 
                                     {selectedKyc.aadhaar && (
                                         <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -954,13 +947,10 @@ const AdminKycVerification = () => {
                                                     "Aadhaar back document not available"
                                                 )}
                                             </div>
-
                                         </div>
                                     )}
 
-                                    {/* =================================================
-                      PAN
-                  ================================================= */}
+                                    {/* PAN */}
 
                                     {selectedKyc.pan && (
                                         <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -976,28 +966,22 @@ const AdminKycVerification = () => {
                                                     "PAN Card"
                                                 )}
                                             </div>
-
                                         </div>
                                     )}
-
                                 </div>
-
                             </div>
 
                             {/* =================================================
-                  REJECTION REASON
-              ================================================= */}
+                                REJECTION REASON
+                            ================================================= */}
 
-                            {selectedKyc.status ===
-                                "rejected" &&
+                            {selectedKyc.status === "rejected" &&
                                 selectedKyc.documents.some(
                                     (document) =>
-                                        document.status ===
-                                        "rejected" &&
+                                        document.status === "rejected" &&
                                         document.rejectionReason
                                 ) && (
                                     <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4">
-
                                         <p className="text-sm font-semibold text-red-800">
                                             Rejection Reason
                                         </p>
@@ -1006,7 +990,7 @@ const AdminKycVerification = () => {
                                             .filter(
                                                 (document) =>
                                                     document.status ===
-                                                    "rejected" &&
+                                                        "rejected" &&
                                                     document.rejectionReason
                                             )
                                             .map((document) => (
@@ -1015,8 +999,7 @@ const AdminKycVerification = () => {
                                                     className="mt-2"
                                                 >
                                                     <p className="text-xs font-semibold text-red-600">
-                                                        {document.documentType
-                                                            ?.toUpperCase()}
+                                                        {document.documentType?.toUpperCase()}
                                                     </p>
 
                                                     <p className="text-sm leading-relaxed text-red-700">
@@ -1026,16 +1009,14 @@ const AdminKycVerification = () => {
                                                     </p>
                                                 </div>
                                             ))}
-
                                     </div>
                                 )}
 
                             {/* =================================================
-                  VERIFICATION INFORMATION
-              ================================================= */}
+                                VERIFICATION INFORMATION
+                            ================================================= */}
 
                             <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-4">
-
                                 <div className="flex gap-3">
 
                                     <div className="text-blue-600">
@@ -1053,18 +1034,18 @@ const AdminKycVerification = () => {
                                             request.
                                         </p>
                                     </div>
-
                                 </div>
-
                             </div>
 
                             {/* =================================================
-                  REJECT REASON INPUT
-              ================================================= */}
+                                REJECT REASON INPUT
+                            ================================================= */}
 
                             {showRejectBox && (
-                                <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-5">
-
+                                <div
+                                    ref={rejectBoxRef}
+                                    className="mt-6 rounded-xl border border-red-200 bg-red-50 p-5"
+                                >
                                     <h3 className="text-sm font-semibold text-red-900">
                                         Reject KYC
                                     </h3>
@@ -1107,31 +1088,26 @@ const AdminKycVerification = () => {
                                                 ? "Rejecting..."
                                                 : "Confirm Rejection"}
                                         </button>
-
                                     </div>
-
                                 </div>
                             )}
 
                             {/* =================================================
-                  ACTION ERROR
-              ================================================= */}
+                                ACTION ERROR
+                            ================================================= */}
 
                             {actionError && (
                                 <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4">
-
                                     <p className="text-sm font-medium text-red-700">
                                         {actionError}
                                     </p>
-
                                 </div>
                             )}
-
                         </div>
 
                         {/* =================================================
-                MODAL FOOTER
-            ================================================= */}
+                            MODAL FOOTER
+                        ================================================= */}
 
                         <div className="sticky bottom-0 border-t border-gray-200 bg-white px-5 py-4 sm:px-6">
 
@@ -1150,40 +1126,35 @@ const AdminKycVerification = () => {
 
                                 {/* REJECT */}
 
-                                {selectedKyc.status !==
-                                    "approved" && (
-                                        <button
-                                            type="button"
-                                            onClick={handleOpenReject}
-                                            disabled={actionLoading}
-                                            className="w-full rounded-lg bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-400 sm:w-auto"
-                                        >
-                                            {actionLoading
-                                                ? "Processing..."
-                                                : "Reject User"}
-                                        </button>
-                                    )}
+                                {selectedKyc.status !== "approved" && (
+                                    <button
+                                        type="button"
+                                        onClick={handleOpenReject}
+                                        disabled={actionLoading}
+                                        className="w-full rounded-lg bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-400 sm:w-auto"
+                                    >
+                                        {actionLoading
+                                            ? "Processing..."
+                                            : "Reject User"}
+                                    </button>
+                                )}
 
                                 {/* APPROVE */}
 
-                                {selectedKyc.status !==
-                                    "approved" && (
-                                        <button
-                                            type="button"
-                                            onClick={handleApprove}
-                                            disabled={actionLoading}
-                                            className="w-full rounded-lg bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-400 sm:w-auto"
-                                        >
-                                            {actionLoading
-                                                ? "Processing..."
-                                                : "Approve User"}
-                                        </button>
-                                    )}
-
+                                {selectedKyc.status !== "approved" && (
+                                    <button
+                                        type="button"
+                                        onClick={handleApprove}
+                                        disabled={actionLoading}
+                                        className="w-full rounded-lg bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-400 sm:w-auto"
+                                    >
+                                        {actionLoading
+                                            ? "Processing..."
+                                            : "Approve User"}
+                                    </button>
+                                )}
                             </div>
-
                         </div>
-
                     </div>
                 </div>
             )}
