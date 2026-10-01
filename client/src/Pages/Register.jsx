@@ -18,6 +18,8 @@ import { useNavigate } from "react-router-dom";
 
 import { register } from "../reducer/slice/authSlice";
 
+// ⚠️ Apne bottom navbar ki height (px). Content isse peeche nahi chhupega.
+// Agar is page par navbar nahi hai to 0 kar do.
 const BOTTOM_NAV_HEIGHT = 64;
 
 const BANNER_IMAGE =
@@ -75,7 +77,6 @@ const Register = () => {
     e.preventDefault();
     setError("");
 
-    // -------- VALIDATIONS --------
     if (
       !form.number ||
       !form.name ||
@@ -101,32 +102,16 @@ const Register = () => {
       return;
     }
 
-    // -------- REGISTER --------
-    try {
-      const result = await dispatch(
-        register({
-          name: form.name.trim(),
-          mobile: form.number,
-          password: form.password,
-        })
-      ).unwrap();
+    const result = await dispatch(
+      register({
+        name: form.name.trim(),
+        mobile: form.number,
+        password: form.password,
+      })
+    );
 
-      console.log("REGISTER SUCCESS:", result);
-
-      // 🔥 FORCE HOMEPAGE — full reload, bypass all guards
-      // Using window.location.replace so no history entry is kept
-      // and HomePage (public route) loads directly.
-      window.location.replace("/");
-    } catch (err) {
-      console.error("REGISTER FAILED:", err);
-      setError(
-        typeof err === "string"
-          ? err
-          : err?.message ||
-              err?.payload?.message ||
-              err?.payload ||
-              "Registration failed. Please try again."
-      );
+    if (register.fulfilled.match(result)) {
+      navigate("/");
     }
   };
 
@@ -236,7 +221,7 @@ const Register = () => {
           </div>
         </section>
 
-        {/* ================= REGISTER CARD ================= */}
+        {/* ================= REGISTER CARD (sirf ek border + ek padding) ================= */}
         <div className="relative z-10 mx-3 -mt-8 rounded-[20px] border border-[#e6c97c]/70 bg-[#fffaf4] p-5 shadow-[0_12px_35px_rgba(0,0,0,0.18)]">
           <div className="mb-4 text-center">
             <h1 className="text-[23px] font-extrabold leading-[1.25] text-[#173e70]">
