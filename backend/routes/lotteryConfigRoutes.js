@@ -14,6 +14,7 @@ const {
   updateEntryStatus,
   deleteLotteryConfig,
   addBulkUserLotteryEntries,
+  deactivateLotteryConfig,
 } = require("../controllers/lotteryConfigController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -113,6 +114,8 @@ router.patch(
   adminMiddleware,
   activateLotteryConfig
 );
+
+router.put('/:id/deactivate',authMiddleware,adminMiddleware,deactivateLotteryConfig)
 
 // UPDATE user entry status
 // PATCH /api/lottery-config/:configId/entry/:entryId/status

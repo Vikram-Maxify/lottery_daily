@@ -68,11 +68,15 @@ const EN_DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const QUICK_OPTIONS = [10, 20, 30, 50, 100];
 const MAX_TICKETS = 100;
 const MIN_TICKETS = 10;
+const TICKET_STEP = 10; // +/- buttons move in steps of 10
+const INITIAL_VISIBLE_TICKETS = 10; // tickets shown before "View More"
 const ALL_DATES_COUNT = 30;
-const SLOT_PATTERN = ["D", "D", "L", "L", "D", "D", "D"];
+
+// Ticket format: 2 digits + 1 alphabet + 5 digits  →  12A12345
+const SLOT_PATTERN = ["D", "D", "L", "D", "D", "D", "D", "D"];
 const TICKET_LENGTH = SLOT_PATTERN.length;
-const TICKET_EXAMPLE = "12AB137";
-const TICKET_REGEX = /^\d{2}[A-Z]{2}\d{3}$/;
+const TICKET_EXAMPLE = "12A12345";
+const TICKET_REGEX = /^\d{2}[A-Z]\d{5}$/;
 
 const DEFAULT_TICKET_PRICE = 20;
 
@@ -104,10 +108,11 @@ const FESTIVALS = [
 // =====================================================
 const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 
+// Format: DD L DDDDD  →  12A12345
 const randomTicketNumber = () => {
   const d = () => String(Math.floor(Math.random() * 10));
   const l = () => LETTERS[Math.floor(Math.random() * LETTERS.length)];
-  return `${d()}${d()}${l()}${l()}${d()}${d()}${d()}`;
+  return `${d()}${d()}${l()}${d()}${d()}${d()}${d()}${d()}`;
 };
 
 const randomUniqueCode = (usedCodes = []) => {
@@ -222,6 +227,7 @@ const FestivalLottery = () => {
   const [showAllDates, setShowAllDates] = useState(false);
   const [showQuick, setShowQuick] = useState(true);
   const [tickets, setTickets] = useState([]);
+  const [showAllTickets, setShowAllTickets] = useState(false);
   const [draft, setDraft] = useState("");
   const [manualError, setManualError] = useState("");
   const [localSuccess, setLocalSuccess] = useState("");
@@ -244,6 +250,12 @@ const FestivalLottery = () => {
   const price = TICKET_PRICE;
   const totalTickets = tickets.length;
   const totalAmount = price * totalTickets;
+
+  // Tickets list: first 10 only, rest behind "View More"
+  const visibleTickets = showAllTickets
+    ? tickets
+    : tickets.slice(0, INITIAL_VISIBLE_TICKETS);
+  const hiddenTicketsCount = Math.max(tickets.length - INITIAL_VISIBLE_TICKETS, 0);
 
   // 🔥 KYC STATUS
   const kycStatus = useMemo(
@@ -268,6 +280,7 @@ const FestivalLottery = () => {
   // =====================================================
   useEffect(() => {
     setTickets([]);
+    setShowAllTickets(false);
     setDraft("");
     setManualError("");
     setLocalSuccess("");
@@ -346,9 +359,17 @@ const FestivalLottery = () => {
     setLocalSuccess("");
   };
 
+  // + / − always move to the next / previous multiple of 10 (10 → 20 → 30 ...)
+  const handleIncrease = () =>
+    setQuantity((Math.floor(totalTickets / TICKET_STEP) + 1) * TICKET_STEP);
+
+  const handleDecrease = () =>
+    setQuantity((Math.ceil(totalTickets / TICKET_STEP) - 1) * TICKET_STEP);
+
   const handleClear = () => {
     if (depositLoading) return;
     setTickets([]);
+    setShowAllTickets(false);
     setManualError("");
     setLocalSuccess("");
   };
@@ -476,7 +497,7 @@ const FestivalLottery = () => {
         return;
       }
 
-      // 🔥🔥🔥 KYC CHECK — PEHLE YE
+      // 🔥 KYC CHECK
       if (!isKycApproved) {
         if (kycStatus === "pending") {
           setManualError(
@@ -485,9 +506,7 @@ const FestivalLottery = () => {
           return;
         }
         if (kycStatus === "rejected") {
-          setManualError(
-            "Your KYC was rejected. Redirecting to KYC page..."
-          );
+          setManualError("Your KYC was rejected. Redirecting to KYC page...");
           setTimeout(() => navigate("/kyc"), 1500);
           return;
         }
@@ -580,6 +599,7 @@ const FestivalLottery = () => {
 
       // Reset local selection
       setTickets([]);
+      setShowAllTickets(false);
       setDraft("");
 
       // ---------- REDIRECT TO PAYMENT GATEWAY ----------
@@ -671,7 +691,11 @@ const FestivalLottery = () => {
               </div>
             </div>
             <div className="relative flex items-center justify-center">
-              <FestivalHeroTicket special={festival.special} price={price} number="12AB137" />
+              <FestivalHeroTicket
+                special={festival.special}
+                price={price}
+                number={TICKET_EXAMPLE}
+              />
             </div>
           </div>
         </section>
@@ -888,7 +912,7 @@ const FestivalLottery = () => {
               <div className="flex items-center gap-2 rounded-xl border border-[#dfe5f0] bg-white px-2 py-2 shadow-sm">
                 <button
                   type="button"
-                  onClick={() => setQuantity(totalTickets - 1)}
+                  onClick={handleDecrease}
                   disabled={totalTickets <= MIN_TICKETS || depositLoading}
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e9eef7] text-[22px] font-bold text-[#173e70] disabled:opacity-50"
                 >
@@ -899,7 +923,7 @@ const FestivalLottery = () => {
                 </span>
                 <button
                   type="button"
-                  onClick={() => setQuantity(totalTickets + 1)}
+                  onClick={handleIncrease}
                   disabled={totalTickets >= MAX_TICKETS || depositLoading}
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e9eef7] text-[22px] font-bold text-[#173e70] disabled:opacity-50"
                 >
@@ -1084,35 +1108,53 @@ const FestivalLottery = () => {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {tickets.map((ticket, index) => {
-                    const color = CHIP_COLORS[index % CHIP_COLORS.length];
-                    return (
-                      <div
-                        key={ticket.id}
-                        className={`flex min-w-0 items-center gap-1.5 rounded-lg border-2 border-white px-1.5 py-2 shadow-sm ${color.row}`}
-                      >
-                        <span
-                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-black text-white ${color.badge}`}
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    {visibleTickets.map((ticket, index) => {
+                      const color = CHIP_COLORS[index % CHIP_COLORS.length];
+                      return (
+                        <div
+                          key={ticket.id}
+                          className={`flex min-w-0 items-center gap-1.5 rounded-lg border-2 border-white px-1.5 py-2 shadow-sm ${color.row}`}
                         >
-                          {index + 1}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-[13px] font-bold tracking-wider text-[#26354b]">
-                          {ticket.code}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveTicket(ticket.id)}
-                          disabled={tickets.length <= MIN_TICKETS || depositLoading}
-                          aria-label={`Remove ticket ${index + 1}`}
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#ed1d43] text-white disabled:opacity-40"
-                        >
-                          <X size={13} strokeWidth={3} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
+                          <span
+                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-black text-white ${color.badge}`}
+                          >
+                            {index + 1}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-[13px] font-bold tracking-wider text-[#26354b]">
+                            {ticket.code}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTicket(ticket.id)}
+                            disabled={tickets.length <= MIN_TICKETS || depositLoading}
+                            aria-label={`Remove ticket ${index + 1}`}
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#ed1d43] text-white disabled:opacity-40"
+                          >
+                            <X size={13} strokeWidth={3} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {hiddenTicketsCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllTickets((s) => !s)}
+                      className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#c9d3e3] bg-white py-2 text-[12px] font-bold text-[#173e70] transition active:scale-[0.99]"
+                    >
+                      {showAllTickets
+                        ? "Show Less"
+                        : `View More Tickets (${hiddenTicketsCount} more)`}
+                      <ChevronDown
+                        size={16}
+                        className={`transition ${showAllTickets ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                  )}
+                </>
               )}
             </div>
 
@@ -1150,7 +1192,7 @@ const FestivalLottery = () => {
                   Example Winning Number
                 </span>
                 <span className="whitespace-nowrap rounded-md bg-white px-2 py-1 text-[17px] font-black tracking-wider text-[#d7193f]">
-                  12AB <span className="text-[#173e70]">137</span>
+                  12A <span className="text-[#173e70]">12345</span>
                 </span>
               </div>
               <div className="flex min-w-0 items-center gap-1.5 rounded-xl border border-[#ffd34e]/30 bg-white/5 px-2.5 py-2">
@@ -1171,9 +1213,9 @@ const FestivalLottery = () => {
               <table className="w-full table-fixed border-collapse text-left">
                 <colgroup>
                   <col style={{ width: "9%" }} />
-                  <col style={{ width: "29%" }} />
-                  <col style={{ width: "24%" }} />
-                  <col style={{ width: "18%" }} />
+                  <col style={{ width: "28%" }} />
+                  <col style={{ width: "26%" }} />
+                  <col style={{ width: "17%" }} />
                   <col style={{ width: "20%" }} />
                 </colgroup>
                 <thead>
@@ -1181,7 +1223,7 @@ const FestivalLottery = () => {
                     {[
                       "#",
                       "Match Condition",
-                      "Example (For 12AB137)",
+                      `Example (For ${TICKET_EXAMPLE})`,
                       "Prize Per Ticket",
                       "Total Prize (10 Tickets)",
                     ].map((h) => (
@@ -1195,11 +1237,10 @@ const FestivalLottery = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  <RuleRow number="1" condition="All digits/characters match" example="12AB137" prize="₹50 Lakh" total="₹5 Crore" badge="bg-[#ed1d43]" row="bg-[#ffe4e8]" />
-                  <RuleRow number="2" condition="Alphabet does not match but all remaining digits match" example="12XY137" prize="₹30 Lakh" total="₹3 Crore" badge="bg-[#2e7dd7]" row="bg-[#e3f0ff]" />
-                  <RuleRow number="3" condition="All numbers after the alphabet match" example="99AB137" prize="₹20,000" total="₹2 Lakh" badge="bg-[#f08a25]" row="bg-[#ffefdc]" />
-                  <RuleRow number="4" condition="Left-most 4 digits match" example="12AB1XX" prize="₹20,000" total="₹2 Lakh" badge="bg-[#20a66a]" row="bg-[#dcf8ea]" />
-                  <RuleRow number="5" condition="Left-most 3 digits match" example="12AXXXX" prize="₹900" total="₹9,000" badge="bg-[#8c4bd6]" row="bg-[#f0e4ff]" />
+                  <RuleRow number="1" condition="All digits/characters match" example="12A12345" prize="₹50 Lakh" total="₹5 Crore" badge="bg-[#ed1d43]" row="bg-[#ffe4e8]" />
+                  <RuleRow number="2" condition="Alphabet does not match but all remaining digits match" example="12X12345" prize="₹30 Lakh" total="₹3 Crore" badge="bg-[#2e7dd7]" row="bg-[#e3f0ff]" />
+                  <RuleRow number="3" condition="Last 5 digits after the alphabet match" example="99A12345" prize="₹20,000" total="₹2 Lakh" badge="bg-[#f08a25]" row="bg-[#ffefdc]" />
+                  
                 </tbody>
               </table>
             </div>
@@ -1381,7 +1422,7 @@ const RuleRow = ({ number, condition, example, prize, total, badge, row }) => (
       {condition}
     </td>
     <td className="px-1.5 py-2.5">
-      <span className="whitespace-nowrap rounded border border-[#e6c97c] bg-[#fffdf5] px-1 py-0.5 font-mono text-[10.5px] font-black tracking-[0.3px] text-[#d7193f]">
+      <span className="whitespace-nowrap rounded border border-[#e6c97c] bg-[#fffdf5] px-1 py-0.5 font-mono text-[10px] font-black tracking-[0.2px] text-[#d7193f]">
         {example}
       </span>
     </td>

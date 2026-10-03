@@ -86,7 +86,6 @@ const getToday = () => {
   );
 };
 
-// backend date -> <input type="date"> value (YYYY-MM-DD)
 const toInputDate = (date) => {
   if (!date) return "";
   if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}/.test(date)) {
@@ -101,7 +100,6 @@ const toInputDate = (date) => {
   );
 };
 
-// Image validation
 const validateImage = (file) => {
   if (!file) return "No file selected";
   if (!file.type.startsWith("image/")) return "Only image files are allowed";
@@ -109,7 +107,6 @@ const validateImage = (file) => {
   return "";
 };
 
-// ---------- shared form validation + payload ----------
 const validateLotteryForm = (d, checkPast) => {
   if (!d.marketName.trim()) return "Market name is required";
   if (!d.month) return "Month is required";
@@ -199,7 +196,7 @@ const ModalShell = ({ title, subtitle, onClose, children, wide, z = "z-50" }) =>
   >
     <div
       className={`my-6 w-full ${
-        wide ? "max-w-6xl" : "max-w-3xl"
+        wide ? "max-w-7xl" : "max-w-3xl"
       } rounded-2xl border border-[#F3E7C4] bg-white shadow-xl`}
     >
       <div className="flex items-center justify-between border-b border-[#F3E7C4] px-5 py-4">
@@ -252,7 +249,6 @@ const IconTile = ({ src, name, size = "h-24 w-24", compact = false }) =>
     </div>
   );
 
-// Create + Update dono popup me same fields
 const LotteryFields = ({ data, onChange, minDate }) => (
   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
     <div className="sm:col-span-2">
@@ -345,6 +341,10 @@ const LotteryFields = ({ data, onChange, minDate }) => (
   </div>
 );
 
+/* =========================================================
+   MAIN COMPONENT
+========================================================= */
+
 const AdminLottery = () => {
   const dispatch = useDispatch();
 
@@ -411,6 +411,10 @@ const AdminLottery = () => {
   const [iconFile, setIconFile] = useState(null);
   const [iconPreview, setIconPreview] = useState("");
 
+  // update popup image state
+  const [updateIconFile, setUpdateIconFile] = useState(null);
+  const [updateIconPreview, setUpdateIconPreview] = useState("");
+
   // info-panel icon state (update page)
   const [infoIconFile, setInfoIconFile] = useState(null);
   const [infoIconPreview, setInfoIconPreview] = useState("");
@@ -452,9 +456,7 @@ const AdminLottery = () => {
 
   const isActive = listItem?.isActive ?? current?.isActive ?? false;
 
-  // icon source: local preview override, otherwise backend imageUrl
-  const currentIcon =
-    infoIconPreview || current?.imageUrl || "";
+  const currentIcon = infoIconPreview || current?.imageUrl || "";
 
   const drawPrefix = useMemo(() => {
     const d = current?.drawDate ? new Date(current.drawDate) : null;
@@ -469,14 +471,6 @@ const AdminLottery = () => {
   const autoNext = String((current?.users?.length || 0) + 1).padStart(3, "0");
   const prefixValue = autoGenerate ? drawPrefix : manualPrefix;
   const nextValue = autoGenerate ? autoNext : manualNext;
-
-  const prizeRows = current?.prizes
-    ? [
-        { name: "1st Prize", amount: current.prizes.first },
-        { name: "2nd Prize", amount: current.prizes.second },
-        { name: "3rd Prize", amount: current.prizes.third },
-      ]
-    : [];
 
   /* ---------- table actions ---------- */
 
@@ -555,7 +549,6 @@ const AdminLottery = () => {
 
   /* ---------- icon handlers ---------- */
 
-  // Info panel icon (update page) — local preview only for now
   const handleInfoIconChange = (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -573,7 +566,6 @@ const AdminLottery = () => {
     setInfoIconPreview(URL.createObjectURL(file));
   };
 
-  // Create popup icon
   const handleIconChange = (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -595,6 +587,30 @@ const AdminLottery = () => {
     if (iconPreview) URL.revokeObjectURL(iconPreview);
     setIconFile(null);
     setIconPreview("");
+  };
+
+  // update popup icon handler
+  const handleUpdateIconChange = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    const err = validateImage(file);
+    if (err) {
+      setFormError(err);
+      return;
+    }
+
+    if (updateIconPreview) URL.revokeObjectURL(updateIconPreview);
+    setUpdateIconFile(file);
+    setUpdateIconPreview(URL.createObjectURL(file));
+    setFormError("");
+  };
+
+  const removeUpdateIcon = () => {
+    if (updateIconPreview) URL.revokeObjectURL(updateIconPreview);
+    setUpdateIconFile(null);
+    setUpdateIconPreview("");
   };
 
   /* ---------- form change handlers ---------- */
@@ -647,7 +663,6 @@ const AdminLottery = () => {
     const err = validateLotteryForm(formData, true);
     if (err) return setFormError(err);
 
-    // image is REQUIRED by backend
     if (!iconFile) {
       return setFormError("Market image is required");
     }
@@ -665,13 +680,19 @@ const AdminLottery = () => {
     }
   };
 
-  /* ---------- UPDATE (popup) ---------- */
+  /* ---------- UPDATE ---------- */
 
   const openUpdatePopup = () => {
     if (!current) return;
     dispatch(clearLotteryError());
     dispatch(clearLotteryMessage());
     setFormError("");
+
+    // reset update image state
+    if (updateIconPreview) URL.revokeObjectURL(updateIconPreview);
+    setUpdateIconFile(null);
+    setUpdateIconPreview("");
+
     setUpdateData({
       marketName: current.marketName || "",
       month: current.month || new Date().getMonth() + 1,
@@ -690,6 +711,7 @@ const AdminLottery = () => {
   const closeUpdatePopup = () => {
     setShowUpdate(false);
     setFormError("");
+    removeUpdateIcon();
     dispatch(clearLotteryError());
   };
 
@@ -699,17 +721,22 @@ const AdminLottery = () => {
 
     if (!current?._id) return;
 
+    // update me past date allowed
     const err = validateLotteryForm(updateData, false);
     if (err) return setFormError(err);
+
+    const payload = buildPayload(updateData);
 
     const result = await dispatch(
       updateLotteryConfig({
         id: current._id,
-        lotteryData: buildPayload(updateData),
+        lotteryData: payload,
+        imageFile: updateIconFile || undefined,   // 👈 image optional
       })
     );
 
     if (updateLotteryConfig.fulfilled.match(result)) {
+      removeUpdateIcon();
       setShowUpdate(false);
       await dispatch(getLotteryConfigById(current._id));
       dispatch(getAllLotteryConfigs());
@@ -803,7 +830,7 @@ const AdminLottery = () => {
 
   return (
     <div className="min-h-screen">
-      <div className="mx-auto max-w-7xl space-y-4">
+      <div className="mx-auto max-w-[100rem] space-y-4">
         {message && (
           <div className="rounded-xl border border-[#12A36B]/30 bg-[#E6F6EF] px-4 py-3 text-sm font-medium text-[#0E7A52]">
             {message}
@@ -1046,7 +1073,6 @@ const AdminLottery = () => {
               </div>
             ) : (
               <>
-                {/* BANNER */}
                 <div className="relative overflow-hidden rounded-2xl border border-[#F3E7C4] bg-gradient-to-r from-white via-[#FFF9E3] to-[#FFE08A] p-4 shadow-[0_6px_18px_-10px_rgba(247,181,0,0.35)] sm:p-5">
                   <div className="pointer-events-none absolute -bottom-10 right-0 h-40 w-2/5 bg-[radial-gradient(ellipse_at_bottom_right,rgba(247,181,0,0.55),transparent_70%)]" />
 
@@ -1095,25 +1121,8 @@ const AdminLottery = () => {
                       </div>
                     </div>
                   </div>
-
-                  <div className="pointer-events-none absolute right-8 top-1/2 hidden -translate-y-1/2 items-end gap-1 lg:flex">
-                    {[
-                      { n: 3, c: "from-[#60A5FA] to-[#1D4ED8]", s: "h-14 w-14" },
-                      { n: 7, c: "from-[#F87171] to-[#B91C1C]", s: "h-[68px] w-[68px]" },
-                      { n: 9, c: "from-[#C084FC] to-[#7E22CE]", s: "h-14 w-14" },
-                      { n: 5, c: "from-[#4ADE80] to-[#15803D]", s: "h-16 w-16" },
-                    ].map((b) => (
-                      <span
-                        key={b.n}
-                        className={`flex items-center justify-center rounded-full bg-gradient-to-br ${b.c} ${b.s} text-xl font-black text-white shadow-lg ring-2 ring-white/70`}
-                      >
-                        {b.n}
-                      </span>
-                    ))}
-                  </div>
                 </div>
 
-                {/* TABS */}
                 <div className="flex gap-1 overflow-x-auto rounded-2xl border border-[#F3E7C4] bg-white p-1.5 shadow-[0_6px_18px_-10px_rgba(247,181,0,0.3)]">
                   {TABS.map((t) => {
                     const Icon = t.icon;
@@ -1136,9 +1145,7 @@ const AdminLottery = () => {
                   })}
                 </div>
 
-                {/* ROW 1 */}
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.25fr_1fr]">
-                  {/* LOTTERY INFORMATION */}
                   <Panel id="sec-info" icon={Info} title="Lottery Information">
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_190px]">
                       <div className="grid grid-cols-2 gap-3">
@@ -1163,7 +1170,6 @@ const AdminLottery = () => {
                         </div>
                       </div>
 
-                      {/* Icon / Banner */}
                       <div>
                         <label className={LABEL_CLS}>Icon / Banner</label>
                         <div className="flex min-h-[210px] flex-col items-center justify-center gap-3 rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3 text-center">
@@ -1194,7 +1200,6 @@ const AdminLottery = () => {
                     </div>
                   </Panel>
 
-                  {/* PUBLISH STATUS */}
                   <Panel id="sec-publish" icon={ToggleRight} title="Publish Status">
                     <div className="space-y-5">
                       <div className="flex items-center gap-3 rounded-xl bg-[#FFFDF7] px-4 py-3 ring-1 ring-[#F3E7C4]">
@@ -1249,7 +1254,7 @@ const AdminLottery = () => {
       </div>
 
       {/* =====================================================
-          VIEW POPUP
+          VIEW POPUP — FULL DETAILS
       ===================================================== */}
 
       {viewId && (
@@ -1271,36 +1276,14 @@ const AdminLottery = () => {
             </div>
           ) : (
             <div className="p-5">
-              <div className="mb-4 flex flex-wrap items-center gap-2">
+              {/* ============ TOP SUMMARY ============ */}
+              <div className="mb-5 flex flex-wrap items-center gap-2">
                 <StatusPill
                   active={
                     (lotteries || []).find((l) => l._id === viewLottery._id)?.isActive ??
                     viewLottery.isActive
                   }
                 />
-                <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#FFF9E3] px-3 py-1.5 text-xs font-semibold text-[#9A5B00] ring-1 ring-[#F3E7C4]">
-                  <Calendar size={13} />
-                  {formatDate(viewLottery.drawDate)}
-                </span>
-                {viewLottery.drawTime && (
-                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#FFEFA8] px-3 py-1.5 text-xs font-bold text-[#9A5B00] ring-1 ring-[#F2B705]/60">
-                    <Clock size={13} />
-                    {viewLottery.drawTime}
-                  </span>
-                )}
-                {viewLottery.prizes &&
-                  [
-                    ["1st", viewLottery.prizes.first],
-                    ["2nd", viewLottery.prizes.second],
-                    ["3rd", viewLottery.prizes.third],
-                  ].map(([label, amt]) => (
-                    <span
-                      key={label}
-                      className="rounded-lg bg-[#FFF9E3] px-3 py-1.5 text-xs font-bold text-[#9A5B00] ring-1 ring-[#F3E7C4]"
-                    >
-                      {label} ₹{Number(amt || 0).toLocaleString("en-IN")}
-                    </span>
-                  ))}
 
                 <button
                   type="button"
@@ -1312,119 +1295,198 @@ const AdminLottery = () => {
                 </button>
               </div>
 
-              <div className="overflow-x-auto rounded-xl ring-1 ring-[#F3E7C4]">
-                {viewLottery.users?.length > 0 ? (
-                  <table className="min-w-full">
-                    <thead className="bg-[#FFF9E3]">
-                      <tr>
-                        <th className={TH_CLS}>#</th>
-                        <th className={TH_CLS}>User</th>
-                        <th className={TH_CLS}>Number</th>
-                        <th className={TH_CLS}>Amount</th>
-                        <th className={TH_CLS}>Prize</th>
-                        <th className={TH_CLS}>Date</th>
-                        <th className={TH_CLS}>Status</th>
-                        <th className={TH_CLS}>Actions</th>
-                      </tr>
-                    </thead>
+              {/* ============ DETAILS + IMAGE ============ */}
+              <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-[220px_1fr]">
+                {/* Image */}
+                <div className="flex flex-col items-center gap-2 rounded-2xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
+                  <IconTile
+                    src={viewLottery.imageUrl}
+                    name={viewLottery.marketName}
+                    size="h-40 w-40"
+                  />
+                  <p className="text-center text-[11px] font-semibold text-[#8A8F98]">
+                    Market Banner
+                  </p>
+                </div>
 
-                    <tbody className="divide-y divide-[#F3E7C4]">
-                      {viewLottery.users.map((entry, index) => (
-                        <tr key={entry._id} className="hover:bg-[#FFFDF7]">
-                          <td className="px-4 py-3 text-sm text-[#8A8F98]">{index + 1}</td>
+                {/* Info fields */}
+                <div className="rounded-2xl border border-[#F3E7C4] bg-white p-4">
+                  <h3 className="mb-3 text-base font-black text-[#1F2A6B]">
+                    {viewLottery.marketName}
+                  </h3>
 
-                          <td className="px-4 py-3 text-sm">
-                            <div className="font-semibold text-[#1A1A1A]">
-                              {getUserName(entry.userId)}
-                            </div>
-                            <div className="mt-0.5 max-w-[180px] truncate text-xs text-[#8A8F98]">
-                              {typeof entry.userId === "object"
-                                ? entry.userId?._id
-                                : entry.userId}
-                            </div>
-                          </td>
-
-                          <td className="px-4 py-3">
-                            <span className="inline-flex rounded-full bg-[#FFEFA8] px-3 py-1 text-sm font-black tracking-wider text-[#1A1204] ring-1 ring-[#F2B705]/60">
-                              {entry.number}
-                            </span>
-                          </td>
-
-                          <td className="px-4 py-3 text-sm font-semibold text-[#1A1A1A]">
-                            ₹{Number(entry.amount || 0).toLocaleString("en-IN")}
-                          </td>
-
-                          <td className="px-4 py-3 text-sm font-semibold text-[#1A1A1A]">
-                            {entry.status === "win" ? (
-                              <div>
-                                <span className="text-[#12A36B]">
-                                  {entry.prizeType || "Winner"}
-                                </span>
-                                {entry.prize && (
-                                  <div className="mt-1 text-xs text-[#6B7280]">
-                                    ₹
-                                    {Number(
-                                      entry.prize.first ||
-                                        entry.prize.second ||
-                                        entry.prize.third ||
-                                        0
-                                    ).toLocaleString("en-IN")}
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              "-"
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3 text-sm text-[#6B7280]">
-                            {entry.entryDate}
-                          </td>
-
-                          <td className="px-4 py-3">
-                            {entry.status === "win" ? (
-                              <span className="rounded-full bg-[#E6F6EF] px-3 py-1 text-xs font-bold text-[#12A36B]">
-                                Win
-                              </span>
-                            ) : entry.status === "lost" ? (
-                              <span className="rounded-full bg-[#FDE8E6] px-3 py-1 text-xs font-bold text-[#D93025]">
-                                Lost
-                              </span>
-                            ) : (
-                              <span className="rounded-full bg-[#FFEFA8] px-3 py-1 text-xs font-bold text-[#9A5B00]">
-                                Pending
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3">
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleEditEntry(entry)}
-                                className={`rounded-lg px-3 py-1.5 text-xs ${GOLD_BTN}`}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteEntry(viewLottery._id, entry._id)}
-                                disabled={deleteLoading}
-                                className="rounded-lg bg-[#D93025] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#B3261E] disabled:opacity-50"
-                              >
-                                {deleteLoading ? "..." : "Delete"}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="py-10 text-center text-sm text-[#6B7280]">
-                    No user entries found.
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <ReadField label="Month" value={getMonthName(viewLottery.month)} />
+                    <ReadField label="Year" value={viewLottery.year} />
+                    <ReadField label="Draw Time" value={viewLottery.drawTime || "-"} />
+                    <ReadField
+                      label="Draw Date"
+                      value={formatDate(viewLottery.drawDate)}
+                    />
+                    <ReadField label="Created" value={formatDate(viewLottery.createdAt)} />
+                    <ReadField
+                      label="Total Entries"
+                      value={viewLottery.users?.length || 0}
+                    />
                   </div>
-                )}
+
+                  {/* Prizes */}
+                  <div className="mt-4">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[#9A5B00]">
+                      Prize Structure
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        ["1st Prize", viewLottery.prizes?.first],
+                        ["2nd Prize", viewLottery.prizes?.second],
+                        ["3rd Prize", viewLottery.prizes?.third],
+                      ].map(([label, amt]) => (
+                        <div
+                          key={label}
+                          className="rounded-xl bg-gradient-to-b from-[#FFF9E3] to-[#FFEFA8] p-3 text-center ring-1 ring-[#F3E7C4]"
+                        >
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-[#9A5B00]">
+                            {label}
+                          </p>
+                          <p className="mt-1 text-lg font-black text-[#1A1204]">
+                            ₹{Number(amt || 0).toLocaleString("en-IN")}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Lottery ID */}
+                  <div className="mt-3 rounded-lg bg-[#FFFDF7] px-3 py-2 text-[11px] text-[#8A8F98] ring-1 ring-[#F3E7C4]">
+                    <b className="text-[#374151]">ID:</b> {viewLottery._id}
+                  </div>
+                </div>
+              </div>
+
+              {/* ============ ENTRIES TABLE ============ */}
+              <div>
+                <p className="mb-2 text-sm font-black text-[#1F2A6B]">
+                  User Entries ({viewLottery.users?.length || 0})
+                </p>
+
+                <div className="overflow-x-auto rounded-xl ring-1 ring-[#F3E7C4]">
+                  {viewLottery.users?.length > 0 ? (
+                    <table className="min-w-full">
+                      <thead className="bg-[#FFF9E3]">
+                        <tr>
+                          <th className={TH_CLS}>#</th>
+                          <th className={TH_CLS}>User</th>
+                          <th className={TH_CLS}>Number</th>
+                          <th className={TH_CLS}>Amount</th>
+                          <th className={TH_CLS}>Prize</th>
+                          <th className={TH_CLS}>Date</th>
+                          <th className={TH_CLS}>Status</th>
+                          <th className={TH_CLS}>Actions</th>
+                        </tr>
+                      </thead>
+
+                      <tbody className="divide-y divide-[#F3E7C4]">
+                        {viewLottery.users.map((entry, index) => (
+                          <tr key={entry._id} className="hover:bg-[#FFFDF7]">
+                            <td className="px-4 py-3 text-sm text-[#8A8F98]">
+                              {index + 1}
+                            </td>
+
+                            <td className="px-4 py-3 text-sm">
+                              <div className="font-semibold text-[#1A1A1A]">
+                                {getUserName(entry.userId)}
+                              </div>
+                              <div className="mt-0.5 max-w-[180px] truncate text-xs text-[#8A8F98]">
+                                {typeof entry.userId === "object"
+                                  ? entry.userId?._id
+                                  : entry.userId}
+                              </div>
+                            </td>
+
+                            <td className="px-4 py-3">
+                              <span className="inline-flex rounded-full bg-[#FFEFA8] px-3 py-1 text-sm font-black tracking-wider text-[#1A1204] ring-1 ring-[#F2B705]/60">
+                                {entry.number}
+                              </span>
+                            </td>
+
+                            <td className="px-4 py-3 text-sm font-semibold text-[#1A1A1A]">
+                              ₹{Number(entry.amount || 0).toLocaleString("en-IN")}
+                            </td>
+
+                            <td className="px-4 py-3 text-sm font-semibold text-[#1A1A1A]">
+                              {entry.status === "win" ? (
+                                <div>
+                                  <span className="text-[#12A36B]">
+                                    {entry.prizeType || "Winner"}
+                                  </span>
+                                  {entry.prize && (
+                                    <div className="mt-1 text-xs text-[#6B7280]">
+                                      ₹
+                                      {Number(
+                                        entry.prize.first ||
+                                          entry.prize.second ||
+                                          entry.prize.third ||
+                                          0
+                                      ).toLocaleString("en-IN")}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                "-"
+                              )}
+                            </td>
+
+                            <td className="px-4 py-3 text-sm text-[#6B7280]">
+                              {entry.entryDate}
+                            </td>
+
+                            <td className="px-4 py-3">
+                              {entry.status === "win" ? (
+                                <span className="rounded-full bg-[#E6F6EF] px-3 py-1 text-xs font-bold text-[#12A36B]">
+                                  Win
+                                </span>
+                              ) : entry.status === "lost" ? (
+                                <span className="rounded-full bg-[#FDE8E6] px-3 py-1 text-xs font-bold text-[#D93025]">
+                                  Lost
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-[#FFEFA8] px-3 py-1 text-xs font-bold text-[#9A5B00]">
+                                  Pending
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="px-4 py-3">
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditEntry(entry)}
+                                  className={`rounded-lg px-3 py-1.5 text-xs ${GOLD_BTN}`}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeleteEntry(viewLottery._id, entry._id)
+                                  }
+                                  disabled={deleteLoading}
+                                  className="rounded-lg bg-[#D93025] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#B3261E] disabled:opacity-50"
+                                >
+                                  {deleteLoading ? "..." : "Delete"}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="py-10 text-center text-sm text-[#6B7280]">
+                      No user entries found.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -1432,7 +1494,7 @@ const AdminLottery = () => {
       )}
 
       {/* =====================================================
-          CREATE LOTTERY POPUP (with image upload)
+          CREATE LOTTERY POPUP
       ===================================================== */}
 
       {showCreate && (
@@ -1456,7 +1518,6 @@ const AdminLottery = () => {
                 minDate={getToday()}
               />
 
-              {/* icon upload */}
               <div>
                 <label className={LABEL_CLS}>Icon / Banner *</label>
 
@@ -1496,7 +1557,9 @@ const AdminLottery = () => {
                     </button>
                   )}
 
-                  <p className="text-[10px] leading-snug text-[#8A8F98]">PNG/JPG, max 2MB</p>
+                  <p className="text-[10px] leading-snug text-[#8A8F98]">
+                    PNG/JPG, max 2MB
+                  </p>
                 </div>
               </div>
             </div>
@@ -1523,13 +1586,13 @@ const AdminLottery = () => {
       )}
 
       {/* =====================================================
-          UPDATE LOTTERY POPUP
+          UPDATE LOTTERY POPUP — WITH IMAGE UPLOAD
       ===================================================== */}
 
       {showUpdate && (
         <ModalShell
           title="Update Lottery"
-          subtitle="Change lottery details and prize amounts."
+          subtitle="Change lottery details, prize amounts and image."
           onClose={closeUpdatePopup}
           z="z-[70]"
         >
@@ -1540,7 +1603,67 @@ const AdminLottery = () => {
               </div>
             )}
 
-            <LotteryFields data={updateData} onChange={handleUpdateChange} />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_200px]">
+              <LotteryFields
+                data={updateData}
+                onChange={handleUpdateChange}
+                minDate={undefined}
+              />
+
+              {/* Update Image */}
+              <div>
+                <label className={LABEL_CLS}>Icon / Banner (optional)</label>
+
+                <div className="flex min-h-[210px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#F2B705] bg-[#FFFDF7] p-3 text-center">
+                  {updateIconPreview ? (
+                    <img
+                      src={updateIconPreview}
+                      alt="New icon preview"
+                      className="h-24 w-24 rounded-xl object-cover shadow ring-1 ring-[#F2B705]"
+                    />
+                  ) : current?.imageUrl ? (
+                    <img
+                      src={current.imageUrl}
+                      alt="Current icon"
+                      className="h-24 w-24 rounded-xl object-cover shadow ring-1 ring-[#F3E7C4]"
+                    />
+                  ) : (
+                    <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-[#FFEFA8]">
+                      <ImagePlus size={30} className="text-[#9A5B00]" />
+                    </div>
+                  )}
+
+                  <label
+                    className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-xs ${OUTLINE_BTN}`}
+                  >
+                    <Upload size={13} />
+                    {updateIconPreview ? "Change Image" : "Upload New Image"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleUpdateIconChange}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {updateIconFile && (
+                    <button
+                      type="button"
+                      onClick={removeUpdateIcon}
+                      className="text-[11px] font-semibold text-[#D93025] hover:underline"
+                    >
+                      Cancel new image
+                    </button>
+                  )}
+
+                  <p className="text-[10px] leading-snug text-[#8A8F98]">
+                    {updateIconFile
+                      ? "New image will replace current one"
+                      : "Leave empty to keep current image"}
+                  </p>
+                </div>
+              </div>
+            </div>
 
             <div className="mt-5 flex justify-end gap-3">
               <button
@@ -1582,8 +1705,8 @@ const AdminLottery = () => {
                 name="number"
                 value={editData.number}
                 onChange={handleEditChange}
-                maxLength={6}
-                placeholder="123456"
+                maxLength={7}
+                placeholder="1234567"
                 className={`${INPUT_CLS} px-4`}
               />
             </div>
