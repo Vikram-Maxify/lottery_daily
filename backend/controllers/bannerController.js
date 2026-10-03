@@ -1,4 +1,5 @@
 const Banner = require("../models/bannerModel");
+const axios = require("axios");
 const uploadToImgBB = require("../utils/imgbbUpload");
 
 // =====================================================
@@ -25,18 +26,46 @@ const addBanner = async (req, res) => {
       });
     }
 
+    // Guard: multer must use memoryStorage() so req.file.buffer exists
+    if (!req.file.buffer) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Uploaded file has no buffer. Make sure multer uses memoryStorage().",
+      });
+    }
+
     const { title } = req.body;
 
     // Upload to ImgBB
-    const uploadedImage = await uploadToImgBB(
-      req.file.buffer,
-      req.file.originalname
-    );
+    let uploadedImage;
+
+    try {
+      uploadedImage = await uploadToImgBB(
+        req.file.buffer,
+        req.file.originalname
+      );
+    } catch (uploadError) {
+      console.error("ImgBB upload error:", uploadError);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to upload banner image",
+        error: uploadError.message,
+      });
+    }
+
+    if (!uploadedImage?.imageUrl) {
+      return res.status(500).json({
+        success: false,
+        message: "Image upload returned no URL",
+      });
+    }
 
     // Save banner
     const banner = await Banner.create({
       imageUrl: uploadedImage.imageUrl,
-      deleteUrl: uploadedImage.deleteUrl,
+      deleteUrl: uploadedImage.deleteUrl || null,
       title: title || "",
       isActive: true,
     });
@@ -134,7 +163,7 @@ const deleteBanner = async (req, res) => {
 
     if (banner.deleteUrl) {
       try {
-        await require("axios").get(banner.deleteUrl);
+        await axios.get(banner.deleteUrl);
       } catch (imgError) {
         console.log(
           "ImgBB delete warning:",
