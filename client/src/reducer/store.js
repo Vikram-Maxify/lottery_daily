@@ -19,6 +19,7 @@ import withdrawalReducer from './slice/withdrawalSlice'
 import kycReducer from './slice/kycReducer'
 import adminKycReducer from './slice/adminKycReducer'
 import festivalLotteryReducer from './slice/festivalLotteryReducer'
+import bannerReducer from './slice/bannerReducer'
 
 export const store = configureStore({
   reducer: {
@@ -36,7 +37,8 @@ export const store = configureStore({
     withdrawal: withdrawalReducer,
     kyc: kycReducer,
     adminKyc: adminKycReducer,
-    festivalLottery: festivalLotteryReducer
+    festivalLottery: festivalLotteryReducer,
+    banner : bannerReducer
 
   },
 });

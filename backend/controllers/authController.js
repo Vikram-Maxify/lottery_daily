@@ -5,6 +5,35 @@ const { v4: uuidv4 } = require("uuid");
 const User = require("../models/userModel");
 
 // =======================
+// HELPERS (register + login dono same use karenge)
+// =======================
+const COOKIE_NAME = "usertoken";
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
+
+const generateToken = (user) =>
+  jwt.sign(
+    {
+      uuid: user.uuid,
+      id: user._id,
+      role: user.role,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" },
+  );
+
+const setAuthCookie = (res, user) => {
+  const token = generateToken(user);
+  res.cookie(COOKIE_NAME, token, cookieOptions);
+  return token;
+};
+
+// =======================
 // REGISTER
 // =======================
 const register = async (req, res) => {
@@ -43,6 +72,9 @@ const register = async (req, res) => {
       password: hashedPassword,
     });
 
+    // 🔥 FIX: register ke baad bhi cookie set karo (login jaisa)
+    setAuthCookie(res, user);
+
     return res.status(201).json({
       success: true,
       message: "User registered successfully",
@@ -50,6 +82,7 @@ const register = async (req, res) => {
         uuid: user.uuid,
         name: user.name,
         mobile: user.mobile,
+        role: user.role,
       },
     });
   } catch (error) {
@@ -92,10 +125,7 @@ const login = async (req, res) => {
       });
     }
 
-    const isPasswordCorrect = await bcrypt.compare(
-      password,
-      user.password
-    );
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
 
     if (!isPasswordCorrect) {
       return res.status(401).json({
@@ -104,24 +134,7 @@ const login = async (req, res) => {
       });
     }
 
-    const token = jwt.sign(
-      {
-        uuid: user.uuid,
-        id: user._id,
-        role: user.role
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "7d",
-      }
-    );
-
-    res.cookie("usertoken", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    setAuthCookie(res, user);
 
     return res.status(200).json({
       success: true,
@@ -130,8 +143,7 @@ const login = async (req, res) => {
         uuid: user.uuid,
         name: user.name,
         mobile: user.mobile,
-        role: user.role
-
+        role: user.role,
       },
     });
   } catch (error) {
@@ -190,7 +202,6 @@ const updateProfile = async (req, res) => {
   try {
     const { name, mobile, password } = req.body;
 
-    // Logged-in user
     const user = await User.findOne({
       uuid: req.user.uuid,
     }).select("+password");
@@ -202,9 +213,8 @@ const updateProfile = async (req, res) => {
       });
     }
 
-    // Update name
     if (name !== undefined) {
-      if (!name.trim()) {
+      if (typeof name !== "string" || !name.trim()) {
         return res.status(400).json({
           success: false,
           message: "Name cannot be empty",
@@ -214,16 +224,14 @@ const updateProfile = async (req, res) => {
       user.name = name.trim();
     }
 
-    // Update mobile
     if (mobile !== undefined) {
-      if (!mobile.trim()) {
+      if (typeof mobile !== "string" || !mobile.trim()) {
         return res.status(400).json({
           success: false,
           message: "Mobile cannot be empty",
         });
       }
 
-      // Check if mobile belongs to another user
       const existingUser = await User.findOne({
         mobile: mobile.trim(),
         uuid: { $ne: req.user.uuid },
@@ -239,9 +247,8 @@ const updateProfile = async (req, res) => {
       user.mobile = mobile.trim();
     }
 
-    // Update password
     if (password !== undefined) {
-      if (password.length < 6) {
+      if (typeof password !== "string" || password.length < 6) {
         return res.status(400).json({
           success: false,
           message: "Password must be at least 6 characters",
@@ -285,9 +292,7 @@ const updateProfile = async (req, res) => {
 // =======================
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find()
-      .select("-password")
-      .sort({ createdAt: -1 });
+    const users = await User.find().select("-password").sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
@@ -305,12 +310,14 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+// =======================
+// ADMIN UPDATE USER PROFILE
+// =======================
 const adminUpdateUserProfile = async (req, res) => {
   try {
     const { uuid } = req.params;
     const { name, mobile, password } = req.body;
 
-    // UUID required
     if (!uuid) {
       return res.status(400).json({
         success: false,
@@ -318,7 +325,6 @@ const adminUpdateUserProfile = async (req, res) => {
       });
     }
 
-    // Find user by UUID
     const user = await User.findOne({ uuid }).select("+password");
 
     if (!user) {
@@ -328,9 +334,6 @@ const adminUpdateUserProfile = async (req, res) => {
       });
     }
 
-    // =======================
-    // UPDATE NAME
-    // =======================
     if (name !== undefined) {
       if (typeof name !== "string" || !name.trim()) {
         return res.status(400).json({
@@ -342,9 +345,6 @@ const adminUpdateUserProfile = async (req, res) => {
       user.name = name.trim();
     }
 
-    // =======================
-    // UPDATE MOBILE
-    // =======================
     if (mobile !== undefined) {
       if (typeof mobile !== "string" || !mobile.trim()) {
         return res.status(400).json({
@@ -355,7 +355,6 @@ const adminUpdateUserProfile = async (req, res) => {
 
       const cleanMobile = mobile.trim();
 
-      // Check mobile belongs to another user
       const existingUser = await User.findOne({
         mobile: cleanMobile,
         uuid: { $ne: uuid },
@@ -371,9 +370,6 @@ const adminUpdateUserProfile = async (req, res) => {
       user.mobile = cleanMobile;
     }
 
-    // =======================
-    // UPDATE PASSWORD
-    // =======================
     if (password !== undefined && password !== "") {
       if (typeof password !== "string" || password.length < 6) {
         return res.status(400).json({
@@ -387,9 +383,6 @@ const adminUpdateUserProfile = async (req, res) => {
 
     await user.save();
 
-    // =======================
-    // RESPONSE
-    // =======================
     return res.status(200).json({
       success: true,
       message: "User profile updated successfully",
@@ -406,7 +399,6 @@ const adminUpdateUserProfile = async (req, res) => {
   } catch (error) {
     console.error("Admin Update User Profile Error:", error);
 
-    // MongoDB duplicate key
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
@@ -426,11 +418,9 @@ const adminUpdateUserProfile = async (req, res) => {
 // =======================
 const logout = async (req, res) => {
   try {
-    res.clearCookie("usertoken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    });
+    // maxAge ko chhodkar baaki options same hone chahiye
+    const { maxAge, ...clearOptions } = cookieOptions;
+    res.clearCookie(COOKIE_NAME, clearOptions);
 
     return res.status(200).json({
       success: true,
