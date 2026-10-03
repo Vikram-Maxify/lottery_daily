@@ -57,7 +57,7 @@ export const fetchProfile = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message ||
-          "Failed to fetch profile"
+        "Failed to fetch profile"
       );
     }
   }
@@ -81,7 +81,7 @@ export const updateProfile = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message ||
-          "Profile update failed"
+        "Profile update failed"
       );
     }
   }
@@ -102,7 +102,7 @@ export const logout = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message ||
-          "Logout failed"
+        "Logout failed"
       );
     }
   }
@@ -195,13 +195,13 @@ const authSlice = createSlice({
         state.registerError = null;
       })
 
-     .addCase(register.fulfilled, (state, action) => {
-  state.registerLoading = false;
-  state.registerError = null;
+      .addCase(register.fulfilled, (state, action) => {
+        state.registerLoading = false;
+        state.registerError = null;
 
-  state.user = action.payload?.data || null;
-  state.isAuthenticated = true;         // 🔥 YE LINE ADD KARO
-})
+        state.user = action.payload?.data || null;
+        state.isAuthenticated = true;         // 🔥 YE LINE ADD KARO
+      })
 
       .addCase(register.rejected, (state, action) => {
         state.registerLoading = false;

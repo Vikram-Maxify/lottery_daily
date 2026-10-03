@@ -31,6 +31,12 @@ import {
   selectLotterySuccessMessage,
 } from "../reducer/slice/createLotteryConfigSlice";
 
+import {
+  getActiveBanners,
+  selectActiveBanners,
+  selectActiveBannerLoading,
+} from "../reducer/slice/bannerReducer";
+
 // =====================================================
 // HELPERS
 // =====================================================
@@ -127,10 +133,10 @@ const getDrawTimestamp = (activeConfig) => {
   const date = activeConfig.drawDate
     ? new Date(activeConfig.drawDate)
     : new Date(
-        Number(activeConfig.year),
-        Number(activeConfig.month) - 1,
-        Number(activeConfig.date || 1)
-      );
+      Number(activeConfig.year),
+      Number(activeConfig.month) - 1,
+      Number(activeConfig.date || 1)
+    );
 
   if (Number.isNaN(date.getTime())) {
     return null;
@@ -257,7 +263,8 @@ const RULES = [
   },
   {
     n: "2",
-    condition: "Alphabet does not match but all remaining digits match",
+    condition:
+      "Alphabet does not match but all remaining digits match",
     example: "10XY123",
     prize: "₹30 Lakh",
     total: "₹3 Crore",
@@ -293,7 +300,6 @@ const RULES = [
   },
 ];
 
-// Shared grid template for the winning-rules table (header + rows)
 const RULES_GRID =
   "grid-cols-[24px_minmax(0,1fr)_70px_54px_58px]";
 
@@ -316,19 +322,39 @@ const HomeLotterySection = () => {
 
   const error = useSelector(selectLotteryError);
 
-  const successMessage = useSelector(selectLotterySuccessMessage);
+  const successMessage = useSelector(
+    selectLotterySuccessMessage
+  );
+
+  // =====================================================
+  // BANNERS
+  // =====================================================
+
+  const activeBanners = useSelector(
+    selectActiveBanners
+  );
+
+  const activeBannerLoading = useSelector(
+    selectActiveBannerLoading
+  );
+
+  const [currentBannerIndex, setCurrentBannerIndex] =
+    useState(0);
 
   // =====================================================
   // USER / WALLET
   // =====================================================
 
-  const user = useSelector((state) => state.auth?.user);
+  const user = useSelector(
+    (state) => state.auth?.user
+  );
 
   const isAuthenticated = useSelector(
     (state) => state.auth?.isAuthenticated
   );
 
-  const walletAmount = user?.wallet ?? user?.balance ?? 0;
+  const walletAmount =
+    user?.wallet ?? user?.balance ?? 0;
 
   // =====================================================
   // COUNTDOWN
@@ -360,6 +386,53 @@ const HomeLotterySection = () => {
   }, [dispatch]);
 
   // =====================================================
+  // FETCH ACTIVE BANNERS
+  // Homepage only
+  // =====================================================
+
+  useEffect(() => {
+    dispatch(getActiveBanners());
+  }, [dispatch]);
+
+  // =====================================================
+  // BANNER INDEX SAFETY
+  // =====================================================
+
+  useEffect(() => {
+    if (!activeBanners.length) {
+      setCurrentBannerIndex(0);
+      return;
+    }
+
+    if (currentBannerIndex >= activeBanners.length) {
+      setCurrentBannerIndex(0);
+    }
+  }, [
+    activeBanners.length,
+    currentBannerIndex,
+  ]);
+
+  // =====================================================
+  // AUTO BANNER SLIDER
+  // =====================================================
+
+  useEffect(() => {
+    if (activeBanners.length <= 1) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setCurrentBannerIndex((prev) => {
+        return (prev + 1) % activeBanners.length;
+      });
+    }, 4000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [activeBanners.length]);
+
+  // =====================================================
   // DERIVED VALUES
   // =====================================================
 
@@ -387,13 +460,28 @@ const HomeLotterySection = () => {
     );
   }, [activeConfig]);
 
-  const isActive = Boolean(activeConfig?.isActive);
+  const isActive = Boolean(
+    activeConfig?.isActive
+  );
 
-  const firstPrize = formatCrore(activeConfig?.prizes?.first);
+  const firstPrize = formatCrore(
+    activeConfig?.prizes?.first
+  );
 
-  const secondPrize = formatCrore(activeConfig?.prizes?.second);
+  const secondPrize = formatCrore(
+    activeConfig?.prizes?.second
+  );
 
-  const thirdPrize = formatCrore(activeConfig?.prizes?.third);
+  const thirdPrize = formatCrore(
+    activeConfig?.prizes?.third
+  );
+
+  // =====================================================
+  // CURRENT BANNER
+  // =====================================================
+
+  const currentBanner =
+    activeBanners[currentBannerIndex] || null;
 
   // =====================================================
   // LIVE COUNTDOWN
@@ -404,7 +492,8 @@ const HomeLotterySection = () => {
       return;
     }
 
-    const drawTimestamp = getDrawTimestamp(activeConfig);
+    const drawTimestamp =
+      getDrawTimestamp(activeConfig);
 
     if (!drawTimestamp) {
       setCountdown({
@@ -420,23 +509,37 @@ const HomeLotterySection = () => {
     }
 
     const updateCountdown = () => {
-      setCountdown(getCountdown(drawTimestamp));
+      setCountdown(
+        getCountdown(drawTimestamp)
+      );
     };
 
     updateCountdown();
 
-    const interval = setInterval(updateCountdown, 1000);
+    const interval = setInterval(
+      updateCountdown,
+      1000
+    );
 
     return () => {
       clearInterval(interval);
     };
-  }, [activeConfig?.drawDate, activeConfig?.drawTime]);
+  }, [
+    activeConfig?.drawDate,
+    activeConfig?.drawTime,
+  ]);
 
-  const formattedHours = String(countdown.hours).padStart(2, "0");
+  const formattedHours = String(
+    countdown.hours
+  ).padStart(2, "0");
 
-  const formattedMinutes = String(countdown.minutes).padStart(2, "0");
+  const formattedMinutes = String(
+    countdown.minutes
+  ).padStart(2, "0");
 
-  const formattedSeconds = String(countdown.seconds).padStart(2, "0");
+  const formattedSeconds = String(
+    countdown.seconds
+  ).padStart(2, "0");
 
   // =====================================================
   // HANDLERS
@@ -444,7 +547,9 @@ const HomeLotterySection = () => {
 
   const handleBuyTicket = () => {
     if (!isActive) {
-      alert("कोई सक्रिय लॉटरी उपलब्ध नहीं है");
+      alert(
+        "कोई सक्रिय लॉटरी उपलब्ध नहीं है"
+      );
       return;
     }
 
@@ -455,19 +560,32 @@ const HomeLotterySection = () => {
     navigate("/user/withdraw");
   };
 
+  const handleBannerDotClick = (index) => {
+    setCurrentBannerIndex(index);
+  };
+
   // =====================================================
   // DRAW DISPLAY DATA
   // =====================================================
 
-  const dynamicPrize = firstPrize !== "₹0" ? firstPrize : "₹0";
+  const dynamicPrize =
+    firstPrize !== "₹0"
+      ? firstPrize
+      : "₹0";
 
   return (
     <div className="min-h-screen w-full bg-[#EEF3FA] flex justify-center">
       {/* Winners infinite scroll animation */}
+
       <style>{`
         @keyframes winners-marquee {
-          from { transform: translateX(0); }
-          to { transform: translateX(-50%); }
+          from {
+            transform: translateX(0);
+          }
+
+          to {
+            transform: translateX(-50%);
+          }
         }
 
         .winners-track {
@@ -492,236 +610,100 @@ const HomeLotterySection = () => {
       <main className="relative w-full max-w-[500px] min-h-screen bg-[#EEF3FA] shadow-xl">
 
         {/* =====================================================
-            HERO
-        ===================================================== */}
+            HOMEPAGE BANNERS
+            ACTIVE BANNERS FROM ADMIN
+        ====================================================== */}
 
-        <section className="relative overflow-hidden bg-[#1a0a1c]">
+        {(activeBannerLoading ||
+          activeBanners.length > 0) && (
+            <section className="pt-[9px]">
 
-          <div className="relative overflow-hidden bg-cover bg-center">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#06132d]/95 via-[#3b0d1c]/88 to-[#7a0f1e]/80" />
+              <div className="relative overflow-hidden bg-[#d9dee8] shadow-[0_8px_22px_rgba(0,0,0,0.15)]">
 
-            <div className="pointer-events-none absolute -left-16 top-10 h-52 w-52 rounded-full bg-[#ff1744]/25 blur-3xl" />
+                {/* =================================================
+                  LOADING
+              ================================================== */}
 
-            <div className="pointer-events-none absolute right-0 top-0 h-72 w-72 rounded-full bg-[#ff8a00]/30 blur-3xl" />
+                {activeBannerLoading &&
+                  !activeBanners.length && (
+                    <div className="aspect-[16/7] w-full animate-pulse bg-[#dfe4ec]" />
+                  )}
 
-            <Sparkles
-              size={16}
-              className="pointer-events-none absolute right-[8%] top-3 text-[#ffb82e]/80"
-            />
+                {/* =================================================
+                  BANNER IMAGE
+              ================================================== */}
 
-            <Sparkles
-              size={12}
-              className="pointer-events-none absolute left-[46%] top-[20%] text-[#ffcf4a]/70"
-            />
+                {currentBanner && (
+                  <div className="relative aspect-[16/7] w-full overflow-hidden">
 
-            <Sparkles
-              size={14}
-              className="pointer-events-none absolute bottom-[22%] left-[3%] text-[#ff3155]/70"
-            />
+                    <img
+                      key={currentBanner._id}
+                      src={currentBanner.imageUrl}
+                      alt={
+                        currentBanner.title ||
+                        `Homepage Banner ${currentBannerIndex + 1
+                        }`
+                      }
+                      className="h-full w-full object-cover"
+                      loading={
+                        currentBannerIndex === 0
+                          ? "eager"
+                          : "lazy"
+                      }
+                    />
 
-            <div className="relative grid w-full grid-cols-[1fr_1.08fr] items-center gap-2 px-3 pb-5 pt-4">
+                    {/* Slight bottom overlay for dots */}
 
-              {/* LEFT */}
+                    {activeBanners.length > 1 && (
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/35 to-transparent" />
+                    )}
 
-              <div className="relative z-10 min-w-0">
+                    {/* =================================================
+                      SLIDER DOTS
+                  ================================================== */}
 
-                <p className="text-[11px] font-medium text-white">
-                  India's Most Exciting
-                </p>
-
-                <h1 className="mt-1 font-black leading-[0.9] tracking-tight">
-
-                  <span
-                    className="block bg-gradient-to-b from-[#ffe08a] to-[#e0a11b] bg-clip-text text-transparent"
-                    style={{
-                      fontSize: "clamp(38px,10vw,66px)",
-                    }}
-                  >
-                    DEAR
-                  </span>
-
-                  <span
-                    className="block text-white"
-                    style={{
-                      fontSize: "clamp(24px,7vw,46px)",
-                    }}
-                  >
-                    LOTTERY
-                  </span>
-
-                </h1>
-
-                <p className="mt-1.5 text-[13px] font-medium leading-tight text-white">
-                  Small Ticket
-                  <br />
-                  Big Dreams
-                </p>
-
-                <div className="mt-3 flex items-start gap-3">
-
-                  <HeroFeature
-                    icon={<Trophy size={17} />}
-                    text="Big Prizes"
-                  />
-
-                  <HeroFeature
-                    icon={<ShieldCheck size={17} />}
-                    text="Fair Draws"
-                  />
-
-                  <HeroFeature
-                    icon={<Users size={17} />}
-                    text="Lakhs of Winners"
-                  />
-
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleBuyTicket}
-                  disabled={!isActive}
-                  className={`mt-3.5 inline-flex h-10 w-full max-w-[205px] items-center justify-center gap-1.5 rounded-xl text-[12px] font-extrabold text-white shadow-[0_8px_25px_rgba(255,20,67,0.4)] transition active:scale-[0.98] ${
-                    isActive
-                      ? "bg-gradient-to-r from-[#ff1744] to-[#e8263f]"
-                      : "cursor-not-allowed bg-gray-600 opacity-70"
-                  }`}
-                >
-                  Buy Ticket Now
-                  <ArrowRight size={15} />
-                </button>
-
-              </div>
-
-              {/* RIGHT - DYNAMIC TICKET */}
-
-              <div className="relative flex items-center justify-center">
-
-                <Coin className="-left-1 top-[26%] h-6 w-6 rotate-[-20deg]" />
-
-                <Coin className="-right-1 top-[44%] h-6 w-6 rotate-[15deg]" />
-
-                <Coin className="bottom-[4%] right-[6%] h-5 w-5 rotate-[25deg]" />
-
-                <div className="relative w-full max-w-[220px]">
-
-                  <div
-                    className="relative z-10 rotate-[3deg] rounded-[0.9em] border-[0.35em] border-[#f7d9a8] bg-[#fffaf0] p-[0.55em] shadow-[0_20px_40px_rgba(0,0,0,0.5)]"
-                    style={{
-                      fontSize: "clamp(6px, 1.8vw, 10px)",
-                    }}
-                  >
-
-                    <div className="absolute -inset-[0.3em] rounded-[1em] border border-[#ff4d68]/50" />
-
-                    <div className="border border-[#e5c8a4] p-[0.55em]">
-
-                      <div className="flex items-start justify-between gap-[0.4em]">
-
-                        <div className="flex items-center gap-[0.4em]">
-
-                          <div className="flex h-[2.3em] w-[2.3em] shrink-0 items-center justify-center rounded-full bg-[#d7193f] text-white">
-                            <Crown size="1.3em" />
-                          </div>
-
-                          <p className="text-[0.75em] font-bold leading-tight text-[#d22a43]">
-                            Nagaland State Lotteries
-                          </p>
-
-                        </div>
-
-                        <div className="text-right leading-tight">
-
-                          <p className="text-[0.75em] font-black text-[#d22a43]">
-                            Draw on
-                          </p>
-
-                          <p className="text-[0.88em] font-black text-[#d22a43]">
-                            {drawDateText}
-                          </p>
-
-                          <p className="text-[0.53em] font-bold text-[#d22a43]">
-                            {activeConfig?.drawTime || "8.00 P.M."}
-                          </p>
-
-                          <span className="mt-[0.2em] inline-block bg-[#d7193f] px-[0.8em] py-[0.1em] text-[0.7em] font-black text-white">
-                            DAILY
-                          </span>
-
-                        </div>
-
+                    {activeBanners.length > 1 && (
+                      <div className="absolute bottom-2.5 left-1/2 flex -translate-x-1/2 items-center gap-1.5">
+                        {activeBanners.map(
+                          (banner, index) => (
+                            <button
+                              key={banner._id}
+                              type="button"
+                              onClick={() =>
+                                handleBannerDotClick(
+                                  index
+                                )
+                              }
+                              aria-label={`Show banner ${index + 1
+                                }`}
+                              className={`h-1.5 rounded-full transition-all ${index ===
+                                currentBannerIndex
+                                ? "w-5 bg-white"
+                                : "w-1.5 bg-white/60"
+                                }`}
+                            />
+                          )
+                        )}
                       </div>
-
-                      <p className="text-[3em] font-black leading-[0.95] text-[#d7193f]">
-                        DEAR
-                      </p>
-
-                      <p className="text-[0.5em] font-bold text-[#153c78]">
-                        DEAR DAILY LOTTERY
-                      </p>
-
-                      <div className="mt-[0.2em] flex items-center justify-between gap-[0.3em]">
-
-                        <div className="text-[0.75em] font-bold leading-tight text-[#d7193f]">
-                          First
-                          <br />
-                          Prize
-                          <br />
-                          ₹
-                        </div>
-
-                        <div className="text-center">
-
-                          <p className="whitespace-nowrap text-[2.7em] font-black leading-none text-[#153c78]">
-                            {dynamicPrize}
-                          </p>
-
-                          <p className="text-[0.5em] font-bold text-[#153c78]">
-                            (First Prize)
-                          </p>
-
-                        </div>
-
-                        <div className="flex h-[3.2em] w-[3.2em] shrink-0 flex-col items-center justify-center rounded-full bg-[#d7198c] text-center text-[0.65em] font-black leading-tight text-white">
-                          Price
-                          <span className="text-[1.25em]">
-                            ₹6/-
-                          </span>
-                        </div>
-
-                      </div>
-
-                      <div className="mt-[0.45em] border-y border-[#d7bba5] py-[0.25em] text-center">
-
-                        <p className="text-[0.58em] font-bold text-[#26354b]">
-                          Ticket Number
-                        </p>
-
-                        <p className="text-[1.8em] font-black tracking-[0.2em] text-[#173e70]">
-                          47B 39120
-                        </p>
-
-                      </div>
-
-                    </div>
+                    )}
 
                   </div>
-
-                  <div className="relative mx-auto -mt-3 h-5 w-[92%] rounded-[50%] bg-gradient-to-r from-[#8a5210] via-[#ffd85c] to-[#8a5210] shadow-[0_0_30px_rgba(255,190,50,0.6)]" />
-
-                  <div className="mx-auto -mt-3 h-4 w-[80%] rounded-[50%] bg-gradient-to-r from-[#6d3f0a] via-[#e0a11b] to-[#6d3f0a]" />
-
-                </div>
+                )}
 
               </div>
 
-            </div>
-          </div>
-
-        </section>
+            </section>
+          )}
 
         {/* =====================================================
-            TOP WINNERS (INFINITE SCROLL)
-        ===================================================== */}
+            HERO
+        ====================================================== */}
+
+
+
+        {/* =====================================================
+            TOP WINNERS
+        ====================================================== */}
 
         <section className="px-2.5 pt-2">
 
@@ -760,8 +742,6 @@ const HomeLotterySection = () => {
 
               <div className="winners-track">
 
-                {/* Two identical sets = seamless infinite loop */}
-
                 {[0, 1].map((set) => (
                   <div
                     key={set}
@@ -787,7 +767,7 @@ const HomeLotterySection = () => {
 
         {/* =====================================================
             LICENSED
-        ===================================================== */}
+        ====================================================== */}
 
         <section className="px-2.5 pt-3">
 
@@ -842,13 +822,11 @@ const HomeLotterySection = () => {
 
         {/* =====================================================
             DAILY + FESTIVAL
-        ===================================================== */}
+        ====================================================== */}
 
         <section className="px-2.5 pt-3">
 
           <div className="grid grid-cols-2 gap-2.5">
-
-            {/* DAILY LOTTERY */}
 
             <LotteryTypeCard
               daily
@@ -873,10 +851,10 @@ const HomeLotterySection = () => {
                   text: "Easy to Play",
                 },
               ]}
-              onClick={() => navigate("/buy-ticket")}
+              onClick={() =>
+                navigate("/buy-ticket")
+              }
             />
-
-            {/* FESTIVAL LOTTERY */}
 
             <LotteryTypeCard
               title="Festival Lottery"
@@ -900,7 +878,9 @@ const HomeLotterySection = () => {
                   text: "Limited Period",
                 },
               ]}
-              onClick={() => navigate("/festival")}
+              onClick={() =>
+                navigate("/festival")
+              }
             />
 
           </div>
@@ -909,7 +889,7 @@ const HomeLotterySection = () => {
 
         {/* =====================================================
             WINNING RULES
-        ===================================================== */}
+        ====================================================== */}
 
         <section className="px-2.5 pt-3 pb-24">
 
@@ -927,7 +907,8 @@ const HomeLotterySection = () => {
                 </h2>
 
                 <p className="mt-2 max-w-[200px] text-[11px] leading-snug text-[#4b5563]">
-                  Match your ticket number with the drawn number and win exciting prizes!
+                  Match your ticket number with the
+                  drawn number and win exciting prizes!
                 </p>
 
               </div>
@@ -961,13 +942,21 @@ const HomeLotterySection = () => {
                     ₹
                   </span>
 
-                  <span>Match Condition</span>
+                  <span>
+                    Match Condition
+                  </span>
 
-                  <span>Example</span>
+                  <span>
+                    Example
+                  </span>
 
-                  <span>Prize / Ticket</span>
+                  <span>
+                    Prize / Ticket
+                  </span>
 
-                  <span>Total (×10)</span>
+                  <span>
+                    Total (×10)
+                  </span>
 
                 </div>
 
@@ -989,7 +978,13 @@ const HomeLotterySection = () => {
               </div>
 
               <p className="text-[10px] leading-relaxed text-[#6b2737]">
-                <strong>Note:</strong> The above is a general representation of winning rules. Actual prizes, rules, and draw details are subject to the official published terms and conditions.
+
+                <strong>Note:</strong> The above is a
+                general representation of winning rules.
+                Actual prizes, rules, and draw details are
+                subject to the official published terms and
+                conditions.
+
               </p>
 
             </div>
@@ -1014,7 +1009,7 @@ const HomeLotterySection = () => {
 
         {/* =====================================================
             BOTTOM NAV
-        ===================================================== */}
+        ====================================================== */}
 
         <nav className="fixed bottom-0 left-1/2 z-50 w-full max-w-[500px] -translate-x-1/2 border-t border-white/10 backdrop-blur">
 
@@ -1030,12 +1025,13 @@ const HomeLotterySection = () => {
                   <button
                     key={label}
                     type="button"
-                    onClick={() => navigate(path)}
-                    className={`flex flex-col items-center justify-center gap-1 transition-colors ${
-                      active
-                        ? "text-[#ff1744]"
-                        : "text-white/85 hover:text-white"
-                    }`}
+                    onClick={() =>
+                      navigate(path)
+                    }
+                    className={`flex flex-col items-center justify-center gap-1 transition-colors ${active
+                      ? "text-[#ff1744]"
+                      : "text-white/85 hover:text-white"
+                      }`}
                   >
 
                     <Icon
@@ -1048,11 +1044,10 @@ const HomeLotterySection = () => {
                     />
 
                     <span
-                      className={`text-[10px] ${
-                        active
-                          ? "font-bold"
-                          : "font-medium"
-                      }`}
+                      className={`text-[10px] ${active
+                        ? "font-bold"
+                        : "font-medium"
+                        }`}
                     >
                       {label}
                     </span>
@@ -1202,20 +1197,18 @@ const LotteryTypeCard = ({
   <div className="flex flex-col overflow-hidden rounded-2xl border border-[#d7d0c6] bg-[#fffaf4] p-1.5 shadow-[0_8px_22px_rgba(0,0,0,0.15)]">
 
     <div
-      className={`relative flex h-[84px] items-center justify-center overflow-hidden rounded-xl ${
-        daily
-          ? "bg-gradient-to-br from-[#ffb3a8] via-[#ffd9c2] to-[#ffefe0]"
-          : "bg-gradient-to-br from-[#123c75] via-[#2a5ea8] to-[#f2c95a]"
-      }`}
+      className={`relative flex h-[84px] items-center justify-center overflow-hidden rounded-xl ${daily
+        ? "bg-gradient-to-br from-[#ffb3a8] via-[#ffd9c2] to-[#ffefe0]"
+        : "bg-gradient-to-br from-[#123c75] via-[#2a5ea8] to-[#f2c95a]"
+        }`}
     >
 
       <Sparkles
         size={13}
-        className={`absolute right-2 top-2 ${
-          daily
-            ? "text-[#ff3155]"
-            : "text-[#ffd34e]"
-        }`}
+        className={`absolute right-2 top-2 ${daily
+          ? "text-[#ff3155]"
+          : "text-[#ffd34e]"
+          }`}
       />
 
       <div className="absolute h-[68%] w-[72%] -rotate-[10deg] rounded-md border border-[#e5c8a4] bg-[#fdf1dc]" />
@@ -1225,7 +1218,8 @@ const LotteryTypeCard = ({
       <div
         className="relative w-[76%] -rotate-[4deg] rounded-md border-[2px] border-[#f2d1b8] bg-[#fffaf0] p-[0.45em] shadow-xl"
         style={{
-          fontSize: "clamp(5px, 1.6vw, 11px)",
+          fontSize:
+            "clamp(5px, 1.6vw, 11px)",
         }}
       >
 
@@ -1274,11 +1268,10 @@ const LotteryTypeCard = ({
     <div className="flex flex-1 flex-col px-1 pt-2">
 
       <h3
-        className={`font-serif text-[18px] font-black leading-none ${
-          daily
-            ? "text-[#d7193f]"
-            : "text-[#173e70]"
-        }`}
+        className={`font-serif text-[18px] font-black leading-none ${daily
+          ? "text-[#d7193f]"
+          : "text-[#173e70]"
+          }`}
       >
         {title}
       </h3>
@@ -1296,11 +1289,10 @@ const LotteryTypeCard = ({
           >
 
             <span
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white ${
-                daily
-                  ? "bg-[#ed1d43]"
-                  : "bg-[#173e70]"
-              }`}
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white ${daily
+                ? "bg-[#ed1d43]"
+                : "bg-[#173e70]"
+                }`}
             >
               {item.icon}
             </span>
@@ -1315,11 +1307,10 @@ const LotteryTypeCard = ({
       <button
         type="button"
         onClick={onClick}
-        className={`mb-0.5 mt-2.5 flex h-9 w-full items-center justify-center gap-1 rounded-xl text-[11px] font-extrabold text-white shadow-lg transition active:scale-[0.98] ${
-          daily
-            ? "bg-gradient-to-r from-[#ff1744] to-[#d60f38] hover:brightness-110"
-            : "bg-gradient-to-r from-[#173e70] to-[#0d2547] hover:brightness-110"
-        }`}
+        className={`mb-0.5 mt-2.5 flex h-9 w-full items-center justify-center gap-1 rounded-xl text-[11px] font-extrabold text-white shadow-lg transition active:scale-[0.98] ${daily
+          ? "bg-gradient-to-r from-[#ff1744] to-[#d60f38] hover:brightness-110"
+          : "bg-gradient-to-r from-[#173e70] to-[#0d2547] hover:brightness-110"
+          }`}
       >
 
         {button}
