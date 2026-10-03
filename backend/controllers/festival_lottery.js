@@ -279,14 +279,7 @@ const validateStatus = (status) => {
 
 const createLotteryConfig = async (req, res) => {
   try {
-    const {
-      marketName,
-      month,
-      year,
-      drawDate,
-      drawTime,
-      prizes,
-    } = req.body;
+    const { marketName, month, year, drawDate, drawTime, prizes } = req.body;
 
     // ================================================
     // PARSE PRIZES (multipart form-data => string)
@@ -482,13 +475,30 @@ const createLotteryConfig = async (req, res) => {
     }
 
     // ================================================
-    // UPLOAD IMAGE TO IMGBB  👈
+    // UPLOAD IMAGE TO IMGBB  ✅ FIXED
     // ================================================
 
     let imageUrl;
 
     try {
-      imageUrl = await uploadToImgBB(req.file);
+      // Guard: multer must use memoryStorage() so req.file.buffer exists
+      if (!req.file.buffer) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Uploaded file has no buffer. Make sure multer uses memoryStorage().",
+        });
+      }
+
+      const uploadResult = await uploadToImgBB(
+        req.file.buffer,
+        req.file.originalname
+      );
+
+      imageUrl =
+        uploadResult?.imageUrl ||
+        uploadResult?.displayUrl ||
+        null;
     } catch (uploadError) {
       console.error("ImgBB upload error:", uploadError);
 
@@ -513,7 +523,7 @@ const createLotteryConfig = async (req, res) => {
     const lottery = await LotteryConfig.create({
       marketName: cleanMarketName,
 
-      imageUrl, // 👈 SAVED
+      imageUrl, // 👈 NOW A STRING URL
 
       month: monthValidation.month,
 
@@ -541,8 +551,7 @@ const createLotteryConfig = async (req, res) => {
     return res.status(201).json({
       success: true,
 
-      message:
-        "Lottery ticket created successfully for selected date",
+      message: "Lottery ticket created successfully for selected date",
 
       data: lottery,
     });
@@ -839,7 +848,7 @@ const addUserLotteryEntry = async (req, res) => {
 
         marketName: config.marketName,
 
-        imageUrl: config.imageUrl, // 👈 ADDED
+        imageUrl: config.imageUrl, // 👈 KEPT
 
         month: config.month,
 
@@ -1213,7 +1222,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
 
         marketName: config.marketName,
 
-        imageUrl: config.imageUrl, // 👈 ADDED
+        imageUrl: config.imageUrl, // 👈 KEPT
 
         month: config.month,
 
@@ -1276,7 +1285,10 @@ const getMyLotteryEntries = async (req, res) => {
       ],
     }).lean();
 
-    console.log("STEP 1 user:", user ? { _id: user._id, uuid: user.uuid } : null);
+    console.log(
+      "STEP 1 user:",
+      user ? { _id: user._id, uuid: user.uuid } : null
+    );
 
     if (!user) {
       return res.status(404).json({
@@ -1312,7 +1324,7 @@ const getMyLotteryEntries = async (req, res) => {
         entries.push({
           configId: config._id,
           marketName: config.marketName,
-          imageUrl: config.imageUrl, // 👈 ADDED
+          imageUrl: config.imageUrl, // 👈 KEPT
           month: config.month,
           year: config.year,
           drawDate: config.drawDate,
@@ -1395,11 +1407,7 @@ const getActiveLotteryConfig = async (req, res) => {
       isActive: true,
 
       drawDate: {
-        $gte: new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate()
-        ),
+        $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
       },
     })
       .sort({ drawDate: 1 })
