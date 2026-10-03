@@ -86,7 +86,6 @@ const festivalSchema = new mongoose.Schema(
 
     imageUrl: {
       type: String,
-      required: true,
       trim: true,
     },
 

@@ -96,7 +96,6 @@ const lotteryConfigSchema = new mongoose.Schema(
 
     imageUrl: {
       type: String,
-      required: true,
       trim: true,
     },
 

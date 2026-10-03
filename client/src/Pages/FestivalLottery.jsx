@@ -804,7 +804,7 @@ const FestivalLottery = () => {
           </section>
 
           {/* ================= SELECT DRAW DATE ================= */}
-          <section className="rounded-[16px] bg-white p-3 shadow-sm">
+          {/* <section className="rounded-[16px] bg-white p-3 shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <CalendarDays size={24} className="text-[#173e70]" />
@@ -851,7 +851,7 @@ const FestivalLottery = () => {
                 ))}
               </div>
             )}
-          </section>
+          </section> */}
 
           {/* ================= HOW MANY TICKETS ================= */}
           <section className="rounded-[16px] bg-white p-3 shadow-sm">

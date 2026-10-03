@@ -25,6 +25,7 @@ const adminGatewayRoutes = require("./routes/adminGatewayRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const startLotteryDepositCron = require("./cron/lotteryDepositCron");
 const { startLotteryCron } = require("./cron/lotteryCron");
+const lotteryNumberRoutes =require('./routes/lotteryNumberRoutes')
 
 // =======================
 // APP

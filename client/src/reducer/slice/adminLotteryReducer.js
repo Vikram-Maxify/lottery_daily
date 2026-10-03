@@ -4,13 +4,30 @@ import api from "../api";
 // =====================================================
 // CREATE LOTTERY CONFIG
 // POST /api/lottery
+// multipart/form-data (with image)
 // =====================================================
 
 export const createLotteryConfig = createAsyncThunk(
   "adminLottery/createLotteryConfig",
-  async (data, { rejectWithValue }) => {
+  async ({ payload, imageFile }, { rejectWithValue }) => {
     try {
-      const response = await api.post("/lottery", data);
+      if (!imageFile) {
+        return rejectWithValue("Market image is required");
+      }
+
+      const fd = new FormData();
+
+      fd.append("marketName", payload.marketName);
+      fd.append("month", String(payload.month));
+      fd.append("year", String(payload.year));
+      fd.append("drawDate", payload.drawDate);
+      fd.append("drawTime", payload.drawTime);
+      fd.append("prizes", JSON.stringify(payload.prizes));
+      fd.append("image", imageFile);
+
+      const response = await api.post("/lottery", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
       return response.data;
     } catch (error) {
