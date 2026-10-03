@@ -18,15 +18,14 @@ const router = express.Router();
 // Public
 router.post("/register", register);
 router.post("/login", login);
+router.post("/logout", logout);
 
 // Protected
 router.get("/profile", authMiddleware, getProfile);
 router.put("/profile", authMiddleware, updateProfile);
-router.get("/all", authMiddleware,adminMiddleware, getAllUsers);
-router.put("/:uuid",authMiddleware,adminMiddleware, adminUpdateUserProfile);
 
-
-
-router.post("/logout", authMiddleware, logout);
+// Admin
+router.get("/all", authMiddleware, adminMiddleware, getAllUsers);
+router.put("/:uuid", authMiddleware, adminMiddleware, adminUpdateUserProfile);
 
 module.exports = router;

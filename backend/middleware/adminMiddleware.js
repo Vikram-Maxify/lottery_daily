@@ -1,16 +1,29 @@
-const authMiddleware = require("./authMiddleware");
+const jwt = require("jsonwebtoken");
 
-const adminMiddleware = (req, res, next) => {
-  authMiddleware(req, res, () => {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({
+const authMiddleware = (req, res, next) => {
+  try {
+    const token = req.cookies.usertoken;
+
+    if (!token) {
+      return res.status(401).json({
         success: false,
-        message: "Admin access required",
+        message: "Authentication required",
       });
     }
 
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    req.user = decoded;
+
     next();
-  });
+  } catch (error) {
+    console.error("Auth Middleware Error:", error.message);
+
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired token",
+    });
+  }
 };
 
-module.exports = adminMiddleware;
+module.exports = authMiddleware;
