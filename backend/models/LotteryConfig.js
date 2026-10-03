@@ -94,6 +94,13 @@ const lotteryConfigSchema = new mongoose.Schema(
       trim: true,
     },
 
+    imageUrl: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+
     // ================================================
     // MONTH (1 - 12)
     // ================================================

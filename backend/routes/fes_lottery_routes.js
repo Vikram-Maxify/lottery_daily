@@ -1,4 +1,5 @@
 const express = require("express");
+const multer = require("multer");
 
 const router = express.Router();
 
@@ -19,15 +20,42 @@ const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
 
 // =====================================================
+// MULTER SETUP (market image upload)
+// =====================================================
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5 MB
+  },
+
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (allowed.includes(file.mimetype)) {
+      return cb(null, true);
+    }
+
+    return cb(
+      new Error("Only JPEG, PNG or WEBP images are allowed"),
+      false
+    );
+  },
+});
+
+// =====================================================
 // PUBLIC ROUTES
 // =====================================================
 
 // GET active lottery
 // GET /api/lottery-config/active
-router.get(
-  "/active",
-  getActiveLotteryConfig
-);
+router.get("/active", getActiveLotteryConfig);
 
 // =====================================================
 // USER ROUTES
@@ -49,19 +77,26 @@ router.post(
   addUserLotteryEntry
 );
 
-router.post("/entry/bulk", authMiddleware, addBulkUserLotteryEntries);
-
+// ADD bulk entries
+// POST /api/lottery-config/entry/bulk
+router.post(
+  "/entry/bulk",
+  authMiddleware,
+  addBulkUserLotteryEntries
+);
 
 // =====================================================
 // ADMIN ROUTES
 // =====================================================
 
-// CREATE lottery config
+// CREATE lottery config (with image upload)
 // POST /api/lottery-config
+// multipart/form-data => field name: "image"
 router.post(
   "/",
   authMiddleware,
   adminMiddleware,
+  upload.single("image"), // 👈 ADDED
   createLotteryConfig
 );
 

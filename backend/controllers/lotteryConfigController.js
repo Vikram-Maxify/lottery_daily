@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const LotteryConfig = require("../models/LotteryConfig");
 const User = require("../models/userModel");
 const TransactionHistory = require("../models/TransactionHistory");
+const uploadToImgBB = require("../utils/imgbbUpload");
 
 // =====================================================
 // GET USER ID FROM JWT
@@ -196,7 +197,6 @@ const validateYear = (year) => {
   };
 };
 
-
 // =====================================================
 // VALIDATE 7 CHARACTER ALPHANUMERIC NUMBER
 // =====================================================
@@ -215,8 +215,6 @@ const validateNumber = (number) => {
 
   const value = String(number).trim();
 
-  // Exactly 7 characters
-  // Only A-Z, a-z and 0-9 allowed
   if (!/^[a-zA-Z0-9]{7}$/.test(value)) {
     return {
       valid: false,
@@ -298,6 +296,15 @@ const validateStatus = (status) => {
 // ADMIN
 //
 // POST /api/lottery
+//
+// multipart/form-data:
+//   - marketName  (text)
+//   - month       (text)
+//   - year        (text)
+//   - drawDate    (text) YYYY-MM-DD
+//   - drawTime    (text) HH:mm
+//   - prizes      (JSON string) { "first": 100, "second": 50, "third": 20 }
+//   - image       (file)  👈 REQUIRED
 // =====================================================
 
 const createLotteryConfig = async (req, res) => {
@@ -310,6 +317,23 @@ const createLotteryConfig = async (req, res) => {
       drawTime,
       prizes,
     } = req.body;
+
+    // ================================================
+    // PARSE PRIZES (multipart form-data => string)
+    // ================================================
+
+    let parsedPrizes = prizes;
+
+    if (typeof prizes === "string") {
+      try {
+        parsedPrizes = JSON.parse(prizes);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          message: "prizes must be a valid JSON object",
+        });
+      }
+    }
 
     // ================================================
     // MARKET VALIDATION
@@ -327,6 +351,17 @@ const createLotteryConfig = async (req, res) => {
     }
 
     const cleanMarketName = marketName.trim();
+
+    // ================================================
+    // IMAGE VALIDATION
+    // ================================================
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Market image is required",
+      });
+    }
 
     // ================================================
     // MONTH VALIDATION
@@ -385,8 +420,8 @@ const createLotteryConfig = async (req, res) => {
     // ================================================
 
     if (
-      !prizes ||
-      typeof prizes !== "object"
+      !parsedPrizes ||
+      typeof parsedPrizes !== "object"
     ) {
       return res.status(400).json({
         success: false,
@@ -395,9 +430,9 @@ const createLotteryConfig = async (req, res) => {
     }
 
     if (
-      prizes.first === undefined ||
-      prizes.first === null ||
-      prizes.first === ""
+      parsedPrizes.first === undefined ||
+      parsedPrizes.first === null ||
+      parsedPrizes.first === ""
     ) {
       return res.status(400).json({
         success: false,
@@ -406,9 +441,9 @@ const createLotteryConfig = async (req, res) => {
     }
 
     if (
-      prizes.second === undefined ||
-      prizes.second === null ||
-      prizes.second === ""
+      parsedPrizes.second === undefined ||
+      parsedPrizes.second === null ||
+      parsedPrizes.second === ""
     ) {
       return res.status(400).json({
         success: false,
@@ -417,9 +452,9 @@ const createLotteryConfig = async (req, res) => {
     }
 
     if (
-      prizes.third === undefined ||
-      prizes.third === null ||
-      prizes.third === ""
+      parsedPrizes.third === undefined ||
+      parsedPrizes.third === null ||
+      parsedPrizes.third === ""
     ) {
       return res.status(400).json({
         success: false,
@@ -427,34 +462,25 @@ const createLotteryConfig = async (req, res) => {
       });
     }
 
-    const firstPrize = Number(prizes.first);
-    const secondPrize = Number(prizes.second);
-    const thirdPrize = Number(prizes.third);
+    const firstPrize = Number(parsedPrizes.first);
+    const secondPrize = Number(parsedPrizes.second);
+    const thirdPrize = Number(parsedPrizes.third);
 
-    if (
-      !Number.isFinite(firstPrize) ||
-      firstPrize < 0
-    ) {
+    if (!Number.isFinite(firstPrize) || firstPrize < 0) {
       return res.status(400).json({
         success: false,
         message: "Valid first prize amount is required",
       });
     }
 
-    if (
-      !Number.isFinite(secondPrize) ||
-      secondPrize < 0
-    ) {
+    if (!Number.isFinite(secondPrize) || secondPrize < 0) {
       return res.status(400).json({
         success: false,
         message: "Valid second prize amount is required",
       });
     }
 
-    if (
-      !Number.isFinite(thirdPrize) ||
-      thirdPrize < 0
-    ) {
+    if (!Number.isFinite(thirdPrize) || thirdPrize < 0) {
       return res.status(400).json({
         success: false,
         message: "Valid third prize amount is required",
@@ -489,11 +515,38 @@ const createLotteryConfig = async (req, res) => {
     }
 
     // ================================================
+    // UPLOAD IMAGE TO IMGBB
+    // ================================================
+
+    let imageUrl;
+
+    try {
+      imageUrl = await uploadToImgBB(req.file);
+    } catch (uploadError) {
+      console.error("ImgBB upload error:", uploadError);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to upload market image",
+        error: uploadError.message,
+      });
+    }
+
+    if (!imageUrl) {
+      return res.status(500).json({
+        success: false,
+        message: "Image upload returned no URL",
+      });
+    }
+
+    // ================================================
     // CREATE ONLY ONE CONFIG
     // ================================================
 
     const lottery = await LotteryConfig.create({
       marketName: cleanMarketName,
+
+      imageUrl,
 
       month: monthValidation.month,
 
@@ -565,15 +618,7 @@ const createLotteryConfig = async (req, res) => {
 
 const addUserLotteryEntry = async (req, res) => {
   try {
-    // =====================================================
-    // GET DATA FROM REQUEST
-    // =====================================================
-
     const { configId, number, amount } = req.body;
-
-    // =====================================================
-    // GET USER ID
-    // =====================================================
 
     const userId = getUserId(req);
 
@@ -583,10 +628,6 @@ const addUserLotteryEntry = async (req, res) => {
         message: "User ID not found in token",
       });
     }
-
-    // =====================================================
-    // VALIDATE CONFIG ID
-    // =====================================================
 
     if (!configId) {
       return res.status(400).json({
@@ -602,10 +643,6 @@ const addUserLotteryEntry = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // VALIDATE NUMBER
-    // =====================================================
-
     const numberValidation = validateNumber(number);
 
     if (!numberValidation.valid) {
@@ -614,10 +651,6 @@ const addUserLotteryEntry = async (req, res) => {
         message: numberValidation.message,
       });
     }
-
-    // =====================================================
-    // VALIDATE AMOUNT
-    // =====================================================
 
     const amountValidation = validateAmount(amount);
 
@@ -635,10 +668,6 @@ const addUserLotteryEntry = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // FIND USER (DB SE — wallet check ke liye)
-    // =====================================================
-
     const isObjectId = /^[a-f\d]{24}$/i.test(String(userId));
 
     const user = await User.findOne({
@@ -655,10 +684,6 @@ const addUserLotteryEntry = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // WALLET BALANCE CHECK (pre-check)
-    // =====================================================
-
     if (Number(user.wallet || 0) < Number(amountValidation.amount)) {
       return res.status(400).json({
         success: false,
@@ -667,10 +692,6 @@ const addUserLotteryEntry = async (req, res) => {
         requiredAmount: Number(amountValidation.amount),
       });
     }
-
-    // =====================================================
-    // FIND LOTTERY CONFIG BY CONFIG ID
-    // =====================================================
 
     const config = await LotteryConfig.findById(configId);
 
@@ -682,10 +703,6 @@ const addUserLotteryEntry = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // CHECK ACTIVE
-    // =====================================================
-
     if (!config.isActive) {
       return res.status(400).json({
         success: false,
@@ -694,10 +711,6 @@ const addUserLotteryEntry = async (req, res) => {
         marketName: config.marketName,
       });
     }
-
-    // =====================================================
-    // GET DRAW DATE
-    // =====================================================
 
     const getDBDateString = (date) => {
       if (!date) {
@@ -723,10 +736,6 @@ const addUserLotteryEntry = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // VALIDATE DRAW TIME
-    // =====================================================
-
     if (
       !config.drawTime ||
       typeof config.drawTime !== "string" ||
@@ -741,10 +750,6 @@ const addUserLotteryEntry = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // CREATE DRAW DATETIME (IST)
-    // =====================================================
-
     const drawDateTime = new Date(
       `${dateString}T${config.drawTime}:00+05:30`
     );
@@ -756,10 +761,6 @@ const addUserLotteryEntry = async (req, res) => {
         configId: config._id,
       });
     }
-
-    // =====================================================
-    // CURRENT TIME
-    // =====================================================
 
     const now = new Date();
 
@@ -776,10 +777,6 @@ const addUserLotteryEntry = async (req, res) => {
     console.log("NUMBER          :", numberValidation.number);
     console.log("==============================================");
 
-    // =====================================================
-    // CHECK DRAW TIME
-    // =====================================================
-
     if (now >= drawDateTime) {
       return res.status(400).json({
         success: false,
@@ -791,17 +788,9 @@ const addUserLotteryEntry = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // SAFETY FOR USERS ARRAY
-    // =====================================================
-
     if (!Array.isArray(config.users)) {
       config.users = [];
     }
-
-    // =====================================================
-    // DEDUCT WALLET (ATOMIC)
-    // =====================================================
 
     const updatedUser = await User.findOneAndUpdate(
       {
@@ -827,10 +816,6 @@ const addUserLotteryEntry = async (req, res) => {
       `WALLET DEDUCTED: ₹${amountValidation.amount} from user ${user._id}. New balance: ₹${updatedUser.wallet}`
     );
 
-    // =====================================================
-    // ADD USER ENTRY
-    // =====================================================
-
     config.users.push({
       userId: String(user._id),
 
@@ -853,14 +838,9 @@ const addUserLotteryEntry = async (req, res) => {
       status: "pending",
     });
 
-    // =====================================================
-    // SAVE CONFIG
-    // =====================================================
-
     try {
       await config.save();
     } catch (saveError) {
-      // Config save fail hua toh wallet refund karo
       console.error("Config save failed, refunding wallet:", saveError);
 
       await User.findByIdAndUpdate(user._id, {
@@ -873,10 +853,6 @@ const addUserLotteryEntry = async (req, res) => {
         error: saveError.message,
       });
     }
-
-    // =====================================================
-    // TRANSACTION HISTORY
-    // =====================================================
 
     try {
       await TransactionHistory.create({
@@ -891,29 +867,15 @@ const addUserLotteryEntry = async (req, res) => {
       });
     } catch (historyError) {
       console.error("TransactionHistory create error:", historyError);
-      // Wallet already deduct ho chuka hai, entry save ho chuki hai.
-      // History fail hone pe rollback nahi karenge, sirf log karenge.
     }
 
-    // =====================================================
-    // GET NEW ENTRY
-    // =====================================================
-
     const newEntry = config.users[config.users.length - 1];
-
-    // =====================================================
-    // GET ALL ENTRIES OF THIS USER FOR THIS DRAW
-    // =====================================================
 
     const userEntries = config.users.filter(
       (entry) =>
         String(entry.userId) === String(user._id) &&
         String(entry.entryDate) === String(dateString)
     );
-
-    // =====================================================
-    // SUCCESS RESPONSE
-    // =====================================================
 
     return res.status(201).json({
       success: true,
@@ -971,35 +933,11 @@ const addUserLotteryEntry = async (req, res) => {
 // USER
 //
 // POST /api/lottery/entry/bulk
-//
-// BODY:
-//
-// {
-//   "configId": "...",
-//   "entries": [
-//     { "number": "123456", "amount": 100 },
-//     { "number": "654321", "amount": 100 }
-//   ]
-// }
-//
-// ✅ Ek hi API call mein multiple tickets
-// ✅ Total amount ek baar mein deduct hoga
-// ✅ Saare entries ek saath insert honge
-// ✅ Koi bhi fail ho toh poora rollback
-// ✅ TransactionHistory mein total amount ki ek entry
 // =====================================================
 
 const addBulkUserLotteryEntries = async (req, res) => {
   try {
-    // =====================================================
-    // 1. GET DATA
-    // =====================================================
-
     const { configId, entries } = req.body;
-
-    // =====================================================
-    // 2. GET USER ID
-    // =====================================================
 
     const userId = getUserId(req);
 
@@ -1009,10 +947,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
         message: "User ID not found in token",
       });
     }
-
-    // =====================================================
-    // 3. VALIDATE CONFIG ID
-    // =====================================================
 
     if (!configId) {
       return res.status(400).json({
@@ -1028,10 +962,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // 4. VALIDATE ENTRIES ARRAY
-    // =====================================================
-
     if (!Array.isArray(entries) || entries.length === 0) {
       return res.status(400).json({
         success: false,
@@ -1046,16 +976,11 @@ const addBulkUserLotteryEntries = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // 5. VALIDATE EACH ENTRY
-    // =====================================================
-
     const normalizedEntries = [];
 
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
 
-      // Number validation
       const numberValidation = validateNumber(entry?.number);
 
       if (!numberValidation.valid) {
@@ -1065,7 +990,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
         });
       }
 
-      // Amount validation
       const amountValidation = validateAmount(entry?.amount);
 
       if (!amountValidation.valid) {
@@ -1088,10 +1012,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // 6. CHECK DUPLICATE NUMBERS IN REQUEST
-    // =====================================================
-
     const numbers = normalizedEntries.map((e) => e.number);
     const uniqueNumbers = new Set(numbers);
 
@@ -1101,10 +1021,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
         message: "Duplicate numbers in the same purchase are not allowed",
       });
     }
-
-    // =====================================================
-    // 7. CALCULATE TOTAL AMOUNT
-    // =====================================================
 
     const totalAmount = normalizedEntries.reduce(
       (sum, entry) => sum + entry.amount,
@@ -1117,10 +1033,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
         message: "Invalid total amount",
       });
     }
-
-    // =====================================================
-    // 8. FIND USER
-    // =====================================================
 
     const isObjectId = /^[a-f\d]{24}$/i.test(String(userId));
 
@@ -1138,10 +1050,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // 9. PRE-CHECK WALLET BALANCE
-    // =====================================================
-
     if (Number(user.wallet || 0) < totalAmount) {
       return res.status(400).json({
         success: false,
@@ -1151,10 +1059,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
         shortfall: totalAmount - Number(user.wallet || 0),
       });
     }
-
-    // =====================================================
-    // 10. FIND LOTTERY CONFIG
-    // =====================================================
 
     const config = await LotteryConfig.findById(configId);
 
@@ -1166,10 +1070,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // 11. CHECK ACTIVE
-    // =====================================================
-
     if (!config.isActive) {
       return res.status(400).json({
         success: false,
@@ -1178,10 +1078,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
         marketName: config.marketName,
       });
     }
-
-    // =====================================================
-    // 12. GET DRAW DATE STRING
-    // =====================================================
 
     const getDBDateString = (date) => {
       if (!date) return null;
@@ -1203,10 +1099,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // 13. VALIDATE DRAW TIME
-    // =====================================================
-
     if (
       !config.drawTime ||
       typeof config.drawTime !== "string" ||
@@ -1220,10 +1112,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
         drawTime: config.drawTime,
       });
     }
-
-    // =====================================================
-    // 14. CREATE DRAW DATETIME (IST)
-    // =====================================================
 
     const drawDateTime = new Date(
       `${dateString}T${config.drawTime}:00+05:30`
@@ -1251,10 +1139,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
     console.log("NUMBERS         :", numbers.join(", "));
     console.log("==============================================");
 
-    // =====================================================
-    // 15. CHECK DRAW TIME
-    // =====================================================
-
     if (now >= drawDateTime) {
       return res.status(400).json({
         success: false,
@@ -1266,17 +1150,9 @@ const addBulkUserLotteryEntries = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // 16. SAFETY FOR USERS ARRAY
-    // =====================================================
-
     if (!Array.isArray(config.users)) {
       config.users = [];
     }
-
-    // =====================================================
-    // 17. ATOMIC WALLET DEDUCTION (TOTAL AMOUNT)
-    // =====================================================
 
     const updatedUser = await User.findOneAndUpdate(
       {
@@ -1301,10 +1177,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
     console.log(
       `WALLET DEDUCTED: ₹${totalAmount} from user ${user._id}. New balance: ₹${updatedUser.wallet}`
     );
-
-    // =====================================================
-    // 18. PUSH ALL ENTRIES
-    // =====================================================
 
     const startIndex = config.users.length;
 
@@ -1332,10 +1204,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // 19. SAVE CONFIG (with rollback on failure)
-    // =====================================================
-
     try {
       await config.save();
     } catch (saveError) {
@@ -1344,12 +1212,10 @@ const addBulkUserLotteryEntries = async (req, res) => {
         saveError
       );
 
-      // Wallet wapas karo
       await User.findByIdAndUpdate(user._id, {
         $inc: { wallet: totalAmount },
       });
 
-      // Config object se naye entries hata do (memory only)
       config.users.splice(startIndex);
 
       return res.status(500).json({
@@ -1358,10 +1224,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
         error: saveError.message,
       });
     }
-
-    // =====================================================
-    // 20. TRANSACTION HISTORY (SINGLE ENTRY FOR TOTAL)
-    // =====================================================
 
     let transaction = null;
 
@@ -1387,25 +1249,13 @@ const addBulkUserLotteryEntries = async (req, res) => {
       );
     }
 
-    // =====================================================
-    // 21. GET NEW ENTRIES
-    // =====================================================
-
     const newEntries = config.users.slice(startIndex);
-
-    // =====================================================
-    // 22. GET ALL ENTRIES OF THIS USER FOR THIS DRAW
-    // =====================================================
 
     const userEntries = config.users.filter(
       (entry) =>
         String(entry.userId) === String(user._id) &&
         String(entry.entryDate) === String(dateString)
     );
-
-    // =====================================================
-    // 23. SUCCESS RESPONSE
-    // =====================================================
 
     return res.status(201).json({
       success: true,
@@ -1432,23 +1282,18 @@ const addBulkUserLotteryEntries = async (req, res) => {
 
         isActive: config.isActive,
 
-        // 👇 summary
         totalTickets: normalizedEntries.length,
 
         totalAmount,
 
         numbers: numbers,
 
-        // 👇 wallet info
         walletBalance: updatedUser.wallet,
 
-        // 👇 new entries
         entries: newEntries,
 
-        // 👇 all entries of this user for this draw
         allEntries: userEntries,
 
-        // 👇 transaction ref
         transactionId: transaction?._id || null,
       },
     });
@@ -1527,6 +1372,7 @@ const getMyLotteryEntries = async (req, res) => {
         entries.push({
           configId: config._id,
           marketName: config.marketName,
+          imageUrl: config.imageUrl,
           month: config.month,
           year: config.year,
           drawDate: config.drawDate,

@@ -84,6 +84,12 @@ const festivalSchema = new mongoose.Schema(
       index: true,
     },
 
+    imageUrl: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
     year: {
       type: Number,
       required: true,
