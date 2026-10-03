@@ -100,7 +100,7 @@ const Header = () => {
                 stroke="#d4a017"
                 strokeWidth="1.2"
                 strokeLinejoin="round"
-              />
+              />d
               <circle cx="2" cy="8" r="2.5" fill="url(#crownGrad)" />
               <circle cx="19" cy="3" r="2.5" fill="url(#crownGrad)" />
               <circle cx="36" cy="8" r="2.5" fill="url(#crownGrad)" />
