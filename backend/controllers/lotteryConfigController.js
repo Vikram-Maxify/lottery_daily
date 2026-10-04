@@ -195,10 +195,10 @@ const validateNumber = (number) => {
 
   const value = String(number).trim();
 
-  if (!/^[a-zA-Z0-9]{7}$/.test(value)) {
+  if (!/^[a-zA-Z0-9]{8}$/.test(value)) {
     return {
       valid: false,
-      message: "Lottery number must be exactly 7 alphanumeric characters",
+      message: "Lottery number must be exactly 8 alphanumeric characters",
     };
   }
 

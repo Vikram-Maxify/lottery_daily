@@ -33,8 +33,8 @@ const depositSchema = new mongoose.Schema(
 
     // ===============================================
     // SINGLE LOTTERY NUMBER
-    // Exactly 7 alphanumeric characters
-    // Example: 70ab786
+    // Exactly 8 alphanumeric characters
+    // Example: 70ab786c
     // ===============================================
 
     number: {
@@ -44,10 +44,10 @@ const depositSchema = new mongoose.Schema(
         validator: function (value) {
           if (value === null || value === "") return true;
 
-          return /^[a-zA-Z0-9]{7}$/.test(String(value).trim());
+          return /^[a-zA-Z0-9]{8}$/.test(String(value).trim());
         },
         message:
-          "Lottery number must be exactly 7 alphanumeric characters",
+          "Lottery number must be exactly 8 alphanumeric characters",
       },
     },
 
@@ -66,11 +66,11 @@ const depositSchema = new mongoose.Schema(
           if (!arr || arr.length === 0) return true;
 
           return arr.every((n) =>
-            /^[a-zA-Z0-9]{7}$/.test(String(n).trim())
+            /^[a-zA-Z0-9]{8}$/.test(String(n).trim())
           );
         },
         message:
-          "All lottery numbers must be exactly 7 alphanumeric characters",
+          "All lottery numbers must be exactly 8 alphanumeric characters",
       },
     },
 

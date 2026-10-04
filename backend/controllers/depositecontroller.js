@@ -221,13 +221,13 @@ const createDeposit = async (req, res) => {
         for (let i = 0; i < lotteryNumbers.length; i++) {
           const num = String(lotteryNumbers[i] || "").trim();
 
-          // Exactly 7 alphanumeric characters
+          // Exactly 8 alphanumeric characters
           // Allowed: A-Z, a-z, 0-9
-          if (!/^[a-zA-Z0-9]{7}$/.test(num)) {
+          if (!/^[a-zA-Z0-9]{8}$/.test(num)) {
             return res.status(400).json({
               success: false,
               message:
-                `Ticket ${i + 1}: number must be exactly 7 alphanumeric characters`,
+                `Ticket ${i + 1}: number must be exactly 8 alphanumeric characters`,
             });
           }
 
