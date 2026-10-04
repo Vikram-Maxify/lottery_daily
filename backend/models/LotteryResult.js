@@ -3,15 +3,6 @@ const mongoose = require("mongoose");
 // =====================================================
 // WINNER SCHEMA
 // =====================================================
-// Har winner ke saath:
-// - userId       (kis user ne jeeta)
-// - userNumber   (uska 6-digit number)
-// - amount       (usne kitna paisa lagaya tha)
-// - prizeType    ("1st" / "2nd" / "3rd")
-// - matchedDigits (4 / 5 / 6)
-// - prize        (object: { first, second, third } — actual amounts)
-// - prizeAmount  (total prize amount jo wallet me credit hua)
-// =====================================================
 
 const winnerSchema = new mongoose.Schema(
   {
@@ -21,27 +12,25 @@ const winnerSchema = new mongoose.Schema(
       index: true,
     },
 
+    // ✅ 8-char alphanumeric: 2 digits + 1 letter + 5 digits
     userNumber: {
       type: String,
       required: true,
-      match: /^\d{8}$/,
+      match: /^[0-9]{2}[A-Z][0-9]{5}$/,
     },
 
-    // ✅ ADDED: user ne kitna amount lagaya tha
     amount: {
       type: Number,
       default: 0,
       min: 0,
     },
 
-    // Prize category
     prizeType: {
       type: String,
       enum: ["1st", "2nd", "3rd"],
       required: true,
     },
 
-    // ✅ ADDED: Prize amount breakdown object
     prize: {
       first: {
         type: Number,
@@ -60,22 +49,18 @@ const winnerSchema = new mongoose.Schema(
       },
     },
 
-    // ✅ ADDED: Total prize amount (wallet me jo credit hua)
     prizeAmount: {
       type: Number,
       default: 0,
       min: 0,
     },
 
+    // 1st=8, 2nd=7, 3rd=5
     matchedDigits: {
       type: Number,
-      enum: [4, 5, 6],
+      enum: [5, 7, 8],
       required: true,
     },
-
-    // Backward-compat: purana code `prize` ko string samajh sakta hai
-    // (controller me `prize: match.prize` bhi set hota tha)
-    // Isliye ek virtual alias bhi de dete hain.
   },
   {
     _id: true,
@@ -85,11 +70,7 @@ const winnerSchema = new mongoose.Schema(
 );
 
 // =====================================================
-// VIRTUAL: prizeLabel
-// =====================================================
-// Purana controller `winner.prize` ko string ki tarah use karta tha
-// (jaise `"1st"`, `"2nd"`, `"3rd"`). Ab `prize` ek object hai,
-// to ek virtual field `prizeLabel` bana dete hain jo wahi string de.
+// VIRTUAL: prizeLabel (backward-compat)
 // =====================================================
 
 winnerSchema.virtual("prizeLabel").get(function () {
@@ -115,10 +96,11 @@ const lotteryResultSchema = new mongoose.Schema(
       index: true,
     },
 
+    // ✅ 8-char alphanumeric: 2 digits + 1 letter + 5 digits
     winningNumber: {
       type: String,
       required: true,
-      match: /^\d{8}$/,
+      match: /^[0-9]{2}[A-Z][0-9]{5}$/,
     },
 
     winners: {

@@ -2,6 +2,11 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import api from "../api";
 
 // =====================================================
+// BASE PATH — server.js: app.use("/api/festival", fes_lottery_routes)
+// =====================================================
+const FESTIVAL_BASE = "/festival";
+
+// =====================================================
 // INITIAL STATE
 // =====================================================
 
@@ -60,21 +65,9 @@ const initialState = {
 };
 
 // =====================================================
-// CREATE LOTTERY CONFIG (WITH IMAGE UPLOAD)
-// ADMIN
-//
+// CREATE LOTTERY CONFIG
 // POST /api/festival
 // multipart/form-data
-//
-// lotteryData: {
-//   marketName,
-//   month,
-//   year,
-//   drawDate,      // YYYY-MM-DD
-//   drawTime,      // HH:mm
-//   prizes: { first, second, third },
-//   image: File    // 👈 REQUIRED
-// }
 // =====================================================
 
 export const createLotteryConfig = createAsyncThunk(
@@ -91,20 +84,12 @@ export const createLotteryConfig = createAsyncThunk(
         image,
       } = lotteryData || {};
 
-      // ================================================
-      // BASIC VALIDATION
-      // ================================================
-
       if (!image) {
         return rejectWithValue({
           success: false,
           message: "Market image is required",
         });
       }
-
-      // ================================================
-      // BUILD FORM DATA
-      // ================================================
 
       const formData = new FormData();
 
@@ -113,26 +98,16 @@ export const createLotteryConfig = createAsyncThunk(
       formData.append("year", year ?? "");
       formData.append("drawDate", drawDate ?? "");
       formData.append("drawTime", drawTime ?? "");
-
-      // prizes must be sent as JSON string
       formData.append(
         "prizes",
         typeof prizes === "string"
           ? prizes
           : JSON.stringify(prizes ?? {})
       );
-
-      // image file (field name must match backend: "image")
       formData.append("image", image);
 
-      // ================================================
-      // SEND REQUEST
-      // ================================================
-
-      const response = await api.post("/festival", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+      const response = await api.post(FESTIVAL_BASE, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
       return response.data;
@@ -148,10 +123,9 @@ export const createLotteryConfig = createAsyncThunk(
 );
 
 // =====================================================
-// UPDATE LOTTERY CONFIG
-// ADMIN
-//
-// PATCH /api/festival/:id
+// UPDATE LOTTERY CONFIG  ✅ FIXED
+// Backend route: PUT /api/festival/update/:id
+// multipart/form-data (image optional)
 // =====================================================
 
 export const updateLotteryConfig = createAsyncThunk(
@@ -172,7 +146,42 @@ export const updateLotteryConfig = createAsyncThunk(
         });
       }
 
-      const response = await api.patch(`/festival/${id}`, lotteryData);
+      const formData = new FormData();
+
+      if (lotteryData.marketName !== undefined) {
+        formData.append("marketName", lotteryData.marketName ?? "");
+      }
+      if (lotteryData.month !== undefined) {
+        formData.append("month", String(lotteryData.month ?? ""));
+      }
+      if (lotteryData.year !== undefined) {
+        formData.append("year", String(lotteryData.year ?? ""));
+      }
+      if (lotteryData.drawDate !== undefined) {
+        formData.append("drawDate", lotteryData.drawDate ?? "");
+      }
+      if (lotteryData.drawTime !== undefined) {
+        formData.append("drawTime", lotteryData.drawTime ?? "");
+      }
+      if (lotteryData.prizes !== undefined) {
+        formData.append(
+          "prizes",
+          typeof lotteryData.prizes === "string"
+            ? lotteryData.prizes
+            : JSON.stringify(lotteryData.prizes ?? {})
+        );
+      }
+      if (lotteryData.image) {
+        formData.append("image", lotteryData.image);
+      }
+
+      const response = await api.put(
+        `${FESTIVAL_BASE}/update/${id}`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
 
       return response.data;
     } catch (error) {
@@ -189,14 +198,14 @@ export const updateLotteryConfig = createAsyncThunk(
 
 // =====================================================
 // GET ALL LOTTERY CONFIGS
-// ADMIN
+// GET /api/festival/all
 // =====================================================
 
 export const getAllLotteryConfigs = createAsyncThunk(
   "festivalLottery/getAllLotteryConfigs",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get("/festival/all");
+      const response = await api.get(`${FESTIVAL_BASE}/all`);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -211,13 +220,14 @@ export const getAllLotteryConfigs = createAsyncThunk(
 
 // =====================================================
 // GET ACTIVE LOTTERY
+// GET /api/festival/active
 // =====================================================
 
 export const getActiveLotteryConfig = createAsyncThunk(
   "festivalLottery/getActiveLotteryConfig",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get("/festival/active");
+      const response = await api.get(`${FESTIVAL_BASE}/active`);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -232,7 +242,7 @@ export const getActiveLotteryConfig = createAsyncThunk(
 
 // =====================================================
 // GET LOTTERY CONFIG BY ID
-// ADMIN
+// GET /api/festival/:id
 // =====================================================
 
 export const getLotteryConfigById = createAsyncThunk(
@@ -246,7 +256,7 @@ export const getLotteryConfigById = createAsyncThunk(
         });
       }
 
-      const response = await api.get(`/festival/${id}`);
+      const response = await api.get(`${FESTIVAL_BASE}/${id}`);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -261,14 +271,13 @@ export const getLotteryConfigById = createAsyncThunk(
 
 // =====================================================
 // GET MY LOTTERY ENTRIES
-// USER
 // =====================================================
 
 export const getMyLotteryEntries = createAsyncThunk(
   "festivalLottery/getMyLotteryEntries",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get("/festival/my-entries");
+      const response = await api.get(`${FESTIVAL_BASE}/my-entries`);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -283,14 +292,16 @@ export const getMyLotteryEntries = createAsyncThunk(
 
 // =====================================================
 // ADD SINGLE LOTTERY ENTRY
-// USER
 // =====================================================
 
 export const addUserLotteryEntry = createAsyncThunk(
   "festivalLottery/addUserLotteryEntry",
   async (entryData, { rejectWithValue }) => {
     try {
-      const response = await api.post("/festival/entry", entryData);
+      const response = await api.post(
+        `${FESTIVAL_BASE}/entry`,
+        entryData
+      );
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -305,14 +316,16 @@ export const addUserLotteryEntry = createAsyncThunk(
 
 // =====================================================
 // ADD BULK LOTTERY ENTRIES
-// USER
 // =====================================================
 
 export const addBulkUserLotteryEntries = createAsyncThunk(
   "festivalLottery/addBulkUserLotteryEntries",
   async (bulkData, { rejectWithValue }) => {
     try {
-      const response = await api.post("/festival/entry/bulk", bulkData);
+      const response = await api.post(
+        `${FESTIVAL_BASE}/entry/bulk`,
+        bulkData
+      );
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -328,7 +341,7 @@ export const addBulkUserLotteryEntries = createAsyncThunk(
 
 // =====================================================
 // ACTIVATE LOTTERY CONFIG
-// ADMIN
+// PATCH /api/festival/:id/activate
 // =====================================================
 
 export const activateLotteryConfig = createAsyncThunk(
@@ -342,7 +355,9 @@ export const activateLotteryConfig = createAsyncThunk(
         });
       }
 
-      const response = await api.patch(`/festival/${id}/activate`);
+      const response = await api.patch(
+        `${FESTIVAL_BASE}/${id}/activate`
+      );
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -357,7 +372,7 @@ export const activateLotteryConfig = createAsyncThunk(
 
 // =====================================================
 // DEACTIVATE LOTTERY CONFIG
-// ADMIN
+// PUT /api/festival/:id/deactivate
 // =====================================================
 
 export const deactivateLotteryConfig = createAsyncThunk(
@@ -371,7 +386,9 @@ export const deactivateLotteryConfig = createAsyncThunk(
         });
       }
 
-      const response = await api.put(`/festival/${id}/deactivate`);
+      const response = await api.put(
+        `${FESTIVAL_BASE}/${id}/deactivate`
+      );
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -386,7 +403,7 @@ export const deactivateLotteryConfig = createAsyncThunk(
 
 // =====================================================
 // UPDATE ENTRY STATUS
-// ADMIN
+// PATCH /api/festival/:configId/entry/:entryId/status
 // =====================================================
 
 export const updateEntryStatus = createAsyncThunk(
@@ -411,7 +428,7 @@ export const updateEntryStatus = createAsyncThunk(
       }
 
       const response = await api.patch(
-        `/festival/${configId}/entry/${entryId}/status`,
+        `${FESTIVAL_BASE}/${configId}/entry/${entryId}/status`,
         { status, prizeType, prize }
       );
 
@@ -430,7 +447,7 @@ export const updateEntryStatus = createAsyncThunk(
 
 // =====================================================
 // DELETE LOTTERY CONFIG
-// ADMIN
+// DELETE /api/festival/:id
 // =====================================================
 
 export const deleteLotteryConfig = createAsyncThunk(
@@ -444,7 +461,7 @@ export const deleteLotteryConfig = createAsyncThunk(
         });
       }
 
-      const response = await api.delete(`/festival/${id}`);
+      const response = await api.delete(`${FESTIVAL_BASE}/${id}`);
 
       return {
         ...response.data,
@@ -549,7 +566,6 @@ const festivalLotterySlice = createSlice({
 
         if (createdConfig) {
           state.config = createdConfig;
-
           state.configs = [createdConfig, ...state.configs];
         }
       })
@@ -626,7 +642,7 @@ const festivalLotterySlice = createSlice({
       })
 
       // =================================================
-      // GET ALL LOTTERY CONFIGS
+      // GET ALL
       // =================================================
       .addCase(getAllLotteryConfigs.pending, (state) => {
         state.loading = true;
@@ -648,7 +664,7 @@ const festivalLotterySlice = createSlice({
       })
 
       // =================================================
-      // GET ACTIVE LOTTERY
+      // GET ACTIVE
       // =================================================
       .addCase(getActiveLotteryConfig.pending, (state) => {
         state.activeLoading = true;
@@ -669,7 +685,7 @@ const festivalLotterySlice = createSlice({
       })
 
       // =================================================
-      // GET CONFIG BY ID
+      // GET BY ID
       // =================================================
       .addCase(getLotteryConfigById.pending, (state) => {
         state.configLoading = true;
@@ -691,7 +707,7 @@ const festivalLotterySlice = createSlice({
       })
 
       // =================================================
-      // GET MY LOTTERY ENTRIES
+      // MY ENTRIES
       // =================================================
       .addCase(getMyLotteryEntries.pending, (state) => {
         state.myEntriesLoading = true;
@@ -761,7 +777,7 @@ const festivalLotterySlice = createSlice({
           const newEntries = responseData.allEntries.map((entry) => ({
             configId: responseData.configId,
             marketName: responseData.marketName,
-            imageUrl: responseData.imageUrl, // 👈 kept
+            imageUrl: responseData.imageUrl,
             month: responseData.month,
             year: responseData.year,
             drawDate: responseData.drawDate,
@@ -839,7 +855,7 @@ const festivalLotterySlice = createSlice({
           const newEntries = responseData.allEntries.map((entry) => ({
             configId: responseData.configId,
             marketName: responseData.marketName,
-            imageUrl: responseData.imageUrl, // 👈 kept
+            imageUrl: responseData.imageUrl,
             month: responseData.month,
             year: responseData.year,
             drawDate: responseData.drawDate,
@@ -874,7 +890,7 @@ const festivalLotterySlice = createSlice({
       })
 
       // =================================================
-      // ACTIVATE LOTTERY
+      // ACTIVATE
       // =================================================
       .addCase(activateLotteryConfig.pending, (state) => {
         state.activateLoading = true;
@@ -911,7 +927,7 @@ const festivalLotterySlice = createSlice({
       })
 
       // =================================================
-      // DEACTIVATE LOTTERY
+      // DEACTIVATE
       // =================================================
       .addCase(deactivateLotteryConfig.pending, (state) => {
         state.deactivateLoading = true;
@@ -1033,7 +1049,7 @@ const festivalLotterySlice = createSlice({
       })
 
       // =================================================
-      // DELETE LOTTERY
+      // DELETE
       // =================================================
       .addCase(deleteLotteryConfig.pending, (state) => {
         state.deleteLoading = true;
