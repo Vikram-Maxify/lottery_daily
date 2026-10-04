@@ -14,6 +14,7 @@ const {
   updateEntryStatus,
   deleteLotteryConfig,
   addBulkUserLotteryEntries,
+  deactivateLotteryConfig, // ✅ ADD
 } = require("../controllers/festival_lottery");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -27,7 +28,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
 
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5 MB
+    fileSize: 5 * 1024 * 1024,
   },
 
   fileFilter: (req, file, cb) => {
@@ -54,15 +55,18 @@ const upload = multer({
 // =====================================================
 
 // GET active lottery
-// GET /api/lottery-config/active
-router.get("/active", getActiveLotteryConfig);
+// GET /api/festival/active
+router.get(
+  "/active",
+  getActiveLotteryConfig
+);
 
 // =====================================================
 // USER ROUTES
 // =====================================================
 
 // GET my lottery entries
-// GET /api/lottery-config/my-entries
+// GET /api/festival/my-entries
 router.get(
   "/my-entries",
   authMiddleware,
@@ -70,7 +74,7 @@ router.get(
 );
 
 // ADD lottery entry
-// POST /api/lottery-config/entry
+// POST /api/festival/entry
 router.post(
   "/entry",
   authMiddleware,
@@ -78,7 +82,7 @@ router.post(
 );
 
 // ADD bulk entries
-// POST /api/lottery-config/entry/bulk
+// POST /api/festival/entry/bulk
 router.post(
   "/entry/bulk",
   authMiddleware,
@@ -89,19 +93,18 @@ router.post(
 // ADMIN ROUTES
 // =====================================================
 
-// CREATE lottery config (with image upload)
-// POST /api/lottery-config
-// multipart/form-data => field name: "image"
+// CREATE lottery config
+// POST /api/festival
 router.post(
   "/",
   authMiddleware,
   adminMiddleware,
-  upload.single("image"), // 👈 ADDED
+  upload.single("image"),
   createLotteryConfig
 );
 
 // GET all lottery configs
-// GET /api/lottery-config/all
+// GET /api/festival/all
 router.get(
   "/all",
   authMiddleware,
@@ -110,7 +113,7 @@ router.get(
 );
 
 // GET lottery config by ID
-// GET /api/lottery-config/:id
+// GET /api/festival/:id
 router.get(
   "/:id",
   authMiddleware,
@@ -119,7 +122,7 @@ router.get(
 );
 
 // ACTIVATE lottery config
-// PATCH /api/lottery-config/:id/activate
+// PATCH /api/festival/:id/activate
 router.patch(
   "/:id/activate",
   authMiddleware,
@@ -127,8 +130,20 @@ router.patch(
   activateLotteryConfig
 );
 
+// =====================================================
+// DEACTIVATE LOTTERY CONFIG
+// =====================================================
+
+// PUT /api/festival/:id/deactivate
+router.put(
+  "/:id/deactivate",
+  authMiddleware,
+  adminMiddleware,
+  deactivateLotteryConfig
+);
+
 // UPDATE user entry status
-// PATCH /api/lottery-config/:configId/entry/:entryId/status
+// PATCH /api/festival/:configId/entry/:entryId/status
 router.patch(
   "/:configId/entry/:entryId/status",
   authMiddleware,
@@ -137,7 +152,7 @@ router.patch(
 );
 
 // DELETE lottery config
-// DELETE /api/lottery-config/:id
+// DELETE /api/festival/:id
 router.delete(
   "/:id",
   authMiddleware,
