@@ -24,7 +24,7 @@ const winnerSchema = new mongoose.Schema(
     userNumber: {
       type: String,
       required: true,
-      match: /^\d{6}$/,
+      match: /^\d{8}$/,
     },
 
     // ✅ ADDED: user ne kitna amount lagaya tha
@@ -118,7 +118,7 @@ const lotteryResultSchema = new mongoose.Schema(
     winningNumber: {
       type: String,
       required: true,
-      match: /^\d{6}$/,
+      match: /^\d{8}$/,
     },
 
     winners: {

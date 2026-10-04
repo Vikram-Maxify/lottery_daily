@@ -20,13 +20,13 @@ const lotteryUserEntrySchema = new mongoose.Schema(
       match: /^\d{4}-\d{2}-\d{2}$/,
     },
 
-    // 7 character alphanumeric lottery number
-    // Example: 70ab786
+    // 8 character alphanumeric lottery number
+    // Example: 70ab786c
     number: {
       type: String,
       required: true,
       trim: true,
-      match: /^[a-zA-Z0-9]{7}$/,
+      match: /^[a-zA-Z0-9]{8}$/,
     },
 
     amount: {

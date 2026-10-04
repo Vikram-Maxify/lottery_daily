@@ -12,7 +12,7 @@ const validateSixDigitNumber = (number) => {
   if (number === undefined || number === null) {
     return false;
   }
-  return /^\d{6}$/.test(String(number).trim());
+  return /^\d{8}$/.test(String(number).trim());
 };
 
 // =====================================================
@@ -75,17 +75,17 @@ const getPrize = (userNumber, winningNumber) => {
   const user = String(userNumber).trim();
   const winning = String(winningNumber).trim();
 
-  // 1ST PRIZE — EXACT 6 DIGITS
+  // 1ST PRIZE — EXACT 8 DIGITS
   if (user === winning) {
-    return { prize: "1st", matchedDigits: 6 };
+    return { prize: "1st", matchedDigits: 8 };
   }
 
-  // 2ND PRIZE — FIRST 5 OR LAST 5
-  const firstFiveMatch = user.substring(0, 5) === winning.substring(0, 5);
-  const lastFiveMatch = user.substring(1, 6) === winning.substring(1, 6);
+  // 2ND PRIZE — FIRST 7 OR LAST 7
+  const firstSevenMatch = user.substring(0, 7) === winning.substring(0, 7);
+  const lastSevenMatch = user.substring(1, 8) === winning.substring(1, 8);
 
-  if (firstFiveMatch || lastFiveMatch) {
-    return { prize: "2nd", matchedDigits: 5 };
+  if (firstSevenMatch || lastSevenMatch) {
+    return { prize: "2nd", matchedDigits: 7 };
   }
 
   // 3RD PRIZE — FIRST 4 OR MIDDLE 4 OR LAST 4

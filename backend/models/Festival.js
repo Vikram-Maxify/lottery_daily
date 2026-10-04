@@ -18,7 +18,7 @@ const lotteryUserEntrySchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      match: /^[a-zA-Z0-9]{7}$/,
+      match: /^[a-zA-Z0-9]{8}$/,
     },
 
     amount: {
