@@ -14,6 +14,7 @@ const {
   updateEntryStatus,
   deleteLotteryConfig,
   addBulkUserLotteryEntries,
+  updateLotteryConfig,
 } = require("../controllers/festival_lottery");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -98,6 +99,15 @@ router.post(
   adminMiddleware,
   upload.single("image"), // 👈 ADDED
   createLotteryConfig
+);
+
+
+router.put(
+  "/update/:id",
+  authMiddleware,
+  adminMiddleware,
+  upload.single("image"),
+  updateLotteryConfig
 );
 
 // GET all lottery configs

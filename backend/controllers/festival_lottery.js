@@ -575,6 +575,365 @@ const createLotteryConfig = async (req, res) => {
 };
 
 // =====================================================
+// UPDATE LOTTERY CONFIG
+// ADMIN
+//
+// PUT /api/lottery/:id
+//
+// multipart/form-data (all fields optional):
+//   - marketName  (text)
+//   - month       (text)
+//   - year        (text)
+//   - drawDate    (text) YYYY-MM-DD
+//   - drawTime    (text) HH:mm
+//   - prizes      (JSON string) { "first": 100, "second": 50, "third": 20 }
+//   - image       (file)  👈 OPTIONAL (agar bheji to replace hogi)
+// =====================================================
+
+const updateLotteryConfig = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // ================================================
+    // VALIDATE CONFIG ID
+    // ================================================
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid configuration ID",
+      });
+    }
+
+    // ================================================
+    // FIND EXISTING CONFIG
+    // ================================================
+
+    const config = await LotteryConfig.findById(id);
+
+    if (!config) {
+      return res.status(404).json({
+        success: false,
+        message: "Lottery configuration not found",
+      });
+    }
+
+    const {
+      marketName,
+      month,
+      year,
+      drawDate,
+      drawTime,
+      prizes,
+    } = req.body;
+
+    // ================================================
+    // PARSE PRIZES (multipart form-data => string)
+    // ================================================
+
+    let parsedPrizes = prizes;
+
+    if (typeof prizes === "string") {
+      try {
+        parsedPrizes = JSON.parse(prizes);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          message: "prizes must be a valid JSON object",
+        });
+      }
+    }
+
+    // ================================================
+    // MARKET NAME VALIDATION (optional)
+    // ================================================
+
+    let cleanMarketName = config.marketName;
+
+    if (marketName !== undefined && marketName !== null && marketName !== "") {
+      if (typeof marketName !== "string" || !marketName.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Market name must be a non-empty string",
+        });
+      }
+      cleanMarketName = marketName.trim();
+    }
+
+    // ================================================
+    // MONTH VALIDATION (optional)
+    // ================================================
+
+    let updatedMonth = config.month;
+
+    if (month !== undefined && month !== null && month !== "") {
+      const monthValidation = validateMonth(month);
+
+      if (!monthValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: monthValidation.message,
+        });
+      }
+      updatedMonth = monthValidation.month;
+    }
+
+    // ================================================
+    // YEAR VALIDATION (optional)
+    // ================================================
+
+    let updatedYear = config.year;
+
+    if (year !== undefined && year !== null && year !== "") {
+      const yearValidation = validateYear(year);
+
+      if (!yearValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: yearValidation.message,
+        });
+      }
+      updatedYear = yearValidation.year;
+    }
+
+    // ================================================
+    // DRAW DATE VALIDATION (optional)
+    // ================================================
+
+    let updatedDrawDate = config.drawDate;
+    let updatedDateString = formatDateString(config.drawDate);
+
+    if (drawDate !== undefined && drawDate !== null && drawDate !== "") {
+      const dateValidation = validateDrawDate(drawDate);
+
+      if (!dateValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: dateValidation.message,
+        });
+      }
+      updatedDrawDate = dateValidation.date;
+      updatedDateString = dateValidation.dateString;
+    }
+
+    // ================================================
+    // DRAW TIME VALIDATION (optional)
+    // ================================================
+
+    let updatedDrawTime = config.drawTime;
+
+    if (drawTime !== undefined && drawTime !== null && drawTime !== "") {
+      const timeValidation = validateDrawTime(drawTime);
+
+      if (!timeValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: timeValidation.message,
+        });
+      }
+      updatedDrawTime = timeValidation.drawTime;
+    }
+
+    // ================================================
+    // PRIZES VALIDATION (optional, but if provided must be complete)
+    // ================================================
+
+    let updatedPrizes = {
+      first: config.prizes?.first || 0,
+      second: config.prizes?.second || 0,
+      third: config.prizes?.third || 0,
+    };
+
+    if (parsedPrizes !== undefined && parsedPrizes !== null) {
+      if (typeof parsedPrizes !== "object") {
+        return res.status(400).json({
+          success: false,
+          message: "Prize amounts must be a valid object",
+        });
+      }
+
+      if (
+        parsedPrizes.first === undefined ||
+        parsedPrizes.first === null ||
+        parsedPrizes.first === ""
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "First prize is required",
+        });
+      }
+
+      if (
+        parsedPrizes.second === undefined ||
+        parsedPrizes.second === null ||
+        parsedPrizes.second === ""
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Second prize is required",
+        });
+      }
+
+      if (
+        parsedPrizes.third === undefined ||
+        parsedPrizes.third === null ||
+        parsedPrizes.third === ""
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Third prize is required",
+        });
+      }
+
+      const firstPrize = Number(parsedPrizes.first);
+      const secondPrize = Number(parsedPrizes.second);
+      const thirdPrize = Number(parsedPrizes.third);
+
+      if (!Number.isFinite(firstPrize) || firstPrize < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Valid first prize amount is required",
+        });
+      }
+
+      if (!Number.isFinite(secondPrize) || secondPrize < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Valid second prize amount is required",
+        });
+      }
+
+      if (!Number.isFinite(thirdPrize) || thirdPrize < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Valid third prize amount is required",
+        });
+      }
+
+      updatedPrizes = {
+        first: firstPrize,
+        second: secondPrize,
+        third: thirdPrize,
+      };
+    }
+
+    // ================================================
+    // CHECK DUPLICATE
+    // (same marketName + same drawDate, excluding self)
+    // ================================================
+
+    const startOfDay = new Date(updatedDrawDate);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(updatedDrawDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existingLottery = await LotteryConfig.findOne({
+      _id: { $ne: config._id },
+      marketName: cleanMarketName,
+      drawDate: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
+    });
+
+    if (existingLottery) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Is market ki selected date ka lottery ticket already exist karta hai",
+        data: existingLottery,
+      });
+    }
+
+    // ================================================
+    // IMAGE UPLOAD (optional - only if new file provided)
+    // ================================================
+
+    let imageUrl = config.imageUrl;
+
+    if (req.file) {
+      try {
+        if (!req.file.buffer) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Uploaded file has no buffer. Make sure multer uses memoryStorage().",
+          });
+        }
+
+        const uploadResult = await uploadToImgBB(
+          req.file.buffer,
+          req.file.originalname
+        );
+
+        const newImageUrl =
+          uploadResult?.imageUrl ||
+          uploadResult?.displayUrl ||
+          null;
+
+        if (!newImageUrl) {
+          return res.status(500).json({
+            success: false,
+            message: "Image upload returned no URL",
+          });
+        }
+
+        imageUrl = newImageUrl;
+      } catch (uploadError) {
+        console.error("ImgBB upload error:", uploadError);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to upload market image",
+          error: uploadError.message,
+        });
+      }
+    }
+
+    // ================================================
+    // APPLY UPDATES
+    // ================================================
+
+    config.marketName = cleanMarketName;
+    config.imageUrl = imageUrl;
+    config.month = updatedMonth;
+    config.year = updatedYear;
+    config.drawDate = updatedDrawDate;
+    config.drawTime = updatedDrawTime;
+    config.prizes = updatedPrizes;
+
+    await config.save();
+
+    // ================================================
+    // RESPONSE
+    // ================================================
+
+    return res.status(200).json({
+      success: true,
+      message: "Lottery configuration updated successfully",
+      data: config,
+    });
+  } catch (error) {
+    console.error("Update lottery config error:", error);
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Is market ki selected date ka lottery ticket already exist karta hai",
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// =====================================================
 // ADD USER LOTTERY ENTRY (SINGLE)
 // USER
 // =====================================================
@@ -1764,4 +2123,5 @@ module.exports = {
   updateEntryStatus,
 
   deleteLotteryConfig,
+  updateLotteryConfig,
 };

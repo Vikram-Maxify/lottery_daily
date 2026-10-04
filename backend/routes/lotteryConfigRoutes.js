@@ -14,6 +14,7 @@ const {
   updateEntryStatus,
   deleteLotteryConfig,
   addBulkUserLotteryEntries,
+  updateLotteryConfig,
 } = require("../controllers/lotteryConfigController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -85,6 +86,15 @@ router.post(
   adminMiddleware,
   upload.single("image"),   // 🔑 YE LINE MISSING THI
   createLotteryConfig
+);
+
+
+router.put(
+  "/update/:id",
+  authMiddleware,
+  adminMiddleware,
+  upload.single("image"),
+  updateLotteryConfig
 );
 
 // GET all lottery configs
