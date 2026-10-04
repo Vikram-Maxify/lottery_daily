@@ -17,7 +17,7 @@ const adminMiddleware = require("../middleware/adminMiddleware");
 const router = express.Router();
 
 // ==========================================
-// ADMIN RESULT ROUTES
+// STATIC ROUTES PEHLE
 // ==========================================
 
 // Create result
@@ -44,13 +44,9 @@ router.post(
   checkNumber
 );
 
-// Get result by ID
-router.get(
-  "/:id",
-  authMiddleware,
-  adminMiddleware,
-  getResultById
-);
+// ==========================================
+// DYNAMIC ROUTES (/:id) BAAD ME
+// ==========================================
 
 // Update result
 router.patch(
@@ -74,6 +70,14 @@ router.patch(
   authMiddleware,
   adminMiddleware,
   unpublishResult
+);
+
+// Get result by ID
+router.get(
+  "/:id",
+  authMiddleware,
+  adminMiddleware,
+  getResultById
 );
 
 // Delete result

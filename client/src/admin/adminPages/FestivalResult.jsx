@@ -15,69 +15,11 @@ import {
   clearFestivalCheckResult,
 } from "../../reducer/slice/festivalResultReducer";
 
-// Namespace import: koi naam missing ho to bhi SyntaxError nahi aata
-import * as festivalSlice from "../../reducer/slice/festivalLotteryReducer";
+import { getAllLotteryConfigs } from "../../reducer/slice/festivalLotteryReducer";
 
 /* =========================================================
-   FESTIVAL LIST (dropdown ke liye) - AUTO DETECT
-   Festival reducer me "saare festivals laane wala" thunk dhoondhta hai.
-   Mila nahi to console me saare thunk naam print hote hain;
-   tab FETCH_FESTIVALS_NAME me asli naam likh do.
+   WINZOX THEME
 ========================================================= */
-
-const FETCH_FESTIVALS_NAME = ""; // optional: jaise "getFestivalLotteries"
-
-const fetchFestivalsAction = (() => {
-  const thunks = Object.keys(festivalSlice).filter(
-    (k) =>
-      typeof festivalSlice[k] === "function" &&
-      typeof festivalSlice[k].fulfilled === "function"
-  );
-
-  if (FETCH_FESTIVALS_NAME && festivalSlice[FETCH_FESTIVALS_NAME]) {
-    return festivalSlice[FETCH_FESTIVALS_NAME];
-  }
-
-  const bad = /(create|update|delete|remove|buy|purchase|publish|toggle|byid|single|ticket|user|my|order|check|image|upload)/i;
-  const good = /(getall|fetchall|getfestival|fetchfestival|getlotter|fetchlotter|loadfestival|list)/i;
-
-  const name = thunks.find((k) => good.test(k) && !bad.test(k));
-
-  if (!name) {
-    console.warn(
-      "[FestivalResult] Festivals list wala thunk nahi mila. Available thunks:",
-      thunks,
-      "-> FETCH_FESTIVALS_NAME me sahi naam daalo."
-    );
-  }
-
-  return name ? festivalSlice[name] : null;
-})();
-
-const EMPTY_LIST = [];
-
-const pickFestivalState = (state) =>
-  state.festivalLottery ?? state.festival ?? state.festivalLotteries ?? null;
-
-const selectFestivals = (state) => {
-  const s = pickFestivalState(state);
-  if (!s) return EMPTY_LIST;
-
-  const preferred =
-    s.festivals ?? s.lotteries ?? s.festivalLotteries ?? s.configs ?? s.list ?? s.data;
-  if (Array.isArray(preferred)) return preferred;
-
-  const found = Object.values(s).find(
-    (v) => Array.isArray(v) && v.length > 0 && typeof v[0] === "object" && v[0]?._id
-  );
-
-  return found || EMPTY_LIST;
-};
-
-const selectFestivalsLoading = (state) =>
-  Boolean(pickFestivalState(state)?.loading);
-
-/* WINZOX THEME: Bright Gold + White (dark text on gold) */
 
 const GOLD_BTN =
   "bg-gradient-to-b from-[#FFD83D] via-[#F7B500] to-[#E39A00] text-[#1A1204] font-extrabold shadow-[0_4px_10px_-3px_rgba(227,154,0,0.55),inset_0_1px_0_rgba(255,255,255,0.55)] hover:brightness-105";
@@ -96,15 +38,32 @@ const CARD_CLS =
 const TH_CLS =
   "px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#9A5B00]";
 
-const NUM_INPUT = `${INPUT_CLS} font-mono font-bold tracking-widest`;
+const NUM_INPUT = `${INPUT_CLS} font-mono font-bold tracking-widest uppercase`;
+
+/* =========================================================
+   HELPERS
+========================================================= */
 
 const getName = (c) =>
   c?.marketName || c?.festivalName || c?.name || c?.title || "-";
 
-// Backend dates UTC me compare karta hai, isliye page bhi UTC use karta hai
+const WINNING_NUMBER_REGEX = /^[0-9]{2}[A-Z][0-9]{5}$/;
+
+const isValidWinningNumber = (value) => {
+  const v = String(value || "").trim().toUpperCase();
+  return WINNING_NUMBER_REGEX.test(v);
+};
+
+const cleanWinningNumber = (value) =>
+  String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 8);
+
 const toDateOnlyString = (value) => {
   if (!value) return "";
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value))
+    return value;
 
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
@@ -112,6 +71,11 @@ const toDateOnlyString = (value) => {
 
 const formatDate = (date) => {
   if (!date) return "-";
+
+  if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}/.test(date)) {
+    const [y, m, d] = date.slice(0, 10).split("-");
+    return `${d}/${m}/${y}`;
+  }
 
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return "-";
@@ -125,8 +89,6 @@ const formatDate = (date) => {
 };
 
 const money = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
-
-const onlySix = (v) => v.replace(/\D/g, "").slice(0, 6);
 
 const Modal = ({ title, onClose, wide, children }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -168,8 +130,8 @@ const FestivalResult = () => {
     message,
   } = useSelector((state) => state.festivalResult);
 
-  const festivals = useSelector(selectFestivals);
-  const festivalLoading = useSelector(selectFestivalsLoading);
+  const { configs: festivals = [], loading: festivalLoading = false } =
+    useSelector((state) => state.festivalLottery || {});
 
   const [showCreate, setShowCreate] = useState(false);
   const [formData, setFormData] = useState(EMPTY_FORM);
@@ -186,31 +148,42 @@ const FestivalResult = () => {
   const [editNumber, setEditNumber] = useState("");
 
   const [showCheck, setShowCheck] = useState(false);
-  const [checkForm, setCheckForm] = useState({ userNumber: "", winningNumber: "" });
+  const [checkForm, setCheckForm] = useState({
+    userNumber: "",
+    winningNumber: "",
+  });
 
   const refreshFestivals = () => {
-    if (fetchFestivalsAction) dispatch(fetchFestivalsAction());
+    dispatch(getAllLotteryConfigs());
   };
 
   useEffect(() => {
     dispatch(getAllFestivalResults());
-    refreshFestivals();
+    dispatch(getAllLotteryConfigs());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
 
   useEffect(() => {
     if (!success && !error) return;
-    const timer = setTimeout(() => dispatch(clearFestivalResultMessage()), 3500);
+    const timer = setTimeout(
+      () => dispatch(clearFestivalResultMessage()),
+      3500
+    );
     return () => clearTimeout(timer);
   }, [success, error, dispatch]);
 
-  const activeFestivals = useMemo(
-    () => festivals.filter((c) => c?.isActive !== false),
-    [festivals]
-  );
+  // ✅ FIXED: Saare festivals dikhao (active filter hata diya)
+  // Backend `createResult` kisi bhi config ke saath kaam karta hai,
+  // chahe active ho ya inactive. Toh filter ki zaroorat nahi.
+  const selectableFestivals = useMemo(() => {
+    return Array.isArray(festivals) ? festivals : [];
+  }, [festivals]);
 
   const selectedFestival = useMemo(
-    () => festivals.find((c) => String(c?._id) === String(formData.lotteryConfigId)),
+    () =>
+      (Array.isArray(festivals) ? festivals : []).find(
+        (c) => String(c?._id) === String(formData.lotteryConfigId)
+      ),
     [festivals, formData.lotteryConfigId]
   );
 
@@ -231,7 +204,7 @@ const FestivalResult = () => {
     });
   }, [results, search, statusFilter]);
 
-  // ---------------- CREATE ----------------
+  /* ---------------- CREATE ---------------- */
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -248,7 +221,10 @@ const FestivalResult = () => {
     }
 
     if (name === "winningNumber") {
-      setFormData((prev) => ({ ...prev, winningNumber: onlySix(value) }));
+      setFormData((prev) => ({
+        ...prev,
+        winningNumber: cleanWinningNumber(value),
+      }));
       return;
     }
 
@@ -258,30 +234,47 @@ const FestivalResult = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
 
-    if (!formData.lotteryConfigId) return setFormError("Please select a festival lottery.");
+    if (!formData.lotteryConfigId)
+      return setFormError("Please select a festival lottery.");
+
     if (!formData.date) return setFormError("Please select the result date.");
-    if (!/^\d{6}$/.test(formData.winningNumber)) {
-      return setFormError("Winning number must be exactly 6 digits.");
+
+    if (!isValidWinningNumber(formData.winningNumber)) {
+      return setFormError(
+        "Winning number must be 8 characters: 2 digits + 1 letter + 5 digits (e.g. 12A12345)."
+      );
     }
 
     setFormError("");
 
-    const response = await dispatch(createFestivalResult(formData));
+    const response = await dispatch(
+      createFestivalResult({
+        ...formData,
+        winningNumber: formData.winningNumber.toUpperCase(),
+      })
+    );
 
     if (createFestivalResult.fulfilled.match(response)) {
       setFormData(EMPTY_FORM);
       setShowCreate(false);
       refreshFestivals();
+    } else if (createFestivalResult.rejected.match(response)) {
+      setFormError(
+        response.payload?.message || "Failed to create result"
+      );
     }
   };
 
-  // ---------------- EDIT ----------------
+  /* ---------------- EDIT ---------------- */
 
   const handleEditSave = async () => {
-    if (!/^\d{6}$/.test(editNumber)) return;
+    if (!isValidWinningNumber(editNumber)) return;
 
     const res = await dispatch(
-      updateFestivalResult({ id: editItem._id, data: { winningNumber: editNumber } })
+      updateFestivalResult({
+        id: editItem._id,
+        data: { winningNumber: editNumber.toUpperCase() },
+      })
     );
 
     if (updateFestivalResult.fulfilled.match(res)) {
@@ -290,7 +283,7 @@ const FestivalResult = () => {
     }
   };
 
-  // ---------------- PUBLISH / DELETE ----------------
+  /* ---------------- PUBLISH / DELETE ---------------- */
 
   const runWithId = async (setter, id, action) => {
     setter((prev) => [...prev, id]);
@@ -301,8 +294,10 @@ const FestivalResult = () => {
     }
   };
 
-  const handlePublish = (id) => runWithId(setPublishingIds, id, publishFestivalResult(id));
-  const handleUnpublish = (id) => runWithId(setPublishingIds, id, unpublishFestivalResult(id));
+  const handlePublish = (id) =>
+    runWithId(setPublishingIds, id, publishFestivalResult(id));
+  const handleUnpublish = (id) =>
+    runWithId(setPublishingIds, id, unpublishFestivalResult(id));
 
   const handleDelete = async (id) => {
     const ok = window.confirm(
@@ -314,7 +309,7 @@ const FestivalResult = () => {
     refreshFestivals();
   };
 
-  // ---------------- CHECK NUMBER ----------------
+  /* ---------------- CHECK NUMBER ---------------- */
 
   const closeCheck = () => {
     setShowCheck(false);
@@ -323,11 +318,15 @@ const FestivalResult = () => {
   };
 
   const runCheck = () => {
-    if (!/^\d{6}$/.test(checkForm.userNumber) || !/^\d{6}$/.test(checkForm.winningNumber)) return;
+    if (
+      !isValidWinningNumber(checkForm.userNumber) ||
+      !isValidWinningNumber(checkForm.winningNumber)
+    )
+      return;
     dispatch(checkFestivalNumber(checkForm));
   };
 
-  // ---------------- RENDER ----------------
+  /* ---------------- RENDER ---------------- */
 
   return (
     <div className="space-y-6">
@@ -337,7 +336,9 @@ const FestivalResult = () => {
           <h1 className="text-2xl font-black tracking-tight text-[#1A1A1A]">
             Festival Lottery Results
           </h1>
-          <p className="mt-1 text-sm text-[#6B7280]">Manage festival lottery results.</p>
+          <p className="mt-1 text-sm text-[#6B7280]">
+            Manage festival lottery results.
+          </p>
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -421,7 +422,10 @@ const FestivalResult = () => {
               ["Lost", summary.lost],
               ["Prize paid", money(summary.totalPrizePaid)],
             ].map(([label, value]) => (
-              <div key={label} className="rounded-xl border border-[#F3E7C4] bg-[#FFF9E3] p-3">
+              <div
+                key={label}
+                className="rounded-xl border border-[#F3E7C4] bg-[#FFF9E3] p-3"
+              >
                 <p className="text-xs font-semibold text-[#8A8F98]">{label}</p>
                 <p className="mt-1 text-lg font-black text-[#1A1A1A]">{value}</p>
               </div>
@@ -437,13 +441,18 @@ const FestivalResult = () => {
       {/* CREATE FORM */}
       {showCreate && (
         <div className={`p-6 ${CARD_CLS}`}>
-          <h2 className="mb-2 text-lg font-black text-[#1A1A1A]">Create Festival Result</h2>
+          <h2 className="mb-2 text-lg font-black text-[#1A1A1A]">
+            Create Festival Result
+          </h2>
           <p className="mb-6 text-sm text-[#6B7280]">
-            Select the festival lottery, then enter the 6 digit winning number.
-            Save karte hi jeetne walon ka prize turant wallet mein jayega.
+            Select the festival lottery, then enter the 8-character winning
+            number.
           </p>
 
-          <form onSubmit={handleCreate} className="grid grid-cols-1 gap-5 md:grid-cols-3">
+          <form
+            onSubmit={handleCreate}
+            className="grid grid-cols-1 gap-5 md:grid-cols-3"
+          >
             <div>
               <label htmlFor="lotteryConfigId" className={LABEL_CLS}>
                 Festival Lottery
@@ -457,22 +466,24 @@ const FestivalResult = () => {
                 className={INPUT_CLS}
               >
                 <option value="">
-                  {festivalLoading ? "Loading festivals..." : "Select Festival Lottery"}
+                  {festivalLoading
+                    ? "Loading festivals..."
+                    : "Select Festival Lottery"}
                 </option>
-                {activeFestivals.map((c) => (
+                {selectableFestivals.map((c) => (
                   <option key={c._id} value={c._id}>
-                    {`${getName(c)}${c.drawDate ? ` - ${toDateOnlyString(c.drawDate)}` : ""}${
-                      c.drawTime ? ` (${c.drawTime})` : ""
+                    {`${getName(c)}${
+                      c.drawDate ? ` - ${toDateOnlyString(c.drawDate)}` : ""
+                    }${c.drawTime ? ` (${c.drawTime})` : ""}${
+                      c.isActive ? " ✅" : ""
                     }`}
                   </option>
                 ))}
               </select>
 
-              {activeFestivals.length === 0 && !festivalLoading && (
+              {selectableFestivals.length === 0 && !festivalLoading && (
                 <p className="mt-2 text-xs font-medium text-[#D93025]">
-                  {fetchFestivalsAction
-                    ? "No festival lottery found."
-                    : "Festival list load nahi ho rahi. Console me thunk naam dekho."}
+                  No festival lottery found. Please create one first.
                 </p>
               )}
             </div>
@@ -515,15 +526,18 @@ const FestivalResult = () => {
               <input
                 id="winningNumber"
                 type="text"
-                inputMode="numeric"
+                inputMode="text"
                 name="winningNumber"
                 value={formData.winningNumber}
                 onChange={handleChange}
-                maxLength={6}
-                placeholder="Enter 6 digit number"
+                maxLength={8}
+                placeholder="e.g. 12A12345"
                 className={NUM_INPUT}
               />
-              <p className="mt-2 text-xs text-[#6B7280]">{formData.winningNumber.length}/6 digits</p>
+              <p className="mt-2 text-xs text-[#6B7280]">
+                {formData.winningNumber.length}/8 characters — 2 digits, 1
+                letter, 5 digits
+              </p>
             </div>
 
             {selectedFestival && (
@@ -537,8 +551,12 @@ const FestivalResult = () => {
                     ["Year", selectedFestival.year],
                   ].map(([label, value]) => (
                     <div key={label}>
-                      <p className="text-xs font-semibold text-[#8A8F98]">{label}</p>
-                      <p className="mt-1 font-bold text-[#1A1A1A]">{value || "-"}</p>
+                      <p className="text-xs font-semibold text-[#8A8F98]">
+                        {label}
+                      </p>
+                      <p className="mt-1 font-bold text-[#1A1A1A]">
+                        {value || "-"}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -578,7 +596,10 @@ const FestivalResult = () => {
 
           <div className="flex flex-wrap gap-2">
             <div className="relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8A8F98]" />
+              <Search
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8A8F98]"
+              />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -620,13 +641,21 @@ const FestivalResult = () => {
             <table className="w-full min-w-[1100px]">
               <thead className="bg-[#FFF9E3]">
                 <tr>
-                  {["#", "Festival", "Draw Date", "Draw Time", "Result Date", "Winning Number", "Winners", "Prize Paid", "Status"].map(
-                    (h) => (
-                      <th key={h} className={TH_CLS}>
-                        {h}
-                      </th>
-                    )
-                  )}
+                  {[
+                    "#",
+                    "Festival",
+                    "Draw Date",
+                    "Draw Time",
+                    "Result Date",
+                    "Winning Number",
+                    "Winners",
+                    "Prize Paid",
+                    "Status",
+                  ].map((h) => (
+                    <th key={h} className={TH_CLS}>
+                      {h}
+                    </th>
+                  ))}
                   <th className={`${TH_CLS} !text-right`}>Actions</th>
                 </tr>
               </thead>
@@ -638,11 +667,19 @@ const FestivalResult = () => {
                   const isPublishing = publishingIds.includes(item._id);
                   const isDeleting = deletingIds.includes(item._id);
                   const winners = item?.winners || [];
-                  const paid = winners.reduce((t, w) => t + Number(w.prizeAmount || 0), 0);
+                  const paid = winners.reduce(
+                    (t, w) => t + Number(w.prizeAmount || 0),
+                    0
+                  );
 
                   return (
-                    <tr key={item?._id || index} className="transition hover:bg-[#FFFDF7]">
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-[#8A8F98]">{index + 1}</td>
+                    <tr
+                      key={item?._id || index}
+                      className="transition hover:bg-[#FFFDF7]"
+                    >
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-[#8A8F98]">
+                        {index + 1}
+                      </td>
 
                       <td className="whitespace-nowrap px-6 py-4 font-semibold text-[#1A1A1A]">
                         {getName(config)}
@@ -666,7 +703,9 @@ const FestivalResult = () => {
                         </span>
                       </td>
 
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-[#1A1A1A]">{winners.length}</td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-[#1A1A1A]">
+                        {winners.length}
+                      </td>
 
                       <td className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-[#1A1A1A]">
                         {money(paid)}
@@ -703,7 +742,11 @@ const FestivalResult = () => {
                               setEditNumber(item.winningNumber || "");
                             }}
                             disabled={published}
-                            title={published ? "Unpublish result before editing" : "Edit winning number"}
+                            title={
+                              published
+                                ? "Unpublish result before editing"
+                                : "Edit winning number"
+                            }
                             className={`rounded-lg px-3 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50 ${OUTLINE_BTN}`}
                           >
                             <Pencil size={14} />
@@ -733,7 +776,11 @@ const FestivalResult = () => {
                             type="button"
                             onClick={() => handleDelete(item._id)}
                             disabled={isDeleting || published}
-                            title={published ? "Unpublish result before deleting" : "Delete result"}
+                            title={
+                              published
+                                ? "Unpublish result before deleting"
+                                : "Delete result"
+                            }
                             className="rounded-lg border border-[#D93025]/30 bg-[#FDE8E6] px-3 py-2 text-xs font-bold text-[#D93025] transition hover:bg-[#FAD2CE] disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {isDeleting ? "..." : "Delete"}
@@ -754,7 +801,9 @@ const FestivalResult = () => {
         <Modal
           wide
           onClose={() => setViewItem(null)}
-          title={`${getName(viewItem.lotteryConfigId)} - ${formatDate(viewItem.date)}`}
+          title={`${getName(viewItem.lotteryConfigId)} - ${formatDate(
+            viewItem.date
+          )}`}
         >
           <p className="mb-4 text-sm text-[#6B7280]">
             Winning number:{" "}
@@ -772,22 +821,34 @@ const FestivalResult = () => {
               <table className="w-full min-w-[560px]">
                 <thead className="bg-[#FFF9E3]">
                   <tr>
-                    {["User ID", "Number", "Played", "Prize", "Match", "Won"].map((h) => (
-                      <th key={h} className={TH_CLS}>
-                        {h}
-                      </th>
-                    ))}
+                    {["User ID", "Number", "Played", "Prize", "Match", "Won"].map(
+                      (h) => (
+                        <th key={h} className={TH_CLS}>
+                          {h}
+                        </th>
+                      )
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F3E7C4]">
                   {viewItem.winners.map((w, i) => (
                     <tr key={w._id || i}>
-                      <td className="px-6 py-3 text-sm text-[#1A1A1A]">{w.userId}</td>
-                      <td className="px-6 py-3 font-mono text-sm font-bold tracking-widest">{w.userNumber}</td>
+                      <td className="px-6 py-3 text-sm text-[#1A1A1A]">
+                        {w.userId}
+                      </td>
+                      <td className="px-6 py-3 font-mono text-sm font-bold tracking-widest">
+                        {w.userNumber}
+                      </td>
                       <td className="px-6 py-3 text-sm">{money(w.amount)}</td>
-                      <td className="px-6 py-3 text-sm font-semibold text-[#9A5B00]">{w.prizeType}</td>
-                      <td className="px-6 py-3 text-sm">{w.matchedDigits} digit</td>
-                      <td className="px-6 py-3 text-sm font-bold text-[#12A36B]">{money(w.prizeAmount)}</td>
+                      <td className="px-6 py-3 text-sm font-semibold text-[#9A5B00]">
+                        {w.prizeType}
+                      </td>
+                      <td className="px-6 py-3 text-sm">
+                        {w.matchedDigits} digit
+                      </td>
+                      <td className="px-6 py-3 text-sm font-bold text-[#12A36B]">
+                        {money(w.prizeAmount)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -807,21 +868,23 @@ const FestivalResult = () => {
           <label className={LABEL_CLS}>Winning Number</label>
           <input
             type="text"
-            inputMode="numeric"
-            maxLength={6}
+            inputMode="text"
+            maxLength={8}
             value={editNumber}
-            onChange={(e) => setEditNumber(onlySix(e.target.value))}
+            onChange={(e) => setEditNumber(cleanWinningNumber(e.target.value))}
             className={NUM_INPUT}
+            placeholder="e.g. 12A12345"
           />
 
           <p className="mt-3 rounded-xl border border-[#F3E7C4] bg-[#FFF9E3] p-3 text-xs text-[#9A5B00]">
-            Save karte hi purane winners ka prize wallet se wapas kat jayega aur naye number se dobara calculate hoga.
+            Save karte hi purane winners ka prize wallet se wapas kat jayega aur
+            naye number se dobara calculate hoga.
           </p>
 
           <button
             type="button"
             onClick={handleEditSave}
-            disabled={updateLoading || !/^\d{6}$/.test(editNumber)}
+            disabled={updateLoading || !isValidWinningNumber(editNumber)}
             className={`mt-5 w-full rounded-xl py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60 ${GOLD_BTN}`}
           >
             {updateLoading ? "Saving..." : "Save changes"}
@@ -845,11 +908,16 @@ const FestivalResult = () => {
                 <label className={LABEL_CLS}>{label}</label>
                 <input
                   type="text"
-                  inputMode="numeric"
-                  maxLength={6}
+                  inputMode="text"
+                  maxLength={8}
                   value={checkForm[key]}
-                  onChange={(e) => setCheckForm((p) => ({ ...p, [key]: onlySix(e.target.value) }))}
-                  placeholder="6 digit"
+                  onChange={(e) =>
+                    setCheckForm((p) => ({
+                      ...p,
+                      [key]: cleanWinningNumber(e.target.value),
+                    }))
+                  }
+                  placeholder="e.g. 12A12345"
                   className={NUM_INPUT}
                 />
               </div>

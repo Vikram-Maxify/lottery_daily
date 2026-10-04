@@ -3,15 +3,6 @@ const mongoose = require("mongoose");
 // =====================================================
 // WINNER SCHEMA
 // =====================================================
-// Har winner ke saath:
-// - userId       (kis user ne jeeta)
-// - userNumber   (uska 8-digit number)
-// - amount       (usne kitna paisa lagaya tha)
-// - prizeType    ("1st" / "2nd" / "3rd")
-// - matchedDigits (4 / 5 / 6)
-// - prize        (object: { first, second, third } — actual amounts)
-// - prizeAmount  (total prize amount jo wallet me credit hua)
-// =====================================================
 
 const winnerSchema = new mongoose.Schema(
   {
@@ -21,55 +12,41 @@ const winnerSchema = new mongoose.Schema(
       index: true,
     },
 
+    // ✅ 8-char alphanumeric: 2 digits + 1 letter + 5 digits
     userNumber: {
       type: String,
       required: true,
-      match: /^\d{8}$/,
+      match: /^[0-9]{2}[A-Z][0-9]{5}$/,
     },
 
-    // ✅ ADDED: user ne kitna amount lagaya tha
     amount: {
       type: Number,
       default: 0,
       min: 0,
     },
 
-    // Prize category
     prizeType: {
       type: String,
       enum: ["1st", "2nd", "3rd"],
       required: true,
     },
 
-    // ✅ ADDED: Prize amount breakdown object
     prize: {
-      first: {
-        type: Number,
-        default: 0,
-        min: 0,
-      },
-      second: {
-        type: Number,
-        default: 0,
-        min: 0,
-      },
-      third: {
-        type: Number,
-        default: 0,
-        min: 0,
-      },
+      first: { type: Number, default: 0, min: 0 },
+      second: { type: Number, default: 0, min: 0 },
+      third: { type: Number, default: 0, min: 0 },
     },
 
-    // ✅ ADDED: Total prize amount (wallet me jo credit hua)
     prizeAmount: {
       type: Number,
       default: 0,
       min: 0,
     },
 
+    // ✅ 1st=8, 2nd=7, 3rd=5
     matchedDigits: {
       type: Number,
-      enum: [4, 5, 6],
+      enum: [5, 7, 8],
       required: true,
     },
   },
@@ -80,16 +57,12 @@ const winnerSchema = new mongoose.Schema(
   }
 );
 
-// =====================================================
-// VIRTUAL: prizeLabel
-// =====================================================
-
 winnerSchema.virtual("prizeLabel").get(function () {
   return this.prizeType || null;
 });
 
 // =====================================================
-// FESTIVAL SCHEMA
+// FESTIVAL RESULT SCHEMA
 // =====================================================
 
 const festivalresultSchema = new mongoose.Schema(
@@ -107,10 +80,11 @@ const festivalresultSchema = new mongoose.Schema(
       index: true,
     },
 
+    // ✅ 8-char alphanumeric: 2 digits + 1 letter + 5 digits
     winningNumber: {
       type: String,
       required: true,
-      match: /^\d{8}$/,
+      match: /^[0-9]{2}[A-Z][0-9]{5}$/,
     },
 
     winners: {
@@ -135,18 +109,9 @@ const festivalresultSchema = new mongoose.Schema(
   }
 );
 
-// =====================================================
-// UNIQUE: Ek config ke ek date ka sirf ek festival result result
-// =====================================================
-
 festivalresultSchema.index(
-  {
-    lotteryConfigId: 1,
-    date: 1,
-  },
-  {
-    unique: true,
-  }
+  { lotteryConfigId: 1, date: 1 },
+  { unique: true }
 );
 
 module.exports = mongoose.model("Festival result", festivalresultSchema);

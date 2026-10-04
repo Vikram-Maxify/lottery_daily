@@ -5,14 +5,17 @@ const LotteryConfig = require("../models/Festival");
 const User = require("../models/userModel");
 
 // =====================================================
-// VALIDATE 8 DIGIT NUMBER
+// VALIDATE 8-CHAR ALPHANUMERIC NUMBER
+// Format: 2 digits + 1 letter + 5 digits → "12A12345"
 // =====================================================
 
 const validateSixDigitNumber = (number) => {
   if (number === undefined || number === null) {
     return false;
   }
-  return /^\d{8}$/.test(String(number).trim());
+  return /^[0-9]{2}[A-Z][0-9]{5}$/.test(
+    String(number).trim().toUpperCase()
+  );
 };
 
 // =====================================================
@@ -53,13 +56,11 @@ const getDateString = (date) => {
 
 // =====================================================
 // BUILD DATE STRING FROM CONFIG
-// ✅ FIXED: `drawDate` use karo, `date` nahi
 // =====================================================
 
 const buildDateFromConfig = (config) => {
   if (!config) return null;
 
-  // ✅ drawDate already ek Date object hai, seedha string me convert karo
   const dateStr = getDateString(config.drawDate);
 
   if (!dateStr) return null;
@@ -69,13 +70,14 @@ const buildDateFromConfig = (config) => {
 
 // =====================================================
 // CHECK PRIZE
+// Format: 8 chars — 1st=8, 2nd=7, 3rd=5
 // =====================================================
 
 const getPrize = (userNumber, winningNumber) => {
-  const user = String(userNumber).trim();
-  const winning = String(winningNumber).trim();
+  const user = String(userNumber).trim().toUpperCase();
+  const winning = String(winningNumber).trim().toUpperCase();
 
-  // 1ST PRIZE — EXACT 8 DIGITS
+  // 1ST PRIZE — EXACT 8 CHARS MATCH
   if (user === winning) {
     return { prize: "1st", matchedDigits: 8 };
   }
@@ -88,13 +90,13 @@ const getPrize = (userNumber, winningNumber) => {
     return { prize: "2nd", matchedDigits: 7 };
   }
 
-  // 3RD PRIZE — FIRST 4 OR MIDDLE 4 OR LAST 4
-  const firstFourMatch = user.substring(0, 4) === winning.substring(0, 4);
-  const middleFourMatch = user.substring(1, 5) === winning.substring(1, 5);
-  const lastFourMatch = user.substring(2, 6) === winning.substring(2, 6);
+  // ✅ 3RD PRIZE — FIRST 5 OR MIDDLE 5 OR LAST 5
+  const firstFiveMatch = user.substring(0, 5) === winning.substring(0, 5);
+  const middleFiveMatch = user.substring(1, 6) === winning.substring(1, 6);
+  const lastFiveMatch = user.substring(3, 8) === winning.substring(3, 8);
 
-  if (firstFourMatch || middleFourMatch || lastFourMatch) {
-    return { prize: "3rd", matchedDigits: 4 };
+  if (firstFiveMatch || middleFiveMatch || lastFiveMatch) {
+    return { prize: "3rd", matchedDigits: 5 };
   }
 
   return null;
@@ -242,7 +244,7 @@ const processUsersForDate = ({
   });
 
   for (const user of dateUsers) {
-    const userNumber = String(user.number || "").trim();
+    const userNumber = String(user.number || "").trim().toUpperCase();
 
     if (!validateSixDigitNumber(userNumber)) {
       user.status = "lost";
@@ -278,7 +280,10 @@ const processUsersForDate = ({
       amount: Number(user.amount) || 0,
       prizeType: match.prize,
       matchedDigits: match.matchedDigits,
-      prize: match.prize,
+
+      // ✅ FIXED: prize OBJECT (model ke mutabik)
+      prize: buildUserPrizeObject(match.prize, prizeAmounts),
+
       prizeAmount: prizeAmount,
     });
   }
@@ -295,7 +300,6 @@ const processUsersForDate = ({
 
 // =====================================================
 // CREATE RESULT
-// POST /
 // =====================================================
 
 const createResult = async (req, res) => {
@@ -332,11 +336,13 @@ const createResult = async (req, res) => {
     if (!validateSixDigitNumber(winningNumber)) {
       return res.status(400).json({
         success: false,
-        message: "Winning number must contain exactly 6 digits",
+        // ✅ FIXED: 6 → 8 characters
+        message:
+          "Winning number must be 8 characters: 2 digits + 1 letter + 5 digits (e.g. 12A12345)",
       });
     }
 
-    const finalWinningNumber = String(winningNumber).trim();
+    const finalWinningNumber = String(winningNumber).trim().toUpperCase();
 
     const config = await LotteryConfig.findById(lotteryConfigId);
     if (!config) {
@@ -346,9 +352,6 @@ const createResult = async (req, res) => {
       });
     }
 
-    // ==========================================
-    // SAFETY: Config drawDate aur selectedDate match karo
-    // ==========================================
     const configDateStr = buildDateFromConfig(config);
 
     if (configDateStr && configDateStr !== selectedDate) {
@@ -358,9 +361,6 @@ const createResult = async (req, res) => {
       });
     }
 
-    // ==========================================
-    // DATE USERS FILTER
-    // ==========================================
     const dateUsers = Array.isArray(config.users)
       ? config.users.filter(
           (user) => getDateString(user.entryDate) === selectedDate
@@ -374,9 +374,6 @@ const createResult = async (req, res) => {
       });
     }
 
-    // ==========================================
-    // EXISTING RESULT CHECK
-    // ==========================================
     const existingResult = await LotteryResult.findOne({
       lotteryConfigId,
       date: selectedDate,
@@ -399,9 +396,6 @@ const createResult = async (req, res) => {
       prizeAmounts,
     });
 
-    // ==========================================
-    // WALLET CREDITS
-    // ==========================================
     const walletCredits = [];
 
     try {
@@ -447,9 +441,6 @@ const createResult = async (req, res) => {
     config.markModified("users");
     await config.save();
 
-    // ==========================================
-    // CREATE RESULT
-    // ==========================================
     let result;
 
     try {
@@ -520,8 +511,6 @@ const createResult = async (req, res) => {
 
 // =====================================================
 // GET ALL RESULTS
-// GET /
-// ✅ FIXED: populate `drawDate` not `date`
 // =====================================================
 
 const getAllResults = async (req, res) => {
@@ -550,8 +539,6 @@ const getAllResults = async (req, res) => {
 
 // =====================================================
 // GET RESULT BY ID
-// GET /:id
-// ✅ FIXED: populate `drawDate` not `date`
 // =====================================================
 
 const getResultById = async (req, res) => {
@@ -593,7 +580,6 @@ const getResultById = async (req, res) => {
 
 // =====================================================
 // PUBLISH RESULT
-// PATCH /:id/publish
 // =====================================================
 
 const publishResult = async (req, res) => {
@@ -637,7 +623,6 @@ const publishResult = async (req, res) => {
 
 // =====================================================
 // UNPUBLISH RESULT
-// PATCH /:id/unpublish
 // =====================================================
 
 const unpublishResult = async (req, res) => {
@@ -681,7 +666,6 @@ const unpublishResult = async (req, res) => {
 
 // =====================================================
 // UPDATE RESULT
-// PUT /:id
 // =====================================================
 
 const updateResult = async (req, res) => {
@@ -706,11 +690,13 @@ const updateResult = async (req, res) => {
     if (!validateSixDigitNumber(winningNumber)) {
       return res.status(400).json({
         success: false,
-        message: "Winning number must contain exactly 6 digits",
+        // ✅ FIXED
+        message:
+          "Winning number must be 8 characters: 2 digits + 1 letter + 5 digits (e.g. 12A12345)",
       });
     }
 
-    const finalWinningNumber = String(winningNumber).trim();
+    const finalWinningNumber = String(winningNumber).trim().toUpperCase();
 
     const result = await LotteryResult.findById(id);
 
@@ -761,15 +747,16 @@ const updateResult = async (req, res) => {
 
     const prizeAmounts = getPrizeAmounts(config);
 
-    // ==========================================
-    // REMOVE OLD PRIZES
-    // ==========================================
     const walletReversals = [];
 
     try {
       if (Array.isArray(result.winners)) {
         for (const oldWinner of result.winners) {
-          const oldPrizeType = oldWinner.prizeType || oldWinner.prize;
+          const oldPrizeType =
+            oldWinner.prizeType ||
+            (typeof oldWinner.prize === "string"
+              ? oldWinner.prize
+              : null);
 
           const oldPrizeAmount =
             oldWinner.prizeAmount !== undefined
@@ -805,9 +792,6 @@ const updateResult = async (req, res) => {
       });
     }
 
-    // ==========================================
-    // RECALCULATE
-    // ==========================================
     const processed = processUsersForDate({
       config,
       selectedDate,
@@ -815,9 +799,6 @@ const updateResult = async (req, res) => {
       prizeAmounts,
     });
 
-    // ==========================================
-    // ADD NEW PRIZES
-    // ==========================================
     const walletCredits = [];
 
     try {
@@ -862,9 +843,6 @@ const updateResult = async (req, res) => {
       });
     }
 
-    // ==========================================
-    // UPDATE RESULT
-    // ==========================================
     result.winningNumber = finalWinningNumber;
     result.winners = processed.winners;
     await result.save();
@@ -904,7 +882,6 @@ const updateResult = async (req, res) => {
 
 // =====================================================
 // DELETE RESULT
-// DELETE /:id
 // =====================================================
 
 const deleteResult = async (req, res) => {
@@ -951,7 +928,6 @@ const deleteResult = async (req, res) => {
 
 // =====================================================
 // CHECK NUMBER
-// POST /check-number
 // =====================================================
 
 const checkNumber = async (req, res) => {
@@ -964,19 +940,21 @@ const checkNumber = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "Both numbers must contain exactly 6 digits",
+        // ✅ FIXED
+        message:
+          "Both numbers must be 8 characters: 2 digits + 1 letter + 5 digits (e.g. 12A12345)",
       });
     }
 
     const result = getPrize(
-      String(userNumber).trim(),
-      String(winningNumber).trim()
+      String(userNumber).trim().toUpperCase(),
+      String(winningNumber).trim().toUpperCase()
     );
 
     return res.status(200).json({
       success: true,
-      userNumber: String(userNumber).trim(),
-      winningNumber: String(winningNumber).trim(),
+      userNumber: String(userNumber).trim().toUpperCase(),
+      winningNumber: String(winningNumber).trim().toUpperCase(),
       winner: result !== null,
       result,
     });
@@ -992,8 +970,6 @@ const checkNumber = async (req, res) => {
 
 // =====================================================
 // GET PUBLISHED RESULTS
-// GET /published
-// ✅ FIXED: populate `drawDate` not `date`
 // =====================================================
 
 const getPublishedResults = async (req, res) => {
@@ -1022,8 +998,6 @@ const getPublishedResults = async (req, res) => {
 
 // =====================================================
 // GET PUBLISHED RESULT BY DATE
-// GET /published/:date
-// ✅ FIXED: populate `drawDate` not `date`
 // =====================================================
 
 const getPublishedResultByDate = async (req, res) => {
