@@ -3,6 +3,7 @@ import {
   ArrowRight,
   BookOpen,
   CalendarDays,
+  Check,
   ChevronDown,
   FileText,
   Flame,
@@ -33,6 +34,13 @@ import {
   clearLotteryConfigError,
   clearLotteryConfigSuccess,
 } from "../reducer/slice/lotteryConfigSlice";
+
+// 🔥 FESTIVAL SLICE - all created lotteries (tab images + prizes)
+// NOTE: path apni actual festival slice file ke naam se match kar lena
+import {
+  getAllLotteryConfigs as getAllFestivalConfigs,
+  selectLotteryConfigs as selectFestivalConfigs,
+} from "../reducer/slice/festivalLotteryReducer";
 
 import {
   createDeposit,
@@ -68,11 +76,15 @@ const EN_DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const QUICK_OPTIONS = [10, 20, 30, 50, 100];
 const MAX_TICKETS = 100;
 const MIN_TICKETS = 10;
+const TICKET_STEP = 10; // +/- buttons move in steps of 10
+const INITIAL_VISIBLE_TICKETS = 10; // tickets shown before "View More"
 const ALL_DATES_COUNT = 30;
-const SLOT_PATTERN = ["D", "D", "L", "L", "D", "D", "D"];
+
+// Ticket format: 2 digits + 1 alphabet + 5 digits  →  12A12345
+const SLOT_PATTERN = ["D", "D", "L", "D", "D", "D", "D", "D"];
 const TICKET_LENGTH = SLOT_PATTERN.length;
-const TICKET_EXAMPLE = "12AB137";
-const TICKET_REGEX = /^\d{2}[A-Z]{2}\d{3}$/;
+const TICKET_EXAMPLE = "12A12345";
+const TICKET_REGEX = /^\d{2}[A-Z]\d{5}$/;
 
 const DEFAULT_TICKET_PRICE = 20;
 
@@ -89,7 +101,7 @@ const CHIP_COLORS = [
   { badge: "bg-[#a0561b]", row: "bg-[#fff1e8]" },
 ];
 
-// Festival meta — `key` must match `marketName` on backend config
+// Festival meta — `name` must match `marketName` on backend config
 const FESTIVALS = [
   { key: "navratra", tab: "Navratra", icon: Flame, name: "Navratra", special: "Navratra Special", desc: "Play & celebrate this Navratra with bigger prizes and more happiness!", price: 50, drawTime: "9:00 PM" },
   { key: "diwali", tab: "Diwali", icon: Sparkles, name: "Diwali", special: "Diwali Special", desc: "Light up your Diwali with mega prizes and endless happiness!", price: 50, drawTime: "9:00 PM" },
@@ -100,14 +112,56 @@ const FESTIVALS = [
 ];
 
 // =====================================================
+// PRIZE HELPERS (Winning Rules)
+// =====================================================
+
+// true  -> admin me jo prize daalte ho wo 10 tickets ka TOTAL prize hai (e.g. first = 5 Crore)
+// false -> admin me jo prize daalte ho wo PER TICKET prize hai (e.g. first = 50 Lakh)
+const PRIZE_IS_TOTAL = true;
+const TICKETS_PER_SET = 10;
+
+// Config me prize na ho to ye default dikhega (total prize)
+const DEFAULT_PRIZE_TOTALS = {
+  first: 50000000, // ₹5 Crore
+  second: 30000000, // ₹3 Crore
+  third: 200000, // ₹2 Lakh
+};
+
+// 100000 -> "₹1 Lakh", 5000000 -> "₹50 Lakh", 50000000 -> "₹5 Crore", 20000 -> "₹20,000"
+const formatPrize = (amount) => {
+  const num = Number(amount);
+  if (!Number.isFinite(num) || num <= 0) return "₹0";
+
+  const trim = (v) => String(Number(v.toFixed(2)));
+
+  if (num >= 10000000) return `₹${trim(num / 10000000)} Crore`;
+  if (num >= 100000) return `₹${trim(num / 100000)} Lakh`;
+
+  return `₹${num.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+};
+
+const RULE_META = [
+  { number: "1", condition: "All digits/characters match", example: "12A12345", badge: "bg-[#ed1d43]", row: "bg-[#ffe4e8]" },
+  { number: "2", condition: "Alphabet does not match but all remaining digits match", example: "12X12345", badge: "bg-[#2e7dd7]", row: "bg-[#e3f0ff]" },
+  { number: "3", condition: "Last 5 digits after the alphabet match", example: "99A12345", badge: "bg-[#f08a25]", row: "bg-[#ffefdc]" },
+];
+
+// =====================================================
 // TICKET HELPERS
 // =====================================================
 const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 
+// "New Year" / "new-year" / "NEWYEAR" -> "newyear"
+const normalizeKey = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+// Format: DD L DDDDD  →  12A12345
 const randomTicketNumber = () => {
   const d = () => String(Math.floor(Math.random() * 10));
   const l = () => LETTERS[Math.floor(Math.random() * LETTERS.length)];
-  return `${d()}${d()}${l()}${l()}${d()}${d()}${d()}`;
+  return `${d()}${d()}${l()}${d()}${d()}${d()}${d()}${d()}`;
 };
 
 const randomUniqueCode = (usedCodes = []) => {
@@ -199,6 +253,9 @@ const FestivalLottery = () => {
       }
   );
 
+  // ---------- ALL FESTIVAL LOTTERIES (tab images + prizes) ----------
+  const allFestivalConfigs = useSelector(selectFestivalConfigs);
+
   // ---------- TICKET PRICE FROM AMOUNT SLICE ----------
   const { amount: ticketPriceFromApi } = useSelector(
     (state) => state.amount || { amount: null, loading: false }
@@ -222,14 +279,65 @@ const FestivalLottery = () => {
   const [showAllDates, setShowAllDates] = useState(false);
   const [showQuick, setShowQuick] = useState(true);
   const [tickets, setTickets] = useState([]);
+  const [showAllTickets, setShowAllTickets] = useState(false);
   const [draft, setDraft] = useState("");
   const [manualError, setManualError] = useState("");
   const [localSuccess, setLocalSuccess] = useState("");
   const draftRefs = useRef([]);
+  const tabsScrollRef = useRef(null);
+  const tabRefs = useRef({});
+
+  // =====================================================
+  // FESTIVAL TABS (hardcoded list + backend imageUrl/config + extra created lotteries)
+  // =====================================================
+  const festivalTabs = useMemo(() => {
+    const list = Array.isArray(allFestivalConfigs) ? allFestivalConfigs : [];
+
+    // same marketName ki multiple configs ho to active wali preferred
+    const pickConfig = (normalizedName) => {
+      const matches = list.filter(
+        (c) => normalizeKey(c?.marketName) === normalizedName
+      );
+      return matches.find((c) => c?.isActive) || matches[0] || null;
+    };
+
+    const base = FESTIVALS.map((f) => {
+      const cfg = pickConfig(normalizeKey(f.name));
+      return { ...f, imageUrl: cfg?.imageUrl || null, config: cfg || null };
+    });
+
+    const knownKeys = new Set(FESTIVALS.map((f) => normalizeKey(f.name)));
+    const seen = new Set();
+    const extras = [];
+
+    list.forEach((c) => {
+      const k = normalizeKey(c?.marketName);
+      if (!k || knownKeys.has(k) || seen.has(k)) return;
+      seen.add(k);
+
+      const cfg = pickConfig(k);
+      const name = String(c.marketName).trim();
+
+      extras.push({
+        key: k,
+        tab: name,
+        icon: Sparkles,
+        name,
+        special: `${name} Special`,
+        desc: `Play & celebrate ${name} with bigger prizes and more happiness!`,
+        price: 50,
+        drawTime: "9:00 PM",
+        imageUrl: cfg?.imageUrl || null,
+        config: cfg || null,
+      });
+    });
+
+    return [...base, ...extras];
+  }, [allFestivalConfigs]);
 
   const festival = useMemo(
-    () => FESTIVALS.find((f) => f.key === festivalKey) || FESTIVALS[0],
-    [festivalKey]
+    () => festivalTabs.find((f) => f.key === festivalKey) || festivalTabs[0],
+    [festivalTabs, festivalKey]
   );
 
   // =====================================================
@@ -245,6 +353,12 @@ const FestivalLottery = () => {
   const totalTickets = tickets.length;
   const totalAmount = price * totalTickets;
 
+  // Tickets list: first 10 only, rest behind "View More"
+  const visibleTickets = showAllTickets
+    ? tickets
+    : tickets.slice(0, INITIAL_VISIBLE_TICKETS);
+  const hiddenTicketsCount = Math.max(tickets.length - INITIAL_VISIBLE_TICKETS, 0);
+
   // 🔥 KYC STATUS
   const kycStatus = useMemo(
     () => deriveKycStatus(kycDocuments),
@@ -257,6 +371,7 @@ const FestivalLottery = () => {
   // =====================================================
   useEffect(() => {
     dispatch(getActiveLotteryConfig());
+    dispatch(getAllFestivalConfigs()); // 🔥 tab images + prizes
     dispatch(getAmount());
     dispatch(clearDepositState());
     // 🔥 FETCH KYC
@@ -268,10 +383,25 @@ const FestivalLottery = () => {
   // =====================================================
   useEffect(() => {
     setTickets([]);
+    setShowAllTickets(false);
     setDraft("");
     setManualError("");
     setLocalSuccess("");
   }, [festivalKey, selectedDateIndex]);
+
+  // =====================================================
+  // KEEP SELECTED TAB CENTERED IN THE SCROLL ROW
+  // =====================================================
+  useEffect(() => {
+    const container = tabsScrollRef.current;
+    const el = tabRefs.current[festivalKey];
+    if (!container || !el) return;
+
+    container.scrollTo({
+      left: el.offsetLeft - (container.clientWidth - el.offsetWidth) / 2,
+      behavior: "smooth",
+    });
+  }, [festivalKey, festivalTabs.length]);
 
   // =====================================================
   // CLEANUP ON UNMOUNT
@@ -312,24 +442,52 @@ const FestivalLottery = () => {
   const festivalConfig = useMemo(() => {
     if (!activeConfig) return null;
     const matches =
-      String(activeConfig.marketName || "").toLowerCase() ===
-      festival.name.toLowerCase();
+      normalizeKey(activeConfig.marketName) === normalizeKey(festival.name);
     return matches ? activeConfig : null;
   }, [activeConfig, festival.name]);
 
   // Purchase config — prefer festival-matched, fallback to any active
   const purchaseConfig = festivalConfig || activeConfig;
 
-  const firstPrizeText = useMemo(() => {
-    const raw = purchaseConfig?.prizes?.first;
-    const num = Number(raw);
-    if (!Number.isFinite(num) || num <= 0) return "₹5 Crore";
-    if (num >= 10000000)
-      return `₹${(num / 10000000).toFixed(num % 10000000 === 0 ? 0 : 2)} Crore`;
-    if (num >= 100000)
-      return `₹${(num / 100000).toFixed(num % 100000 === 0 ? 0 : 2)} Lakh`;
-    return `₹${num.toLocaleString("en-IN")}`;
-  }, [purchaseConfig]);
+  // =====================================================
+  // PRIZES (lottery create karte time jo add kiya wahi dikhega)
+  // =====================================================
+
+  // Prize source: selected festival ka apna config, nahi mila to purchaseConfig
+  const prizeSource = festival?.config || purchaseConfig;
+
+  // first / second / third -> { total, perTicket }
+  const prizeAmounts = useMemo(() => {
+    const prizes = prizeSource?.prizes || {};
+
+    return ["first", "second", "third"].map((key) => {
+      const entered = Number(prizes[key]);
+      const hasValue = Number.isFinite(entered) && entered > 0;
+
+      const total = hasValue
+        ? PRIZE_IS_TOTAL
+          ? entered
+          : entered * TICKETS_PER_SET
+        : DEFAULT_PRIZE_TOTALS[key];
+
+      return { total, perTicket: total / TICKETS_PER_SET };
+    });
+  }, [prizeSource]);
+
+  const firstPrizeText = useMemo(
+    () => formatPrize(prizeAmounts[0].total),
+    [prizeAmounts]
+  );
+
+  const winningRules = useMemo(
+    () =>
+      RULE_META.map((meta, i) => ({
+        ...meta,
+        prize: formatPrize(prizeAmounts[i].perTicket),
+        total: formatPrize(prizeAmounts[i].total),
+      })),
+    [prizeAmounts]
+  );
 
   // =====================================================
   // HANDLERS — TICKET SELECTION
@@ -346,9 +504,17 @@ const FestivalLottery = () => {
     setLocalSuccess("");
   };
 
+  // + / − always move to the next / previous multiple of 10 (10 → 20 → 30 ...)
+  const handleIncrease = () =>
+    setQuantity((Math.floor(totalTickets / TICKET_STEP) + 1) * TICKET_STEP);
+
+  const handleDecrease = () =>
+    setQuantity((Math.ceil(totalTickets / TICKET_STEP) - 1) * TICKET_STEP);
+
   const handleClear = () => {
     if (depositLoading) return;
     setTickets([]);
+    setShowAllTickets(false);
     setManualError("");
     setLocalSuccess("");
   };
@@ -476,7 +642,7 @@ const FestivalLottery = () => {
         return;
       }
 
-      // 🔥🔥🔥 KYC CHECK — PEHLE YE
+      // 🔥 KYC CHECK
       if (!isKycApproved) {
         if (kycStatus === "pending") {
           setManualError(
@@ -485,9 +651,7 @@ const FestivalLottery = () => {
           return;
         }
         if (kycStatus === "rejected") {
-          setManualError(
-            "Your KYC was rejected. Redirecting to KYC page..."
-          );
+          setManualError("Your KYC was rejected. Redirecting to KYC page...");
           setTimeout(() => navigate("/kyc"), 1500);
           return;
         }
@@ -580,6 +744,7 @@ const FestivalLottery = () => {
 
       // Reset local selection
       setTickets([]);
+      setShowAllTickets(false);
       setDraft("");
 
       // ---------- REDIRECT TO PAYMENT GATEWAY ----------
@@ -671,37 +836,52 @@ const FestivalLottery = () => {
               </div>
             </div>
             <div className="relative flex items-center justify-center">
-              <FestivalHeroTicket special={festival.special} price={price} number="12AB137" />
+              <FestivalHeroTicket
+                special={festival.special}
+                price={price}
+                number={TICKET_EXAMPLE}
+              />
             </div>
           </div>
         </section>
 
         {/* ================= FESTIVAL TABS ================= */}
         <section className="relative z-10 -mt-10 px-2">
-          <div className="grid grid-cols-6 gap-1">
-            {FESTIVALS.map((f) => {
-              const Icon = f.icon;
-              const active = f.key === festivalKey;
-              return (
-                <button
+          <div className="rounded-2xl border border-[#e3d3ae] bg-[#fffaf4] p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]">
+            <div className="flex items-center justify-between gap-2 px-0.5">
+              <div className="min-w-0">
+                <h2 className="text-[13px] font-extrabold leading-tight text-[#173e70]">
+                  Select Festival Lottery
+                </h2>
+                <p className="text-[10px] leading-tight text-[#6b7280]">
+                  Tap on a festival to choose it
+                </p>
+              </div>
+
+              {festivalTabs.length > 4 && (
+                <span className="flex shrink-0 items-center gap-1 text-[10px] font-semibold text-[#ed1d43]">
+                  Swipe <ArrowRight size={12} />
+                </span>
+              )}
+            </div>
+
+            <div
+              ref={tabsScrollRef}
+              className="relative mt-2 flex snap-x gap-2 overflow-x-auto px-0.5 pb-2 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {festivalTabs.map((f) => (
+                <FestivalTab
                   key={f.key}
-                  type="button"
-                  onClick={() => setFestivalKey(f.key)}
+                  festival={f}
+                  active={f.key === festivalKey}
                   disabled={depositLoading}
-                  className={`flex min-h-[72px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-2 text-center shadow-md transition active:scale-95 disabled:opacity-60 ${active
-                    ? "bg-gradient-to-b from-[#ff1744] to-[#c9102f] text-white"
-                    : "bg-[#fffaf4] text-[#173e70]"
-                    }`}
-                >
-                  <Icon size={22} />
-                  <span className="text-[9.5px] font-bold leading-tight">
-                    {f.tab}
-                    <br />
-                    Lottery
-                  </span>
-                </button>
-              );
-            })}
+                  onClick={() => setFestivalKey(f.key)}
+                  innerRef={(el) => {
+                    tabRefs.current[f.key] = el;
+                  }}
+                />
+              ))}
+            </div>
           </div>
         </section>
 
@@ -888,7 +1068,7 @@ const FestivalLottery = () => {
               <div className="flex items-center gap-2 rounded-xl border border-[#dfe5f0] bg-white px-2 py-2 shadow-sm">
                 <button
                   type="button"
-                  onClick={() => setQuantity(totalTickets - 1)}
+                  onClick={handleDecrease}
                   disabled={totalTickets <= MIN_TICKETS || depositLoading}
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e9eef7] text-[22px] font-bold text-[#173e70] disabled:opacity-50"
                 >
@@ -899,7 +1079,7 @@ const FestivalLottery = () => {
                 </span>
                 <button
                   type="button"
-                  onClick={() => setQuantity(totalTickets + 1)}
+                  onClick={handleIncrease}
                   disabled={totalTickets >= MAX_TICKETS || depositLoading}
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e9eef7] text-[22px] font-bold text-[#173e70] disabled:opacity-50"
                 >
@@ -1084,35 +1264,53 @@ const FestivalLottery = () => {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {tickets.map((ticket, index) => {
-                    const color = CHIP_COLORS[index % CHIP_COLORS.length];
-                    return (
-                      <div
-                        key={ticket.id}
-                        className={`flex min-w-0 items-center gap-1.5 rounded-lg border-2 border-white px-1.5 py-2 shadow-sm ${color.row}`}
-                      >
-                        <span
-                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-black text-white ${color.badge}`}
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    {visibleTickets.map((ticket, index) => {
+                      const color = CHIP_COLORS[index % CHIP_COLORS.length];
+                      return (
+                        <div
+                          key={ticket.id}
+                          className={`flex min-w-0 items-center gap-1.5 rounded-lg border-2 border-white px-1.5 py-2 shadow-sm ${color.row}`}
                         >
-                          {index + 1}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-[13px] font-bold tracking-wider text-[#26354b]">
-                          {ticket.code}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveTicket(ticket.id)}
-                          disabled={tickets.length <= MIN_TICKETS || depositLoading}
-                          aria-label={`Remove ticket ${index + 1}`}
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#ed1d43] text-white disabled:opacity-40"
-                        >
-                          <X size={13} strokeWidth={3} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
+                          <span
+                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-black text-white ${color.badge}`}
+                          >
+                            {index + 1}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-[13px] font-bold tracking-wider text-[#26354b]">
+                            {ticket.code}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTicket(ticket.id)}
+                            disabled={tickets.length <= MIN_TICKETS || depositLoading}
+                            aria-label={`Remove ticket ${index + 1}`}
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#ed1d43] text-white disabled:opacity-40"
+                          >
+                            <X size={13} strokeWidth={3} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {hiddenTicketsCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllTickets((s) => !s)}
+                      className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#c9d3e3] bg-white py-2 text-[12px] font-bold text-[#173e70] transition active:scale-[0.99]"
+                    >
+                      {showAllTickets
+                        ? "Show Less"
+                        : `View More Tickets (${hiddenTicketsCount} more)`}
+                      <ChevronDown
+                        size={16}
+                        className={`transition ${showAllTickets ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                  )}
+                </>
               )}
             </div>
 
@@ -1150,7 +1348,7 @@ const FestivalLottery = () => {
                   Example Winning Number
                 </span>
                 <span className="whitespace-nowrap rounded-md bg-white px-2 py-1 text-[17px] font-black tracking-wider text-[#d7193f]">
-                  12AB <span className="text-[#173e70]">137</span>
+                  12A <span className="text-[#173e70]">12345</span>
                 </span>
               </div>
               <div className="flex min-w-0 items-center gap-1.5 rounded-xl border border-[#ffd34e]/30 bg-white/5 px-2.5 py-2">
@@ -1161,7 +1359,7 @@ const FestivalLottery = () => {
                     {firstPrizeText.toUpperCase()}
                   </p>
                   <p className="mt-0.5 whitespace-nowrap text-[9px] text-white/75">
-                    (10 Tickets × ₹50 Lakh)
+                    (10 Tickets × {formatPrize(prizeAmounts[0].perTicket)})
                   </p>
                 </div>
               </div>
@@ -1171,9 +1369,9 @@ const FestivalLottery = () => {
               <table className="w-full table-fixed border-collapse text-left">
                 <colgroup>
                   <col style={{ width: "9%" }} />
-                  <col style={{ width: "29%" }} />
-                  <col style={{ width: "24%" }} />
-                  <col style={{ width: "18%" }} />
+                  <col style={{ width: "28%" }} />
+                  <col style={{ width: "26%" }} />
+                  <col style={{ width: "17%" }} />
                   <col style={{ width: "20%" }} />
                 </colgroup>
                 <thead>
@@ -1181,7 +1379,7 @@ const FestivalLottery = () => {
                     {[
                       "#",
                       "Match Condition",
-                      "Example (For 12AB137)",
+                      `Example (For ${TICKET_EXAMPLE})`,
                       "Prize Per Ticket",
                       "Total Prize (10 Tickets)",
                     ].map((h) => (
@@ -1195,11 +1393,9 @@ const FestivalLottery = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  <RuleRow number="1" condition="All digits/characters match" example="12AB137" prize="₹50 Lakh" total="₹5 Crore" badge="bg-[#ed1d43]" row="bg-[#ffe4e8]" />
-                  <RuleRow number="2" condition="Alphabet does not match but all remaining digits match" example="12XY137" prize="₹30 Lakh" total="₹3 Crore" badge="bg-[#2e7dd7]" row="bg-[#e3f0ff]" />
-                  <RuleRow number="3" condition="All numbers after the alphabet match" example="99AB137" prize="₹20,000" total="₹2 Lakh" badge="bg-[#f08a25]" row="bg-[#ffefdc]" />
-                  <RuleRow number="4" condition="Left-most 4 digits match" example="12AB1XX" prize="₹20,000" total="₹2 Lakh" badge="bg-[#20a66a]" row="bg-[#dcf8ea]" />
-                  <RuleRow number="5" condition="Left-most 3 digits match" example="12AXXXX" prize="₹900" total="₹9,000" badge="bg-[#8c4bd6]" row="bg-[#f0e4ff]" />
+                  {winningRules.map((rule) => (
+                    <RuleRow key={rule.number} {...rule} />
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -1265,6 +1461,66 @@ const FestivalLottery = () => {
 // =====================================================
 // SMALL COMPONENTS
 // =====================================================
+
+// 🔥 FESTIVAL TAB (image from backend, icon fallback, clear clickable look)
+const FestivalTab = ({ festival, active, disabled, onClick, innerRef }) => {
+  const Icon = festival.icon;
+  const [imgFailed, setImgFailed] = useState(false);
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [festival.imageUrl]);
+
+  const showImage = Boolean(festival.imageUrl) && !imgFailed;
+
+  return (
+    <button
+      ref={innerRef}
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={active}
+      className={`relative flex w-[78px] shrink-0 snap-center flex-col items-center gap-1.5 rounded-2xl border-2 px-1.5 pb-2 pt-2 text-center transition active:scale-95 disabled:opacity-60 ${active
+        ? "border-[#ed1d43] bg-gradient-to-b from-[#ff1744] to-[#c9102f] text-white shadow-[0_3px_8px_rgba(237,29,67,0.30)]"
+        : "border-[#d5dcec] bg-white text-[#173e70] shadow-sm hover:border-[#ed1d43]/60"
+        }`}
+    >
+      {active && (
+        <span className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-[#14a06a] text-white shadow-sm">
+          <Check size={11} strokeWidth={4} />
+        </span>
+      )}
+
+      <span
+        className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border-2 ${active
+          ? "border-white bg-white/20"
+          : "border-[#e3d3ae] bg-[#fff6e0]"
+          }`}
+      >
+        {showImage ? (
+          <img
+            src={festival.imageUrl}
+            alt={`${festival.name} lottery`}
+            loading="lazy"
+            onError={() => setImgFailed(true)}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <Icon
+            size={24}
+            className={active ? "text-white" : "text-[#173e70]"}
+          />
+        )}
+      </span>
+
+      <span className="w-full min-w-0 text-[10px] font-bold leading-tight">
+        <span className="block truncate">{festival.tab}</span>
+        <span className="block">Lottery</span>
+      </span>
+    </button>
+  );
+};
+
 const DateChip = ({ date, today, active, onClick, fluid = false }) => (
   <button
     type="button"
@@ -1381,7 +1637,7 @@ const RuleRow = ({ number, condition, example, prize, total, badge, row }) => (
       {condition}
     </td>
     <td className="px-1.5 py-2.5">
-      <span className="whitespace-nowrap rounded border border-[#e6c97c] bg-[#fffdf5] px-1 py-0.5 font-mono text-[10.5px] font-black tracking-[0.3px] text-[#d7193f]">
+      <span className="whitespace-nowrap rounded border border-[#e6c97c] bg-[#fffdf5] px-1 py-0.5 font-mono text-[10px] font-black tracking-[0.2px] text-[#d7193f]">
         {example}
       </span>
     </td>

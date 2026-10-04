@@ -1,29 +1,31 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  Calendar,
-  Clock,
-  Info,
-  Hash,
-  Trophy,
-  ToggleRight,
-  Plus,
-  X,
-  Crown,
-  Users,
-  ImagePlus,
-  Upload,
-  ArrowLeft,
-  Pencil,
-  Eye,
+  CalendarDays,
+  Clock3,
+  Ticket,
   Trash2,
+  RefreshCw,
+  Pencil,
+  Power,
+  X,
+  CheckCircle2,
+  XCircle,
+  Eye,
+  Upload,
+  Image as ImageIcon,
+  Search,
+  Plus,
+  Filter,
+  Trophy,
+  Crown,
 } from "lucide-react";
 
 import {
   createLotteryConfig,
+  updateLotteryConfig,
   getAllLotteryConfigs,
   getLotteryConfigById,
-  updateLotteryConfig,
   activateLotteryConfig,
   deactivateLotteryConfig,
   updateUserLotteryEntry,
@@ -49,36 +51,45 @@ const OUTLINE_BTN =
   "border border-[#F2B705] bg-white font-bold text-[#9A5B00] hover:bg-[#FFEFA8]/60";
 
 const INPUT_CLS =
-  "w-full rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] py-2.5 text-sm text-[#1A1A1A] outline-none transition placeholder:text-[#8A8F98] focus:border-[#F2B705] focus:ring-2 focus:ring-[#FFEFA8] disabled:cursor-not-allowed disabled:opacity-80";
+  "w-full rounded-lg border border-[#F3E7C4] bg-[#FFFDF7] px-3 py-2.5 text-sm text-[#1A1A1A] outline-none transition placeholder:text-[#8A8F98] focus:border-[#F2B705] focus:ring-2 focus:ring-[#FFEFA8] disabled:bg-[#F5F1E4]";
 
-const LABEL_CLS = "mb-1.5 block text-xs font-semibold text-[#1A1A1A]";
+const LABEL_CLS =
+  "mb-1.5 block text-xs font-semibold text-[#1A1A1A]";
 
 const CARD_CLS =
   "rounded-2xl border border-[#F3E7C4] bg-white shadow-[0_6px_18px_-10px_rgba(247,181,0,0.35)]";
 
 const TH_CLS =
-  "whitespace-nowrap px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-[#9A5B00]";
+  "whitespace-nowrap px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#9A5B00]";
+
+const ICON_BTN =
+  "inline-flex h-8 w-8 items-center justify-center rounded-lg border transition disabled:opacity-50";
+
+/* =========================================================
+   HELPERS
+========================================================= */
 
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
-const getMonthName = (month) => MONTHS[Number(month) - 1] || "-";
-
-const formatDate = (date) => {
-  if (!date) return "-";
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-};
+const getMonthName = (month) =>
+  MONTHS[Number(month) - 1] || "-";
 
 const getToday = () => {
   const now = new Date();
+
   return (
     `${now.getFullYear()}-` +
     `${String(now.getMonth() + 1).padStart(2, "0")}-` +
@@ -86,14 +97,34 @@ const getToday = () => {
   );
 };
 
-// backend date -> <input type="date"> value (YYYY-MM-DD)
+const formatDate = (date) => {
+  if (!date) return "-";
+
+  const d = new Date(date);
+
+  if (Number.isNaN(d.getTime())) return "-";
+
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
 const toInputDate = (date) => {
   if (!date) return "";
-  if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}/.test(date)) {
+
+  if (
+    typeof date === "string" &&
+    /^\d{4}-\d{2}-\d{2}/.test(date)
+  ) {
     return date.slice(0, 10);
   }
+
   const d = new Date(date);
+
   if (Number.isNaN(d.getTime())) return "";
+
   return (
     `${d.getFullYear()}-` +
     `${String(d.getMonth() + 1).padStart(2, "0")}-` +
@@ -101,112 +132,129 @@ const toInputDate = (date) => {
   );
 };
 
-// Image validation
 const validateImage = (file) => {
   if (!file) return "No file selected";
-  if (!file.type.startsWith("image/")) return "Only image files are allowed";
-  if (file.size > 2 * 1024 * 1024) return "Image must be smaller than 2MB";
+
+  if (!file.type.startsWith("image/")) {
+    return "Only image files are allowed";
+  }
+
+  if (file.size > 2 * 1024 * 1024) {
+    return "Image must be smaller than 2MB";
+  }
+
   return "";
 };
 
-// ---------- shared form validation + payload ----------
-const validateLotteryForm = (d, checkPast) => {
-  if (!d.marketName.trim()) return "Market name is required";
-  if (!d.month) return "Month is required";
-  if (!d.year) return "Year is required";
-  if (!d.drawDate) return "Draw date is required";
-  if (!d.drawTime) return "Draw time is required";
+const validateLotteryForm = (data, checkPast = true) => {
+  if (!data.marketName.trim()) {
+    return "Market name is required";
+  }
 
-  const selectedDate = new Date(`${d.drawDate}T00:00:00`);
-  if (Number.isNaN(selectedDate.getTime())) return "Invalid draw date";
+  if (!data.month) {
+    return "Month is required";
+  }
+
+  if (!data.year) {
+    return "Year is required";
+  }
+
+  if (!data.drawDate) {
+    return "Draw date is required";
+  }
+
+  if (!data.drawTime) {
+    return "Draw time is required";
+  }
+
+  const selectedDate = new Date(`${data.drawDate}T00:00:00`);
+
+  if (Number.isNaN(selectedDate.getTime())) {
+    return "Invalid draw date";
+  }
 
   if (checkPast) {
     const today = new Date();
+
     today.setHours(0, 0, 0, 0);
     selectedDate.setHours(0, 0, 0, 0);
-    if (selectedDate < today) return "Past draw date cannot be selected";
+
+    if (selectedDate < today) {
+      return "Past draw date cannot be selected";
+    }
   }
 
-  if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(d.drawTime)) return "Invalid draw time";
+  if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(data.drawTime)) {
+    return "Invalid draw time";
+  }
 
-  const bad = (v) => v === "" || v === null || Number(v) < 0;
-  if (bad(d.prizes.first)) return "First prize amount is required";
-  if (bad(d.prizes.second)) return "Second prize amount is required";
-  if (bad(d.prizes.third)) return "Third prize amount is required";
+  const badPrize = (value) =>
+    value === "" ||
+    value === null ||
+    value === undefined ||
+    Number(value) < 0;
+
+  if (badPrize(data.prizes.first)) {
+    return "First prize amount is required";
+  }
+
+  if (badPrize(data.prizes.second)) {
+    return "Second prize amount is required";
+  }
+
+  if (badPrize(data.prizes.third)) {
+    return "Third prize amount is required";
+  }
 
   return "";
 };
 
-const buildPayload = (d) => ({
-  marketName: d.marketName.trim(),
-  month: Number(d.month),
-  year: Number(d.year),
-  drawDate: d.drawDate,
-  drawTime: d.drawTime,
+const buildPayload = (data) => ({
+  marketName: data.marketName.trim(),
+  month: Number(data.month),
+  year: Number(data.year),
+  drawDate: data.drawDate,
+  drawTime: data.drawTime,
   prizes: {
-    first: Number(d.prizes.first),
-    second: Number(d.prizes.second),
-    third: Number(d.prizes.third),
+    first: Number(data.prizes.first),
+    second: Number(data.prizes.second),
+    third: Number(data.prizes.third),
   },
 });
 
-/* ---------- small UI helpers ---------- */
+/* =========================================================
+   SMALL UI COMPONENTS
+========================================================= */
 
-const Panel = ({ id, icon: Icon, title, right, children, className = "" }) => (
-  <div id={id} className={`${CARD_CLS} scroll-mt-24 p-5 ${className}`}>
-    <div className="mb-4 flex items-center justify-between gap-2">
-      <div className="flex items-center gap-2.5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-b from-[#FFE46B] to-[#F2B705] shadow-sm">
-          <Icon size={16} className="text-[#1A1204]" strokeWidth={2.4} />
-        </span>
-        <h3 className="text-[16px] font-black text-[#1F2A6B]">{title}</h3>
-      </div>
-      {right}
-    </div>
-    {children}
-  </div>
-);
-
-const Switch = ({ checked, onChange, disabled }) => (
-  <button
-    type="button"
-    role="switch"
-    aria-checked={checked}
-    disabled={disabled}
-    onClick={onChange}
-    className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${
-      checked ? "bg-[#12A36B]" : "bg-[#D1D5DB]"
-    }`}
-  >
-    <span
-      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
-        checked ? "left-[22px]" : "left-0.5"
-      }`}
-    />
-  </button>
-);
-
-const ReadField = ({ label, value }) => (
-  <div>
-    <label className={LABEL_CLS}>{label}</label>
-    <input type="text" value={value ?? "-"} readOnly className={`${INPUT_CLS} px-3`} />
-  </div>
-);
-
-const ModalShell = ({ title, subtitle, onClose, children, wide, z = "z-50" }) => (
+const ModalShell = ({
+  title,
+  subtitle,
+  onClose,
+  children,
+  wide = false,
+  z = "z-50",
+}) => (
   <div
     className={`fixed inset-0 ${z} flex items-start justify-center overflow-y-auto bg-black/50 p-4`}
   >
     <div
       className={`my-6 w-full ${
-        wide ? "max-w-6xl" : "max-w-3xl"
+        wide ? "max-w-7xl" : "max-w-2xl"
       } rounded-2xl border border-[#F3E7C4] bg-white shadow-xl`}
     >
       <div className="flex items-center justify-between border-b border-[#F3E7C4] px-5 py-4">
         <div>
-          <h2 className="text-lg font-black text-[#1F2A6B]">{title}</h2>
-          {subtitle && <p className="mt-1 text-xs text-[#6B7280]">{subtitle}</p>}
+          <h2 className="text-lg font-black text-[#1F2A6B]">
+            {title}
+          </h2>
+
+          {subtitle && (
+            <p className="mt-1 text-xs text-[#6B7280]">
+              {subtitle}
+            </p>
+          )}
         </div>
+
         <button
           type="button"
           onClick={onClose}
@@ -215,6 +263,7 @@ const ModalShell = ({ title, subtitle, onClose, children, wide, z = "z-50" }) =>
           <X size={20} />
         </button>
       </div>
+
       {children}
     </div>
   </div>
@@ -232,7 +281,12 @@ const StatusPill = ({ active }) =>
     </span>
   );
 
-const IconTile = ({ src, name, size = "h-24 w-24", compact = false }) =>
+const IconTile = ({
+  src,
+  name,
+  size = "h-24 w-24",
+  compact = false,
+}) =>
   src ? (
     <img
       src={src}
@@ -243,7 +297,11 @@ const IconTile = ({ src, name, size = "h-24 w-24", compact = false }) =>
     <div
       className={`${size} flex shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-br from-[#EF4444] to-[#991B1B] text-center shadow ring-2 ring-white`}
     >
-      <Crown size={compact ? 16 : 22} className="text-[#FFD83D]" strokeWidth={2} />
+      <Crown
+        size={compact ? 16 : 22}
+        className="text-[#FFD83D]"
+      />
+
       {!compact && (
         <span className="mt-1 line-clamp-2 px-1.5 text-[11px] font-black uppercase leading-tight text-white">
           {name || "Lottery"}
@@ -252,32 +310,59 @@ const IconTile = ({ src, name, size = "h-24 w-24", compact = false }) =>
     </div>
   );
 
-// Create + Update dono popup me same fields
-const LotteryFields = ({ data, onChange, minDate }) => (
+const ReadField = ({ label, value }) => (
+  <div>
+    <label className={LABEL_CLS}>{label}</label>
+
+    <input
+      type="text"
+      value={value ?? "-"}
+      readOnly
+      className={`${INPUT_CLS}`}
+    />
+  </div>
+);
+
+/* =========================================================
+   LOTTERY FORM
+========================================================= */
+
+const LotteryFields = ({
+  data,
+  onChange,
+  minDate,
+}) => (
   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
     <div className="sm:col-span-2">
-      <label className={LABEL_CLS}>Market Name</label>
+      <label className={LABEL_CLS}>
+        Market Name
+      </label>
+
       <input
         type="text"
         name="marketName"
         value={data.marketName}
         onChange={onChange}
         placeholder="Enter market name"
-        className={`${INPUT_CLS} px-3`}
+        className={`${INPUT_CLS}`}
       />
     </div>
 
     <div>
       <label className={LABEL_CLS}>Month</label>
+
       <select
         name="month"
         value={data.month}
         onChange={onChange}
-        className={`${INPUT_CLS} px-3`}
+        className={INPUT_CLS}
       >
-        {MONTHS.map((m, i) => (
-          <option key={m} value={i + 1}>
-            {m}
+        {MONTHS.map((month, index) => (
+          <option
+            key={month}
+            value={index + 1}
+          >
+            {month}
           </option>
         ))}
       </select>
@@ -285,36 +370,43 @@ const LotteryFields = ({ data, onChange, minDate }) => (
 
     <div>
       <label className={LABEL_CLS}>Year</label>
+
       <input
         type="number"
         name="year"
         value={data.year}
         onChange={onChange}
         min="2000"
-        className={`${INPUT_CLS} px-3`}
+        className={INPUT_CLS}
       />
     </div>
 
     <div>
-      <label className={LABEL_CLS}>Draw Date</label>
+      <label className={LABEL_CLS}>
+        Draw Date
+      </label>
+
       <input
         type="date"
         name="drawDate"
         value={data.drawDate}
         onChange={onChange}
         min={minDate}
-        className={`${INPUT_CLS} px-3`}
+        className={INPUT_CLS}
       />
     </div>
 
     <div>
-      <label className={LABEL_CLS}>Draw Time</label>
+      <label className={LABEL_CLS}>
+        Draw Time
+      </label>
+
       <input
         type="time"
         name="drawTime"
         value={data.drawTime}
         onChange={onChange}
-        className={`${INPUT_CLS} px-3`}
+        className={INPUT_CLS}
       />
     </div>
 
@@ -322,13 +414,17 @@ const LotteryFields = ({ data, onChange, minDate }) => (
       ["firstPrize", "1st Prize Amount", data.prizes.first],
       ["secondPrize", "2nd Prize Amount", data.prizes.second],
       ["thirdPrize", "3rd Prize Amount", data.prizes.third],
-    ].map(([name, label, value], i) => (
-      <div key={name} className={i === 2 ? "sm:col-span-2" : ""}>
-        <label className={LABEL_CLS}>{label}</label>
+    ].map(([name, label, value]) => (
+      <div key={name}>
+        <label className={LABEL_CLS}>
+          {label}
+        </label>
+
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-[#9A5B00]">
             ₹
           </span>
+
           <input
             type="number"
             name={name}
@@ -337,13 +433,17 @@ const LotteryFields = ({ data, onChange, minDate }) => (
             min="0"
             step="1"
             placeholder={label}
-            className={`${INPUT_CLS} pl-8 pr-3`}
+            className={`${INPUT_CLS} pl-8`}
           />
         </div>
       </div>
     ))}
   </div>
 );
+
+/* =========================================================
+   MAIN COMPONENT
+========================================================= */
 
 const AdminLottery = () => {
   const dispatch = useDispatch();
@@ -360,33 +460,63 @@ const AdminLottery = () => {
     message,
   } = useSelector((state) => state.adminLottery);
 
-  const { users = [], usersLoading } = useSelector((state) => state.adminAuth);
+  const { users = [], usersLoading } = useSelector(
+    (state) => state.adminAuth
+  );
 
-  /* ---------- user lookup ---------- */
+  /* =======================================================
+     USERS
+  ======================================================= */
 
   const userMap = useMemo(() => {
     const map = {};
-    (users || []).forEach((u) => {
-      if (u?._id) map[String(u._id)] = u;
-      if (u?.uuid) map[String(u.uuid)] = u;
+
+    (users || []).forEach((user) => {
+      if (user?._id) {
+        map[String(user._id)] = user;
+      }
+
+      if (user?.uuid) {
+        map[String(user.uuid)] = user;
+      }
     });
+
     return map;
   }, [users]);
 
   const getUserName = (userId) => {
     if (!userId) return "-";
+
     if (typeof userId === "object") {
       return (
-        userId.name || userId.fullName || userId.username || userId.email ||
+        userId.name ||
+        userId.fullName ||
+        userId.username ||
+        userId.email ||
         String(userId._id || "-")
       );
     }
+
     const user = userMap[String(userId)];
-    if (!user) return usersLoading ? "Loading..." : String(userId);
-    return user.name || user.fullName || user.username || user.email || String(userId);
+
+    if (!user) {
+      return usersLoading
+        ? "Loading..."
+        : String(userId);
+    }
+
+    return (
+      user.name ||
+      user.fullName ||
+      user.username ||
+      user.email ||
+      String(userId)
+    );
   };
 
-  /* ---------- state ---------- */
+  /* =======================================================
+     FORM
+  ======================================================= */
 
   const getInitialFormData = () => ({
     marketName: "",
@@ -394,8 +524,16 @@ const AdminLottery = () => {
     year: new Date().getFullYear(),
     drawDate: getToday(),
     drawTime: "18:30",
-    prizes: { first: "", second: "", third: "" },
+    prizes: {
+      first: "",
+      second: "",
+      third: "",
+    },
   });
+
+  const [formData, setFormData] = useState(
+    getInitialFormData()
+  );
 
   const [editingId, setEditingId] = useState(null);
   const [viewId, setViewId] = useState(null);
@@ -403,20 +541,34 @@ const AdminLottery = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [showUpdate, setShowUpdate] = useState(false);
 
-  const [formData, setFormData] = useState(getInitialFormData());
-  const [updateData, setUpdateData] = useState(getInitialFormData());
+  const [updateData, setUpdateData] = useState(
+    getInitialFormData()
+  );
+
   const [formError, setFormError] = useState("");
 
-  // create popup image state
+  /* image */
   const [iconFile, setIconFile] = useState(null);
   const [iconPreview, setIconPreview] = useState("");
 
-  // info-panel icon state (update page)
-  const [infoIconFile, setInfoIconFile] = useState(null);
-  const [infoIconPreview, setInfoIconPreview] = useState("");
-  const [iconError, setIconError] = useState("");
+  const [updateIconFile, setUpdateIconFile] =
+    useState(null);
 
-  const [editingEntry, setEditingEntry] = useState(null);
+  const [updateIconPreview, setUpdateIconPreview] =
+    useState("");
+
+  /* filters */
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] =
+    useState("all");
+
+  /* delete modal */
+  const [deleteId, setDeleteId] = useState(null);
+
+  /* entry edit */
+  const [editingEntry, setEditingEntry] =
+    useState(null);
+
   const [editData, setEditData] = useState({
     number: "",
     amount: "",
@@ -424,180 +576,74 @@ const AdminLottery = () => {
     entryDate: "",
   });
 
-  const [activeTab, setActiveTab] = useState("sec-info");
-
-  const [autoGenerate, setAutoGenerate] = useState(true);
-  const [manualPrefix, setManualPrefix] = useState("");
-  const [manualNext, setManualNext] = useState("");
-
-  /* ---------- load ---------- */
+  /* =======================================================
+     LOAD
+  ======================================================= */
 
   useEffect(() => {
     dispatch(getAllLotteryConfigs());
     dispatch(getAllUsers());
+
     return () => {
       dispatch(clearLotteryError());
       dispatch(clearLotteryMessage());
     };
   }, [dispatch]);
 
-  /* ---------- derived ---------- */
+  /* =======================================================
+     DERIVED
+  ======================================================= */
 
-  const current = lottery && lottery._id === editingId ? lottery : null;
-  const viewLottery = lottery && lottery._id === viewId ? lottery : null;
+  const currentLottery =
+    lottery && lottery._id === editingId
+      ? lottery
+      : null;
 
-  const listItem = current
-    ? (lotteries || []).find((l) => l._id === current._id)
-    : null;
+  const viewLottery =
+    lottery && lottery._id === viewId
+      ? lottery
+      : null;
 
-  const isActive = listItem?.isActive ?? current?.isActive ?? false;
+  const filteredLotteries = useMemo(() => {
+    const list = Array.isArray(lotteries)
+      ? lotteries
+      : [];
 
-  // icon source: local preview override, otherwise backend imageUrl
-  const currentIcon =
-    infoIconPreview || current?.imageUrl || "";
+    return list.filter((item) => {
+      const search = searchTerm
+        .trim()
+        .toLowerCase();
 
-  const drawPrefix = useMemo(() => {
-    const d = current?.drawDate ? new Date(current.drawDate) : null;
-    if (!d || Number.isNaN(d.getTime())) return "DL-";
-    return (
-      `DL-${d.getFullYear()}` +
-      `${String(d.getMonth() + 1).padStart(2, "0")}` +
-      `${String(d.getDate()).padStart(2, "0")}-`
-    );
-  }, [current]);
+      const matchesSearch =
+        !search ||
+        item.marketName
+          ?.toLowerCase()
+          .includes(search);
 
-  const autoNext = String((current?.users?.length || 0) + 1).padStart(3, "0");
-  const prefixValue = autoGenerate ? drawPrefix : manualPrefix;
-  const nextValue = autoGenerate ? autoNext : manualNext;
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "active" &&
+          item.isActive) ||
+        (statusFilter === "inactive" &&
+          !item.isActive);
 
-  const prizeRows = current?.prizes
-    ? [
-        { name: "1st Prize", amount: current.prizes.first },
-        { name: "2nd Prize", amount: current.prizes.second },
-        { name: "3rd Prize", amount: current.prizes.third },
-      ]
-    : [];
+      return matchesSearch && matchesStatus;
+    });
+  }, [
+    lotteries,
+    searchTerm,
+    statusFilter,
+  ]);
 
-  /* ---------- table actions ---------- */
+  const viewedIsActive = viewLottery
+    ? (lotteries || []).find(
+        (item) => item._id === viewLottery._id
+      )?.isActive ?? viewLottery.isActive
+    : false;
 
-  const handleUpdateClick = (id) => {
-    setEditingId(id);
-    setActiveTab("sec-info");
-    setAutoGenerate(true);
-    setIconError("");
-    setInfoIconFile(null);
-    setInfoIconPreview("");
-    dispatch(clearLotteryError());
-    dispatch(clearLotteryMessage());
-    dispatch(getLotteryConfigById(id));
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleViewClick = (id) => {
-    dispatch(clearLotteryError());
-    dispatch(clearLotteryMessage());
-    setViewId(id);
-    dispatch(getLotteryConfigById(id));
-  };
-
-  const handleDeleteMarket = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this lottery?")) return;
-    const result = await dispatch(deleteLotteryConfig(id));
-    if (deleteLotteryConfig.fulfilled.match(result)) {
-      if (editingId === id) setEditingId(null);
-      if (viewId === id) setViewId(null);
-    }
-  };
-
-  const handleBack = () => {
-    setEditingId(null);
-    setViewId(null);
-    setShowUpdate(false);
-    setInfoIconFile(null);
-    if (infoIconPreview) URL.revokeObjectURL(infoIconPreview);
-    setInfoIconPreview("");
-    dispatch(clearLotteryError());
-    dispatch(getAllLotteryConfigs());
-  };
-
-  /* ---------- tabs ---------- */
-
-  const TABS = [
-    { id: "sec-info", label: "Lottery Information", icon: Info },
-    { id: "sec-prize", label: "Prize Structure", icon: Trophy },
-    { id: "sec-publish", label: "Publish Status", icon: ToggleRight },
-    {
-      id: "entries",
-      label: `User Entries (${current?.users?.length || 0})`,
-      icon: Users,
-      modal: true,
-    },
-  ];
-
-  const handleTab = (tab) => {
-    if (tab.modal) {
-      setViewId(editingId);
-      return;
-    }
-    setActiveTab(tab.id);
-    document
-      .getElementById(tab.id)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  const handleAutoToggle = () => {
-    if (autoGenerate) {
-      setManualPrefix(drawPrefix);
-      setManualNext(autoNext);
-    }
-    setAutoGenerate((v) => !v);
-  };
-
-  /* ---------- icon handlers ---------- */
-
-  // Info panel icon (update page) — local preview only for now
-  const handleInfoIconChange = (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-
-    const err = validateImage(file);
-    if (err) {
-      setIconError(err);
-      return;
-    }
-
-    setIconError("");
-    if (infoIconPreview) URL.revokeObjectURL(infoIconPreview);
-    setInfoIconFile(file);
-    setInfoIconPreview(URL.createObjectURL(file));
-  };
-
-  // Create popup icon
-  const handleIconChange = (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-
-    const err = validateImage(file);
-    if (err) {
-      setFormError(err);
-      return;
-    }
-
-    if (iconPreview) URL.revokeObjectURL(iconPreview);
-    setIconFile(file);
-    setIconPreview(URL.createObjectURL(file));
-    setFormError("");
-  };
-
-  const removeIcon = () => {
-    if (iconPreview) URL.revokeObjectURL(iconPreview);
-    setIconFile(null);
-    setIconPreview("");
-  };
-
-  /* ---------- form change handlers ---------- */
+  /* =======================================================
+     FORM CHANGE
+  ======================================================= */
 
   const makeChangeHandler = (setter) => (e) => {
     const { name, value } = e.target;
@@ -611,158 +657,509 @@ const AdminLottery = () => {
     if (prizeKey) {
       setter((prev) => ({
         ...prev,
-        prizes: { ...prev.prizes, [prizeKey]: value },
+        prizes: {
+          ...prev.prizes,
+          [prizeKey]: value,
+        },
       }));
     } else {
-      setter((prev) => ({ ...prev, [name]: value }));
+      setter((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
     }
 
     setFormError("");
   };
 
-  const handleCreateChange = makeChangeHandler(setFormData);
-  const handleUpdateChange = makeChangeHandler(setUpdateData);
+  const handleCreateChange =
+    makeChangeHandler(setFormData);
 
-  /* ---------- CREATE ---------- */
+  const handleUpdateChange =
+    makeChangeHandler(setUpdateData);
+
+  /* =======================================================
+     CREATE
+  ======================================================= */
 
   const openCreate = () => {
     dispatch(clearLotteryError());
     dispatch(clearLotteryMessage());
+
+    setFormData(getInitialFormData());
     setFormError("");
+
+    if (iconPreview) {
+      URL.revokeObjectURL(iconPreview);
+    }
+
+    setIconFile(null);
+    setIconPreview("");
+
     setShowCreate(true);
   };
 
-  const closeCreateModal = () => {
+  const closeCreate = () => {
     setShowCreate(false);
     setFormError("");
+
     setFormData(getInitialFormData());
-    removeIcon();
+
+    if (iconPreview) {
+      URL.revokeObjectURL(iconPreview);
+    }
+
+    setIconFile(null);
+    setIconPreview("");
+
     dispatch(clearLotteryError());
+  };
+
+  const handleIconChange = (e) => {
+    const file = e.target.files?.[0];
+
+    e.target.value = "";
+
+    if (!file) return;
+
+    const validationError = validateImage(file);
+
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
+    if (iconPreview) {
+      URL.revokeObjectURL(iconPreview);
+    }
+
+    setIconFile(file);
+    setIconPreview(
+      URL.createObjectURL(file)
+    );
+
+    setFormError("");
+  };
+
+  const removeIcon = () => {
+    if (iconPreview) {
+      URL.revokeObjectURL(iconPreview);
+    }
+
+    setIconFile(null);
+    setIconPreview("");
   };
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
+
     setFormError("");
 
-    const err = validateLotteryForm(formData, true);
-    if (err) return setFormError(err);
+    const validationError =
+      validateLotteryForm(formData, true);
 
-    // image is REQUIRED by backend
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
     if (!iconFile) {
-      return setFormError("Market image is required");
+      setFormError(
+        "Market image is required"
+      );
+      return;
     }
 
     const payload = buildPayload(formData);
 
     const result = await dispatch(
-      createLotteryConfig({ payload, imageFile: iconFile })
+      createLotteryConfig({
+        payload,
+        imageFile: iconFile,
+      })
     );
 
-    if (createLotteryConfig.fulfilled.match(result)) {
-      removeIcon();
-      closeCreateModal();
-      await dispatch(getAllLotteryConfigs());
+    if (
+      createLotteryConfig.fulfilled.match(
+        result
+      )
+    ) {
+      closeCreate();
+
+      await dispatch(
+        getAllLotteryConfigs()
+      );
     }
   };
 
-  /* ---------- UPDATE (popup) ---------- */
+  /* =======================================================
+     UPDATE
+  ======================================================= */
 
-  const openUpdatePopup = () => {
-    if (!current) return;
+  const openUpdate = async (id) => {
     dispatch(clearLotteryError());
     dispatch(clearLotteryMessage());
+
     setFormError("");
-    setUpdateData({
-      marketName: current.marketName || "",
-      month: current.month || new Date().getMonth() + 1,
-      year: current.year || new Date().getFullYear(),
-      drawDate: toInputDate(current.drawDate),
-      drawTime: current.drawTime || "18:30",
-      prizes: {
-        first: current.prizes?.first ?? "",
-        second: current.prizes?.second ?? "",
-        third: current.prizes?.third ?? "",
-      },
-    });
+
+    setEditingId(id);
+
+    if (updateIconPreview) {
+      URL.revokeObjectURL(updateIconPreview);
+    }
+
+    setUpdateIconFile(null);
+    setUpdateIconPreview("");
+
+    const result = await dispatch(
+      getLotteryConfigById(id)
+    );
+
+    const data =
+      result?.payload?.lottery ||
+      result?.payload?.data ||
+      result?.payload;
+
+    if (data) {
+      setUpdateData({
+        marketName: data.marketName || "",
+        month:
+          data.month ||
+          new Date().getMonth() + 1,
+        year:
+          data.year ||
+          new Date().getFullYear(),
+        drawDate: toInputDate(
+          data.drawDate
+        ),
+        drawTime:
+          data.drawTime || "18:30",
+        prizes: {
+          first:
+            data.prizes?.first ?? "",
+          second:
+            data.prizes?.second ?? "",
+          third:
+            data.prizes?.third ?? "",
+        },
+      });
+    } else if (
+      lotteries?.length
+    ) {
+      const item = lotteries.find(
+        (lotteryItem) =>
+          lotteryItem._id === id
+      );
+
+      if (item) {
+        setUpdateData({
+          marketName:
+            item.marketName || "",
+          month:
+            item.month ||
+            new Date().getMonth() + 1,
+          year:
+            item.year ||
+            new Date().getFullYear(),
+          drawDate: toInputDate(
+            item.drawDate
+          ),
+          drawTime:
+            item.drawTime || "18:30",
+          prizes: {
+            first:
+              item.prizes?.first ?? "",
+            second:
+              item.prizes?.second ?? "",
+            third:
+              item.prizes?.third ?? "",
+          },
+        });
+      }
+    }
+
     setShowUpdate(true);
   };
 
-  const closeUpdatePopup = () => {
+  const closeUpdate = () => {
     setShowUpdate(false);
+    setEditingId(null);
     setFormError("");
+
+    if (updateIconPreview) {
+      URL.revokeObjectURL(
+        updateIconPreview
+      );
+    }
+
+    setUpdateIconFile(null);
+    setUpdateIconPreview("");
+
     dispatch(clearLotteryError());
+  };
+
+  const handleUpdateIconChange = (e) => {
+    const file = e.target.files?.[0];
+
+    e.target.value = "";
+
+    if (!file) return;
+
+    const validationError =
+      validateImage(file);
+
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
+    if (updateIconPreview) {
+      URL.revokeObjectURL(
+        updateIconPreview
+      );
+    }
+
+    setUpdateIconFile(file);
+    setUpdateIconPreview(
+      URL.createObjectURL(file)
+    );
+
+    setFormError("");
+  };
+
+  const removeUpdateIcon = () => {
+    if (updateIconPreview) {
+      URL.revokeObjectURL(
+        updateIconPreview
+      );
+    }
+
+    setUpdateIconFile(null);
+    setUpdateIconPreview("");
   };
 
   const handleUpdateSubmit = async (e) => {
     e.preventDefault();
+
     setFormError("");
 
-    if (!current?._id) return;
+    if (!editingId) return;
 
-    const err = validateLotteryForm(updateData, false);
-    if (err) return setFormError(err);
+    const validationError =
+      validateLotteryForm(
+        updateData,
+        false
+      );
+
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
+    const payload =
+      buildPayload(updateData);
 
     const result = await dispatch(
       updateLotteryConfig({
-        id: current._id,
-        lotteryData: buildPayload(updateData),
+        id: editingId,
+        lotteryData: payload,
+        imageFile:
+          updateIconFile || undefined,
       })
     );
 
-    if (updateLotteryConfig.fulfilled.match(result)) {
-      setShowUpdate(false);
-      await dispatch(getLotteryConfigById(current._id));
-      dispatch(getAllLotteryConfigs());
+    if (
+      updateLotteryConfig.fulfilled.match(
+        result
+      )
+    ) {
+      const id = editingId;
+
+      closeUpdate();
+
+      await dispatch(
+        getAllLotteryConfigs()
+      );
+
+      await dispatch(
+        getLotteryConfigById(id)
+      );
     }
   };
 
-  /* ---------- activate / deactivate ---------- */
+  /* =======================================================
+     VIEW
+  ======================================================= */
 
-  const handleActivate = async (id) => {
-    if (!window.confirm("Are you sure you want to activate this lottery?")) return;
-    const result = await dispatch(activateLotteryConfig(id));
-    if (activateLotteryConfig.fulfilled.match(result)) {
-      await dispatch(getLotteryConfigById(id));
-      dispatch(getAllLotteryConfigs());
+  const handleView = async (id) => {
+    dispatch(clearLotteryError());
+    dispatch(clearLotteryMessage());
+
+    setViewId(id);
+
+    await dispatch(
+      getLotteryConfigById(id)
+    );
+  };
+
+  /* =======================================================
+     ACTIVATE / DEACTIVATE
+  ======================================================= */
+
+  const handleToggleStatus = async (item) => {
+    const id = item._id;
+
+    if (item.isActive) {
+      if (
+        !window.confirm(
+          "Are you sure you want to deactivate this lottery?"
+        )
+      ) {
+        return;
+      }
+
+      const result = await dispatch(
+        deactivateLotteryConfig(id)
+      );
+
+      if (
+        deactivateLotteryConfig.fulfilled.match(
+          result
+        )
+      ) {
+        await dispatch(
+          getAllLotteryConfigs()
+        );
+
+        if (viewId === id) {
+          await dispatch(
+            getLotteryConfigById(id)
+          );
+        }
+      }
+    } else {
+      if (
+        !window.confirm(
+          "Are you sure you want to activate this lottery?"
+        )
+      ) {
+        return;
+      }
+
+      const result = await dispatch(
+        activateLotteryConfig(id)
+      );
+
+      if (
+        activateLotteryConfig.fulfilled.match(
+          result
+        )
+      ) {
+        await dispatch(
+          getAllLotteryConfigs()
+        );
+
+        if (viewId === id) {
+          await dispatch(
+            getLotteryConfigById(id)
+          );
+        }
+      }
     }
   };
 
-  const handleDeactivate = async (id) => {
-    if (!window.confirm("Are you sure you want to deactivate this lottery?")) return;
-    const result = await dispatch(deactivateLotteryConfig(id));
-    if (deactivateLotteryConfig.fulfilled.match(result)) {
-      await dispatch(getLotteryConfigById(id));
-      dispatch(getAllLotteryConfigs());
+  /* =======================================================
+     DELETE LOTTERY
+  ======================================================= */
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+
+    const result = await dispatch(
+      deleteLotteryConfig(deleteId)
+    );
+
+    if (
+      deleteLotteryConfig.fulfilled.match(
+        result
+      )
+    ) {
+      if (viewId === deleteId) {
+        setViewId(null);
+      }
+
+      setDeleteId(null);
+
+      await dispatch(
+        getAllLotteryConfigs()
+      );
     }
   };
 
-  /* ---------- entry edit / delete ---------- */
+  /* =======================================================
+     ENTRY EDIT
+  ======================================================= */
 
   const handleEditEntry = (entry) => {
     setEditingEntry(entry);
+
     setEditData({
       number: entry.number || "",
-      amount: entry.amount !== undefined && entry.amount !== null ? entry.amount : "",
-      status: entry.status || "pending",
-      entryDate: entry.entryDate || "",
+      amount:
+        entry.amount !== undefined &&
+        entry.amount !== null
+          ? entry.amount
+          : "",
+      status:
+        entry.status || "pending",
+      entryDate:
+        entry.entryDate || "",
     });
   };
 
-  const handleEditChange = (e) => {
-    const { name, value } = e.target;
-    setEditData((prev) => ({ ...prev, [name]: value }));
+  const closeEditEntry = () => {
+    setEditingEntry(null);
+
+    setEditData({
+      number: "",
+      amount: "",
+      status: "pending",
+      entryDate: "",
+    });
   };
 
-  const closeEditModal = () => {
-    setEditingEntry(null);
-    setEditData({ number: "", amount: "", status: "pending", entryDate: "" });
+  const handleEditEntryChange = (e) => {
+    const { name, value } = e.target;
+
+    setEditData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleUpdateEntry = async (e) => {
     e.preventDefault();
-    if (!viewLottery?._id || !editingEntry?._id) return;
-    if (!editData.number || String(editData.number).length !== 6) return;
-    if (editData.amount === "" || Number(editData.amount) < 0) return;
+
+    if (
+      !viewLottery?._id ||
+      !editingEntry?._id
+    ) {
+      return;
+    }
+
+    if (
+      !editData.number ||
+      String(editData.number).length !== 6
+    ) {
+      return;
+    }
+
+    if (
+      editData.amount === "" ||
+      Number(editData.amount) < 0
+    ) {
+      return;
+    }
 
     const result = await dispatch(
       updateUserLotteryEntry({
@@ -770,483 +1167,801 @@ const AdminLottery = () => {
         userEntryId: editingEntry._id,
         data: {
           number: editData.number,
-          amount: Number(editData.amount),
+          amount: Number(
+            editData.amount
+          ),
           status: editData.status,
-          entryDate: editData.entryDate,
+          entryDate:
+            editData.entryDate,
         },
       })
     );
 
-    if (updateUserLotteryEntry.fulfilled.match(result)) {
-      closeEditModal();
-      await dispatch(getLotteryConfigById(viewLottery._id));
-      dispatch(getAllLotteryConfigs());
+    if (
+      updateUserLotteryEntry.fulfilled.match(
+        result
+      )
+    ) {
+      closeEditEntry();
+
+      await dispatch(
+        getLotteryConfigById(
+          viewLottery._id
+        )
+      );
+
+      dispatch(
+        getAllLotteryConfigs()
+      );
     }
   };
 
-  const handleDeleteEntry = async (configId, entryId) => {
-    if (!window.confirm("Are you sure you want to delete this user entry?")) return;
+  const handleDeleteEntry = async (
+    configId,
+    entryId
+  ) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this user entry?"
+      )
+    ) {
+      return;
+    }
+
     const result = await dispatch(
-      deleteUserLotteryEntry({ id: configId, userEntryId: entryId })
+      deleteUserLotteryEntry({
+        id: configId,
+        userEntryId: entryId,
+      })
     );
-    if (deleteUserLotteryEntry.fulfilled.match(result)) {
-      await dispatch(getLotteryConfigById(configId));
-      dispatch(getAllLotteryConfigs());
+
+    if (
+      deleteUserLotteryEntry.fulfilled.match(
+        result
+      )
+    ) {
+      await dispatch(
+        getLotteryConfigById(configId)
+      );
+
+      dispatch(
+        getAllLotteryConfigs()
+      );
     }
   };
 
-  const anyPopupOpen = showCreate || showUpdate;
-
-  /* =====================================================
+  /* =======================================================
      RENDER
-  ===================================================== */
+  ======================================================= */
 
   return (
-    <div className="min-h-screen">
-      <div className="mx-auto max-w-7xl space-y-4">
+    <div className="min-h-screen bg-[#FFFDF7] p-4 md:p-6">
+      <div className="mx-auto max-w-[1400px] space-y-5">
+
+        {/* =================================================
+            HEADER
+        ================================================= */}
+
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-black tracking-tight text-[#1F2A6B]">
+              Daily Lottery
+            </h1>
+
+            <p className="mt-1 text-sm text-[#6B7280]">
+              Manage daily lotteries, schedule draws,
+              set prizes and publish results.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={openCreate}
+            className={`flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm ${BROWN_BTN}`}
+          >
+            <Plus
+              size={17}
+              strokeWidth={3}
+            />
+            Create Lottery
+          </button>
+        </div>
+
+        {/* =================================================
+            HERO
+        ================================================= */}
+
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#5B0B0B] via-[#8A170F] to-[#C98A1B] p-5 shadow-[0_8px_25px_-10px_rgba(138,83,0,0.5)]">
+          <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[#FFD83D]/20 blur-2xl" />
+
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#FFD83D]">
+                Bharat Lottery
+              </p>
+
+              <h2 className="mt-1 text-2xl font-black text-white">
+                Daily Lottery
+              </h2>
+
+              <p className="mt-1 text-sm font-medium text-white/80">
+                DAILY DRAWS • BIGGER PRIZES • INSTANT MANAGEMENT
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20">
+                <Trophy
+                  size={28}
+                  className="text-[#FFD83D]"
+                />
+              </div>
+
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20">
+                <Ticket
+                  size={27}
+                  className="text-white"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* =================================================
+            SUCCESS / ERROR
+        ================================================= */}
+
         {message && (
-          <div className="rounded-xl border border-[#12A36B]/30 bg-[#E6F6EF] px-4 py-3 text-sm font-medium text-[#0E7A52]">
+          <div className="flex items-center gap-2 rounded-xl border border-[#12A36B]/30 bg-[#E6F6EF] px-4 py-3 text-sm font-medium text-[#0E7A52]">
+            <CheckCircle2 size={17} />
             {message}
           </div>
         )}
 
-        {error && !anyPopupOpen && (
-          <div className="rounded-xl border border-[#D93025]/30 bg-[#FDE8E6] px-4 py-3 text-sm font-medium text-[#B3261E]">
-            {error}
-          </div>
-        )}
+        {error &&
+          !showCreate &&
+          !showUpdate && (
+            <div className="flex items-center gap-2 rounded-xl border border-[#D93025]/30 bg-[#FDE8E6] px-4 py-3 text-sm font-medium text-[#B3261E]">
+              <XCircle size={17} />
+              {error}
+            </div>
+          )}
 
         {/* =================================================
-            TABLE VIEW
+            LOTTERY LIST
         ================================================= */}
-        {!editingId && (
-          <>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h1 className="text-3xl font-black tracking-tight text-[#1F2A6B]">
-                  Daily Lottery
-                </h1>
-                <p className="mt-1 text-sm text-[#6B7280]">
-                  Manage lotteries, schedule draws, set prizes and publish results.
-                </p>
+
+        <div className={CARD_CLS}>
+          <div className="flex flex-col gap-4 border-b border-[#F3E7C4] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-black text-[#1F2A6B]">
+                Daily Draw List
+              </h2>
+
+              <p className="mt-1 text-sm text-[#6B7280]">
+                Total lotteries:{" "}
+                {lotteries?.length || 0}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {/* status */}
+              <div className="relative">
+                <Filter
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A5B00]"
+                />
+
+                <select
+                  value={statusFilter}
+                  onChange={(e) =>
+                    setStatusFilter(
+                      e.target.value
+                    )
+                  }
+                  className="h-10 rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] pl-9 pr-8 text-xs font-semibold text-[#374151] outline-none focus:border-[#F2B705]"
+                >
+                  <option value="all">
+                    All Status
+                  </option>
+                  <option value="active">
+                    Active
+                  </option>
+                  <option value="inactive">
+                    Inactive
+                  </option>
+                </select>
+              </div>
+
+              {/* search */}
+              <div className="relative">
+                <Search
+                  size={15}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A5B00]"
+                />
+
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) =>
+                    setSearchTerm(
+                      e.target.value
+                    )
+                  }
+                  placeholder="Search lottery..."
+                  className="h-10 w-full rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] pl-9 pr-3 text-xs outline-none focus:border-[#F2B705] sm:w-[210px]"
+                />
               </div>
 
               <button
                 type="button"
-                onClick={openCreate}
-                className={`flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm ${BROWN_BTN}`}
+                onClick={() =>
+                  dispatch(
+                    getAllLotteryConfigs()
+                  )
+                }
+                disabled={loading}
+                className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-xs disabled:opacity-50 ${OUTLINE_BTN}`}
               >
-                <Plus size={16} strokeWidth={3} />
-                Create Lottery
+                <RefreshCw
+                  size={14}
+                  className={
+                    loading
+                      ? "animate-spin"
+                      : ""
+                  }
+                />
+                Refresh
               </button>
             </div>
+          </div>
 
-            <div className={CARD_CLS}>
-              <div className="flex flex-col gap-3 border-b border-[#F3E7C4] px-5 py-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h2 className="text-lg font-black text-[#1F2A6B]">All Lotteries</h2>
-                  <p className="mt-1 text-sm text-[#6B7280]">
-                    Total lotteries: {lotteries?.length || 0}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => dispatch(getAllLotteryConfigs())}
-                  disabled={loading}
-                  className={`rounded-xl px-4 py-2 text-xs disabled:opacity-60 ${OUTLINE_BTN}`}
-                >
-                  {loading ? "Loading..." : "Refresh"}
-                </button>
+          {/* loading */}
+          {loading &&
+          (!lotteries ||
+            lotteries.length === 0) ? (
+            <div className="flex min-h-[260px] items-center justify-center text-sm text-[#6B7280]">
+              Loading lotteries...
+            </div>
+          ) : filteredLotteries.length ===
+            0 ? (
+            <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 px-5 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FFF9E3]">
+                <Trophy
+                  size={28}
+                  className="text-[#F2B705]"
+                />
               </div>
 
-              {loading && (!lotteries || lotteries.length === 0) ? (
-                <div className="flex min-h-[220px] items-center justify-center text-sm text-[#6B7280]">
-                  Loading lotteries...
-                </div>
-              ) : !lotteries || lotteries.length === 0 ? (
-                <div className="flex min-h-[260px] flex-col items-center justify-center gap-2 px-5 text-center">
-                  <Crown size={34} className="text-[#F2B705]" />
-                  <h3 className="text-base font-black text-[#1A1A1A]">No lotteries found</h3>
-                  <p className="text-sm text-[#6B7280]">
-                    Click “Create Lottery” to add your first one.
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full">
-                    <thead className="bg-[#FFF9E3]">
-                      <tr>
-                        <th className={TH_CLS}>#</th>
-                        <th className={TH_CLS}>Lottery</th>
-                        <th className={TH_CLS}>Month</th>
-                        <th className={TH_CLS}>Year</th>
-                        <th className={TH_CLS}>Draw Date</th>
-                        <th className={TH_CLS}>Draw Time</th>
-                        <th className={TH_CLS}>Prize Amounts</th>
-                        <th className={TH_CLS}>Users</th>
-                        <th className={TH_CLS}>Status</th>
-                        <th className={TH_CLS}>Created</th>
-                        <th className={TH_CLS}>Actions</th>
-                      </tr>
-                    </thead>
+              <h3 className="text-base font-black text-[#1A1A1A]">
+                No lotteries found
+              </h3>
 
-                    <tbody className="divide-y divide-[#F3E7C4]">
-                      {lotteries.map((item, index) => (
-                        <tr key={item._id} className="transition hover:bg-[#FFFDF7]">
-                          <td className="px-4 py-3 text-sm text-[#8A8F98]">{index + 1}</td>
+              <p className="max-w-md text-sm text-[#6B7280]">
+                {searchTerm ||
+                statusFilter !== "all"
+                  ? "Try changing your search or filter."
+                  : "Create your first daily lottery to get started."}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-[#FFF9E3]">
+                  <tr>
+                    <th className={TH_CLS}>
+                      #
+                    </th>
 
+                    <th className={TH_CLS}>
+                      Lottery
+                    </th>
+
+                    <th className={TH_CLS}>
+                      Draw Date & Time
+                    </th>
+
+                    <th className={TH_CLS}>
+                      Total Prize
+                    </th>
+
+                    <th className={TH_CLS}>
+                      Users
+                    </th>
+
+                    <th className={TH_CLS}>
+                      Status
+                    </th>
+
+                    <th className={TH_CLS}>
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-[#F3E7C4]">
+                  {filteredLotteries.map(
+                    (item, index) => {
+                      const totalPrize =
+                        Number(
+                          item.prizes?.first || 0
+                        ) +
+                        Number(
+                          item.prizes?.second ||
+                            0
+                        ) +
+                        Number(
+                          item.prizes?.third ||
+                            0
+                        );
+
+                      return (
+                        <tr
+                          key={item._id}
+                          className="transition hover:bg-[#FFFDF7]"
+                        >
+                          <td className="px-4 py-3 text-sm text-[#8A8F98]">
+                            {index + 1}
+                          </td>
+
+                          {/* lottery */}
                           <td className="whitespace-nowrap px-4 py-3">
                             <div className="flex items-center gap-3">
                               <IconTile
-                                src={item.imageUrl}
-                                name={item.marketName}
-                                size="h-10 w-10"
+                                src={
+                                  item.imageUrl
+                                }
+                                name={
+                                  item.marketName
+                                }
+                                size="h-11 w-11"
                                 compact
                               />
+
                               <div>
                                 <div className="font-semibold text-[#1A1A1A]">
-                                  {item.marketName}
+                                  {
+                                    item.marketName
+                                  }
                                 </div>
+
                                 <div className="mt-0.5 text-[11px] text-[#8A8F98]">
-                                  ID: {item._id}
+                                  ID:{" "}
+                                  {item._id}
                                 </div>
                               </div>
                             </div>
                           </td>
 
-                          <td className="whitespace-nowrap px-4 py-3 text-sm">
-                            {getMonthName(item.month)}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-sm">{item.year}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-sm">
-                            {formatDate(item.drawDate)}
-                          </td>
-
+                          {/* date */}
                           <td className="whitespace-nowrap px-4 py-3">
-                            {item.drawTime ? (
-                              <span className="rounded-lg bg-[#FFEFA8] px-3 py-1.5 text-xs font-bold text-[#9A5B00] ring-1 ring-[#F2B705]/60">
-                                {item.drawTime}
-                              </span>
-                            ) : (
-                              "-"
-                            )}
-                          </td>
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <div className="flex items-center gap-1.5 text-sm font-semibold text-[#1A1A1A]">
+                                  <CalendarDays
+                                    size={14}
+                                    className="text-[#9A5B00]"
+                                  />
 
-                          <td className="px-4 py-3">
-                            {item.prizes ? (
-                              <div className="flex min-w-[210px] flex-wrap gap-1.5">
-                                {[
-                                  ["1st", item.prizes.first],
-                                  ["2nd", item.prizes.second],
-                                  ["3rd", item.prizes.third],
-                                ].map(([label, amt]) => (
-                                  <span
-                                    key={label}
-                                    className="rounded-md bg-[#FFF9E3] px-2 py-1 text-xs font-semibold text-[#9A5B00] ring-1 ring-[#F3E7C4]"
-                                  >
-                                    {label} ₹{Number(amt || 0).toLocaleString("en-IN")}
-                                  </span>
-                                ))}
+                                  {formatDate(
+                                    item.drawDate
+                                  )}
+                                </div>
+
+                                <div className="mt-1 flex items-center gap-1.5 text-xs text-[#6B7280]">
+                                  <Clock3
+                                    size={13}
+                                    className="text-[#9A5B00]"
+                                  />
+
+                                  {item.drawTime ||
+                                    "-"}
+                                </div>
                               </div>
-                            ) : (
-                              <span className="text-sm text-[#8A8F98]">Not configured</span>
-                            )}
+                            </div>
                           </td>
 
-                          <td className="px-4 py-3 text-sm">{item.users?.length || 0}</td>
-
-                          <td className="whitespace-nowrap px-4 py-3">
-                            <StatusPill active={item.isActive} />
-                          </td>
-
-                          <td className="whitespace-nowrap px-4 py-3 text-sm text-[#6B7280]">
-                            {formatDate(item.createdAt)}
-                          </td>
-
+                          {/* total prize */}
                           <td className="px-4 py-3">
-                            <div className="flex min-w-[250px] items-center gap-2">
+                            <div className="min-w-[210px]">
+                              <div className="text-sm font-black text-[#1A1204]">
+                                ₹
+                                {totalPrize.toLocaleString(
+                                  "en-IN"
+                                )}
+                              </div>
+
+                              <div className="mt-1 flex flex-wrap gap-1.5">
+                                {[
+                                  [
+                                    "1st",
+                                    item.prizes
+                                      ?.first,
+                                  ],
+                                  [
+                                    "2nd",
+                                    item.prizes
+                                      ?.second,
+                                  ],
+                                  [
+                                    "3rd",
+                                    item.prizes
+                                      ?.third,
+                                  ],
+                                ].map(
+                                  ([
+                                    label,
+                                    amount,
+                                  ]) => (
+                                    <span
+                                      key={
+                                        label
+                                      }
+                                      className="rounded-md bg-[#FFF9E3] px-2 py-1 text-[10px] font-semibold text-[#9A5B00] ring-1 ring-[#F3E7C4]"
+                                    >
+                                      {label} ₹
+                                      {Number(
+                                        amount ||
+                                          0
+                                      ).toLocaleString(
+                                        "en-IN"
+                                      )}
+                                    </span>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* users */}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-[#374151]">
+                              <UsersIcon />
+                              {item.users
+                                ?.length ||
+                                0}
+                            </div>
+                          </td>
+
+                          {/* status */}
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <StatusPill
+                              active={
+                                item.isActive
+                              }
+                            />
+                          </td>
+
+                          {/* actions */}
+                          <td className="px-4 py-3">
+                            <div className="flex min-w-[280px] items-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => handleUpdateClick(item._id)}
-                                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ${GOLD_BTN}`}
+                                onClick={() =>
+                                  handleView(
+                                    item._id
+                                  )
+                                }
+                                className={`${ICON_BTN} border-[#F2B705] bg-white text-[#9A5B00] hover:bg-[#FFF9E3]`}
+                                title="View"
                               >
-                                <Pencil size={12} />
-                                Update
+                                <Eye
+                                  size={15}
+                                />
                               </button>
 
                               <button
                                 type="button"
-                                onClick={() => handleViewClick(item._id)}
-                                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ${OUTLINE_BTN}`}
+                                onClick={() =>
+                                  openUpdate(
+                                    item._id
+                                  )
+                                }
+                                disabled={
+                                  updateLoading
+                                }
+                                className={`${ICON_BTN} border-[#F2B705] bg-[#FFF9E3] text-[#9A5B00] hover:bg-[#FFEFA8]`}
+                                title="Edit"
                               >
-                                <Eye size={12} />
-                                View
+                                <Pencil
+                                  size={15}
+                                />
                               </button>
 
                               <button
                                 type="button"
-                                onClick={() => handleDeleteMarket(item._id)}
-                                disabled={deleteLoading}
-                                className="flex items-center gap-1.5 rounded-lg bg-[#D93025] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#B3261E] disabled:opacity-50"
+                                onClick={() =>
+                                  handleToggleStatus(
+                                    item
+                                  )
+                                }
+                                disabled={
+                                  actionLoading
+                                }
+                                className={`${ICON_BTN} ${
+                                  item.isActive
+                                    ? "border-[#D93025]/30 bg-[#FDE8E6] text-[#D93025]"
+                                    : "border-[#12A36B]/30 bg-[#E6F6EF] text-[#12A36B]"
+                                }`}
+                                title={
+                                  item.isActive
+                                    ? "Deactivate"
+                                    : "Activate"
+                                }
                               >
-                                <Trash2 size={12} />
-                                {deleteLoading ? "..." : "Delete"}
+                                <Power
+                                  size={15}
+                                />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setDeleteId(
+                                    item._id
+                                  )
+                                }
+                                disabled={
+                                  deleteLoading
+                                }
+                                className={`${ICON_BTN} border-[#D93025]/30 bg-[#FDE8E6] text-[#D93025] hover:bg-[#FAD5D1]`}
+                                title="Delete"
+                              >
+                                <Trash2
+                                  size={15}
+                                />
                               </button>
                             </div>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      );
+                    }
+                  )}
+                </tbody>
+              </table>
             </div>
-          </>
-        )}
+          )}
+        </div>
+      </div>
 
-        {/* =================================================
-            UPDATE PAGE
-        ================================================= */}
-        {editingId && (
-          <>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleBack}
-                  className={`flex h-10 w-10 items-center justify-center rounded-xl ${OUTLINE_BTN}`}
-                  title="Back to lotteries"
-                >
-                  <ArrowLeft size={18} />
-                </button>
-                <div>
-                  <h1 className="text-3xl font-black tracking-tight text-[#1F2A6B]">
-                    Daily Lottery
-                  </h1>
-                  <p className="mt-1 text-sm text-[#6B7280]">
-                    Manage lotteries, schedule draws, set prizes and publish results.
+      {/* =====================================================
+          CREATE POPUP
+      ===================================================== */}
+
+      {showCreate && (
+        <ModalShell
+          title="Create Lottery"
+          subtitle="Create a daily lottery market and set prize amounts."
+          onClose={closeCreate}
+          z="z-[70]"
+        >
+          <form
+            onSubmit={handleCreateSubmit}
+            className="p-5"
+          >
+            {(formError || error) && (
+              <div className="mb-4 rounded-xl border border-[#D93025]/30 bg-[#FDE8E6] px-4 py-3 text-sm font-medium text-[#B3261E]">
+                {formError || error}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_200px]">
+              <LotteryFields
+                data={formData}
+                onChange={
+                  handleCreateChange
+                }
+                minDate={getToday()}
+              />
+
+              {/* IMAGE */}
+              <div>
+                <label className={LABEL_CLS}>
+                  Market Banner *
+                </label>
+
+                <div className="flex min-h-[235px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#F2B705] bg-[#FFFDF7] p-3 text-center">
+                  {iconPreview ? (
+                    <img
+                      src={iconPreview}
+                      alt="Lottery preview"
+                      className="h-28 w-28 rounded-xl object-cover shadow ring-1 ring-[#F2B705]"
+                    />
+                  ) : (
+                    <div className="flex h-28 w-28 items-center justify-center rounded-xl bg-[#FFEFA8]">
+                      <ImageIcon
+                        size={32}
+                        className="text-[#9A5B00]"
+                      />
+                    </div>
+                  )}
+
+                  <label
+                    className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-xs ${OUTLINE_BTN}`}
+                  >
+                    <Upload size={13} />
+
+                    {iconPreview
+                      ? "Change Image"
+                      : "Upload Image"}
+
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={
+                        handleIconChange
+                      }
+                      className="hidden"
+                    />
+                  </label>
+
+                  {iconFile && (
+                    <button
+                      type="button"
+                      onClick={
+                        removeIcon
+                      }
+                      className="text-[11px] font-semibold text-[#D93025] hover:underline"
+                    >
+                      Remove
+                    </button>
+                  )}
+
+                  <p className="text-[10px] leading-snug text-[#8A8F98]">
+                    PNG/JPG, max 2MB
                   </p>
                 </div>
               </div>
-
-              <button
-                type="button"
-                onClick={openCreate}
-                className={`flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm ${BROWN_BTN}`}
-              >
-                <Plus size={16} strokeWidth={3} />
-                Create Lottery
-              </button>
             </div>
 
-            {!current ? (
-              <div className={`${CARD_CLS} flex min-h-[300px] items-center justify-center text-sm text-[#6B7280]`}>
-                Loading lottery details...
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeCreate}
+                className={`rounded-xl px-5 py-2.5 text-sm ${OUTLINE_BTN}`}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                disabled={createLoading}
+                className={`rounded-xl px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-60 ${BROWN_BTN}`}
+              >
+                {createLoading
+                  ? "Creating..."
+                  : "Create Lottery"}
+              </button>
+            </div>
+          </form>
+        </ModalShell>
+      )}
+
+      {/* =====================================================
+          UPDATE POPUP
+      ===================================================== */}
+
+      {showUpdate && (
+        <ModalShell
+          title="Update Lottery"
+          subtitle="Change lottery details, prize amounts and image."
+          onClose={closeUpdate}
+          z="z-[70]"
+        >
+          <form
+            onSubmit={handleUpdateSubmit}
+            className="p-5"
+          >
+            {(formError || error) && (
+              <div className="mb-4 rounded-xl border border-[#D93025]/30 bg-[#FDE8E6] px-4 py-3 text-sm font-medium text-[#B3261E]">
+                {formError || error}
               </div>
-            ) : (
-              <>
-                {/* BANNER */}
-                <div className="relative overflow-hidden rounded-2xl border border-[#F3E7C4] bg-gradient-to-r from-white via-[#FFF9E3] to-[#FFE08A] p-4 shadow-[0_6px_18px_-10px_rgba(247,181,0,0.35)] sm:p-5">
-                  <div className="pointer-events-none absolute -bottom-10 right-0 h-40 w-2/5 bg-[radial-gradient(ellipse_at_bottom_right,rgba(247,181,0,0.55),transparent_70%)]" />
-
-                  <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center">
-                    <IconTile src={currentIcon} name={current.marketName} size="h-28 w-28" />
-
-                    <div className="min-w-0 flex-1">
-                      <h2 className="truncate text-2xl font-black text-[#1A1A1A]">
-                        {current.marketName}
-                      </h2>
-
-                      <p className="mt-1 text-sm text-[#6B7280]">
-                        {getMonthName(current.month)} {current.year} • Draw{" "}
-                        {formatDate(current.drawDate)}
-                        {current.drawTime ? ` at ${current.drawTime}` : ""}
-                      </p>
-
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-[#374151] ring-1 ring-[#F3E7C4]">
-                          Status
-                          <span
-                            className={`inline-flex items-center gap-1 font-bold ${
-                              isActive ? "text-[#12A36B]" : "text-[#6B7280]"
-                            }`}
-                          >
-                            <span
-                              className={`h-2 w-2 rounded-full ${
-                                isActive ? "bg-[#12A36B]" : "bg-[#9CA3AF]"
-                              }`}
-                            />
-                            {isActive ? "Active" : "Inactive"}
-                          </span>
-                        </span>
-
-                        <span className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-[#374151] ring-1 ring-[#F3E7C4]">
-                          Total Draws
-                          <Calendar size={13} className="text-[#9A5B00]" />
-                          <b className="text-[#1A1A1A]">{lotteries?.length || 0}</b>
-                        </span>
-
-                        <span className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-[#374151] ring-1 ring-[#F3E7C4]">
-                          Entries
-                          <Users size={13} className="text-[#9A5B00]" />
-                          <b className="text-[#1A1A1A]">{current.users?.length || 0}</b>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pointer-events-none absolute right-8 top-1/2 hidden -translate-y-1/2 items-end gap-1 lg:flex">
-                    {[
-                      { n: 3, c: "from-[#60A5FA] to-[#1D4ED8]", s: "h-14 w-14" },
-                      { n: 7, c: "from-[#F87171] to-[#B91C1C]", s: "h-[68px] w-[68px]" },
-                      { n: 9, c: "from-[#C084FC] to-[#7E22CE]", s: "h-14 w-14" },
-                      { n: 5, c: "from-[#4ADE80] to-[#15803D]", s: "h-16 w-16" },
-                    ].map((b) => (
-                      <span
-                        key={b.n}
-                        className={`flex items-center justify-center rounded-full bg-gradient-to-br ${b.c} ${b.s} text-xl font-black text-white shadow-lg ring-2 ring-white/70`}
-                      >
-                        {b.n}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* TABS */}
-                <div className="flex gap-1 overflow-x-auto rounded-2xl border border-[#F3E7C4] bg-white p-1.5 shadow-[0_6px_18px_-10px_rgba(247,181,0,0.3)]">
-                  {TABS.map((t) => {
-                    const Icon = t.icon;
-                    const active = activeTab === t.id;
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => handleTab(t)}
-                        className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] transition ${
-                          active
-                            ? BROWN_BTN
-                            : "font-semibold text-[#1F2A6B] hover:bg-[#FFF9E3]"
-                        }`}
-                      >
-                        <Icon size={16} />
-                        {t.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* ROW 1 */}
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.25fr_1fr]">
-                  {/* LOTTERY INFORMATION */}
-                  <Panel id="sec-info" icon={Info} title="Lottery Information">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_190px]">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="col-span-2">
-                          <ReadField label="Lottery Name" value={current.marketName} />
-                        </div>
-                        <ReadField label="Month" value={getMonthName(current.month)} />
-                        <ReadField label="Year" value={current.year} />
-                        <ReadField label="Draw Date" value={formatDate(current.drawDate)} />
-                        <ReadField label="Draw Time" value={current.drawTime || "-"} />
-                        <ReadField label="Total Entries" value={current.users?.length || 0} />
-                        <ReadField label="Created" value={formatDate(current.createdAt)} />
-
-                        <div className="col-span-2 mt-1 flex justify-end">
-                          <button
-                            type="button"
-                            onClick={openUpdatePopup}
-                            className={`rounded-xl px-6 py-2.5 text-sm ${BROWN_BTN}`}
-                          >
-                            Update Information
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Icon / Banner */}
-                      <div>
-                        <label className={LABEL_CLS}>Icon / Banner</label>
-                        <div className="flex min-h-[210px] flex-col items-center justify-center gap-3 rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3 text-center">
-                          <IconTile src={currentIcon} name={current.marketName} />
-
-                          <label
-                            className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-xs ${OUTLINE_BTN}`}
-                          >
-                            <Upload size={13} />
-                            Change Icon
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={handleInfoIconChange}
-                              className="hidden"
-                            />
-                          </label>
-
-                          {iconError ? (
-                            <p className="text-[10px] font-semibold text-[#D93025]">{iconError}</p>
-                          ) : (
-                            <p className="text-[10px] leading-snug text-[#8A8F98]">
-                              PNG/JPG, max 2MB
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </Panel>
-
-                  {/* PUBLISH STATUS */}
-                  <Panel id="sec-publish" icon={ToggleRight} title="Publish Status">
-                    <div className="space-y-5">
-                      <div className="flex items-center gap-3 rounded-xl bg-[#FFFDF7] px-4 py-3 ring-1 ring-[#F3E7C4]">
-                        <span className="text-sm font-bold text-[#1A1A1A]">Current Status</span>
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-bold ${
-                            isActive ? "bg-[#DDF7E8] text-[#12A36B]" : "bg-gray-100 text-[#6B7280]"
-                          }`}
-                        >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              isActive ? "bg-[#12A36B]" : "bg-[#9CA3AF]"
-                            }`}
-                          />
-                          {isActive ? "Active" : "Inactive"}
-                        </span>
-                      </div>
-
-                      <div>
-                        <p className="mb-3 text-sm font-bold text-[#1A1A1A]">
-                          Activate / Deactivate
-                        </p>
-
-                        <div className="flex items-center gap-3">
-                          <Switch
-                            checked={isActive}
-                            disabled={actionLoading}
-                            onChange={() =>
-                              isActive
-                                ? handleDeactivate(current._id)
-                                : handleActivate(current._id)
-                            }
-                          />
-                          <span className="text-sm font-semibold text-[#374151]">
-                            {actionLoading
-                              ? "Updating..."
-                              : `Lottery is currently ${isActive ? "Active" : "Inactive"}`}
-                          </span>
-                        </div>
-
-                        <p className="mt-3 text-xs text-[#6B7280]">
-                          When inactive, this lottery will not be visible to users.
-                        </p>
-                      </div>
-                    </div>
-                  </Panel>
-                </div>
-              </>
             )}
-          </>
-        )}
-      </div>
+
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_200px]">
+              <LotteryFields
+                data={updateData}
+                onChange={
+                  handleUpdateChange
+                }
+              />
+
+              <div>
+                <label className={LABEL_CLS}>
+                  Market Banner
+                  <span className="ml-1 text-[#8A8F98]">
+                    (optional)
+                  </span>
+                </label>
+
+                <div className="flex min-h-[235px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#F2B705] bg-[#FFFDF7] p-3 text-center">
+                  {updateIconPreview ? (
+                    <img
+                      src={
+                        updateIconPreview
+                      }
+                      alt="New lottery preview"
+                      className="h-28 w-28 rounded-xl object-cover shadow ring-1 ring-[#F2B705]"
+                    />
+                  ) : currentLottery?.imageUrl ? (
+                    <img
+                      src={
+                        currentLottery.imageUrl
+                      }
+                      alt="Current lottery"
+                      className="h-28 w-28 rounded-xl object-cover shadow ring-1 ring-[#F3E7C4]"
+                    />
+                  ) : (
+                    <div className="flex h-28 w-28 items-center justify-center rounded-xl bg-[#FFEFA8]">
+                      <ImageIcon
+                        size={32}
+                        className="text-[#9A5B00]"
+                      />
+                    </div>
+                  )}
+
+                  <label
+                    className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-xs ${OUTLINE_BTN}`}
+                  >
+                    <Upload size={13} />
+
+                    {updateIconPreview
+                      ? "Change Image"
+                      : "Upload New Image"}
+
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={
+                        handleUpdateIconChange
+                      }
+                      className="hidden"
+                    />
+                  </label>
+
+                  {updateIconFile && (
+                    <button
+                      type="button"
+                      onClick={
+                        removeUpdateIcon
+                      }
+                      className="text-[11px] font-semibold text-[#D93025] hover:underline"
+                    >
+                      Cancel new image
+                    </button>
+                  )}
+
+                  <p className="text-[10px] leading-snug text-[#8A8F98]">
+                    {updateIconFile
+                      ? "New image will replace current image"
+                      : "Leave empty to keep current image"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeUpdate}
+                className={`rounded-xl px-5 py-2.5 text-sm ${OUTLINE_BTN}`}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                disabled={updateLoading}
+                className={`rounded-xl px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-60 ${BROWN_BTN}`}
+              >
+                {updateLoading
+                  ? "Updating..."
+                  : "Update Lottery"}
+              </button>
+            </div>
+          </form>
+        </ModalShell>
+      )}
 
       {/* =====================================================
           VIEW POPUP
@@ -1255,11 +1970,20 @@ const AdminLottery = () => {
       {viewId && (
         <ModalShell
           wide
-          title={viewLottery ? `View — ${viewLottery.marketName}` : "View Lottery"}
+          title={
+            viewLottery
+              ? `View — ${viewLottery.marketName}`
+              : "View Lottery"
+          }
           subtitle={
             viewLottery
-              ? `${getMonthName(viewLottery.month)} ${viewLottery.year} • ${
-                  viewLottery.users?.length || 0
+              ? `${getMonthName(
+                  viewLottery.month
+                )} ${
+                  viewLottery.year
+                } • ${
+                  viewLottery.users
+                    ?.length || 0
                 } Users`
               : "Loading..."
           }
@@ -1271,160 +1995,403 @@ const AdminLottery = () => {
             </div>
           ) : (
             <div className="p-5">
-              <div className="mb-4 flex flex-wrap items-center gap-2">
+
+              {/* SUMMARY */}
+              <div className="mb-5 flex flex-wrap items-center gap-2">
                 <StatusPill
-                  active={
-                    (lotteries || []).find((l) => l._id === viewLottery._id)?.isActive ??
-                    viewLottery.isActive
-                  }
+                  active={viewedIsActive}
                 />
-                <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#FFF9E3] px-3 py-1.5 text-xs font-semibold text-[#9A5B00] ring-1 ring-[#F3E7C4]">
-                  <Calendar size={13} />
-                  {formatDate(viewLottery.drawDate)}
-                </span>
-                {viewLottery.drawTime && (
-                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#FFEFA8] px-3 py-1.5 text-xs font-bold text-[#9A5B00] ring-1 ring-[#F2B705]/60">
-                    <Clock size={13} />
-                    {viewLottery.drawTime}
-                  </span>
-                )}
-                {viewLottery.prizes &&
-                  [
-                    ["1st", viewLottery.prizes.first],
-                    ["2nd", viewLottery.prizes.second],
-                    ["3rd", viewLottery.prizes.third],
-                  ].map(([label, amt]) => (
-                    <span
-                      key={label}
-                      className="rounded-lg bg-[#FFF9E3] px-3 py-1.5 text-xs font-bold text-[#9A5B00] ring-1 ring-[#F3E7C4]"
-                    >
-                      {label} ₹{Number(amt || 0).toLocaleString("en-IN")}
-                    </span>
-                  ))}
 
                 <button
                   type="button"
-                  onClick={() => dispatch(getLotteryConfigById(viewLottery._id))}
+                  onClick={() =>
+                    dispatch(
+                      getLotteryConfigById(
+                        viewLottery._id
+                      )
+                    )
+                  }
                   disabled={loading}
-                  className={`ml-auto rounded-xl px-4 py-2 text-xs disabled:opacity-60 ${OUTLINE_BTN}`}
+                  className={`ml-auto inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs disabled:opacity-50 ${OUTLINE_BTN}`}
                 >
-                  {loading ? "Loading..." : "Refresh Details"}
+                  <RefreshCw
+                    size={13}
+                    className={
+                      loading
+                        ? "animate-spin"
+                        : ""
+                    }
+                  />
+                  Refresh Details
                 </button>
               </div>
 
-              <div className="overflow-x-auto rounded-xl ring-1 ring-[#F3E7C4]">
-                {viewLottery.users?.length > 0 ? (
-                  <table className="min-w-full">
-                    <thead className="bg-[#FFF9E3]">
-                      <tr>
-                        <th className={TH_CLS}>#</th>
-                        <th className={TH_CLS}>User</th>
-                        <th className={TH_CLS}>Number</th>
-                        <th className={TH_CLS}>Amount</th>
-                        <th className={TH_CLS}>Prize</th>
-                        <th className={TH_CLS}>Date</th>
-                        <th className={TH_CLS}>Status</th>
-                        <th className={TH_CLS}>Actions</th>
-                      </tr>
-                    </thead>
+              {/* DETAILS */}
+              <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-[220px_1fr]">
 
-                    <tbody className="divide-y divide-[#F3E7C4]">
-                      {viewLottery.users.map((entry, index) => (
-                        <tr key={entry._id} className="hover:bg-[#FFFDF7]">
-                          <td className="px-4 py-3 text-sm text-[#8A8F98]">{index + 1}</td>
+                {/* IMAGE */}
+                <div className="flex flex-col items-center gap-2 rounded-2xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
+                  <IconTile
+                    src={
+                      viewLottery.imageUrl
+                    }
+                    name={
+                      viewLottery.marketName
+                    }
+                    size="h-40 w-40"
+                  />
 
-                          <td className="px-4 py-3 text-sm">
-                            <div className="font-semibold text-[#1A1A1A]">
-                              {getUserName(entry.userId)}
-                            </div>
-                            <div className="mt-0.5 max-w-[180px] truncate text-xs text-[#8A8F98]">
-                              {typeof entry.userId === "object"
-                                ? entry.userId?._id
-                                : entry.userId}
-                            </div>
-                          </td>
+                  <p className="text-center text-[11px] font-semibold text-[#8A8F98]">
+                    Market Banner
+                  </p>
+                </div>
 
-                          <td className="px-4 py-3">
-                            <span className="inline-flex rounded-full bg-[#FFEFA8] px-3 py-1 text-sm font-black tracking-wider text-[#1A1204] ring-1 ring-[#F2B705]/60">
-                              {entry.number}
-                            </span>
-                          </td>
+                {/* INFO */}
+                <div className="rounded-2xl border border-[#F3E7C4] bg-white p-4">
+                  <h3 className="mb-3 text-base font-black text-[#1F2A6B]">
+                    {
+                      viewLottery.marketName
+                    }
+                  </h3>
 
-                          <td className="px-4 py-3 text-sm font-semibold text-[#1A1A1A]">
-                            ₹{Number(entry.amount || 0).toLocaleString("en-IN")}
-                          </td>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <ReadField
+                      label="Month"
+                      value={getMonthName(
+                        viewLottery.month
+                      )}
+                    />
 
-                          <td className="px-4 py-3 text-sm font-semibold text-[#1A1A1A]">
-                            {entry.status === "win" ? (
-                              <div>
-                                <span className="text-[#12A36B]">
-                                  {entry.prizeType || "Winner"}
-                                </span>
-                                {entry.prize && (
-                                  <div className="mt-1 text-xs text-[#6B7280]">
-                                    ₹
-                                    {Number(
-                                      entry.prize.first ||
-                                        entry.prize.second ||
-                                        entry.prize.third ||
-                                        0
-                                    ).toLocaleString("en-IN")}
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              "-"
-                            )}
-                          </td>
+                    <ReadField
+                      label="Year"
+                      value={
+                        viewLottery.year
+                      }
+                    />
 
-                          <td className="px-4 py-3 text-sm text-[#6B7280]">
-                            {entry.entryDate}
-                          </td>
+                    <ReadField
+                      label="Draw Time"
+                      value={
+                        viewLottery.drawTime ||
+                        "-"
+                      }
+                    />
 
-                          <td className="px-4 py-3">
-                            {entry.status === "win" ? (
-                              <span className="rounded-full bg-[#E6F6EF] px-3 py-1 text-xs font-bold text-[#12A36B]">
-                                Win
-                              </span>
-                            ) : entry.status === "lost" ? (
-                              <span className="rounded-full bg-[#FDE8E6] px-3 py-1 text-xs font-bold text-[#D93025]">
-                                Lost
-                              </span>
-                            ) : (
-                              <span className="rounded-full bg-[#FFEFA8] px-3 py-1 text-xs font-bold text-[#9A5B00]">
-                                Pending
-                              </span>
-                            )}
-                          </td>
+                    <ReadField
+                      label="Draw Date"
+                      value={formatDate(
+                        viewLottery.drawDate
+                      )}
+                    />
 
-                          <td className="px-4 py-3">
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleEditEntry(entry)}
-                                className={`rounded-lg px-3 py-1.5 text-xs ${GOLD_BTN}`}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteEntry(viewLottery._id, entry._id)}
-                                disabled={deleteLoading}
-                                className="rounded-lg bg-[#D93025] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#B3261E] disabled:opacity-50"
-                              >
-                                {deleteLoading ? "..." : "Delete"}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="py-10 text-center text-sm text-[#6B7280]">
-                    No user entries found.
+                    <ReadField
+                      label="Created"
+                      value={formatDate(
+                        viewLottery.createdAt
+                      )}
+                    />
+
+                    <ReadField
+                      label="Total Entries"
+                      value={
+                        viewLottery.users
+                          ?.length || 0
+                      }
+                    />
                   </div>
-                )}
+
+                  {/* PRIZES */}
+                  <div className="mt-5">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[#9A5B00]">
+                      Prize Structure
+                    </p>
+
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      {[
+                        [
+                          "1st Prize",
+                          viewLottery.prizes
+                            ?.first,
+                        ],
+                        [
+                          "2nd Prize",
+                          viewLottery.prizes
+                            ?.second,
+                        ],
+                        [
+                          "3rd Prize",
+                          viewLottery.prizes
+                            ?.third,
+                        ],
+                      ].map(
+                        ([label, amount]) => (
+                          <div
+                            key={label}
+                            className="rounded-xl bg-gradient-to-b from-[#FFF9E3] to-[#FFEFA8] p-3 text-center ring-1 ring-[#F3E7C4]"
+                          >
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-[#9A5B00]">
+                              {label}
+                            </p>
+
+                            <p className="mt-1 text-lg font-black text-[#1A1204]">
+                              ₹
+                              {Number(
+                                amount || 0
+                              ).toLocaleString(
+                                "en-IN"
+                              )}
+                            </p>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ID */}
+                  <div className="mt-3 rounded-lg bg-[#FFFDF7] px-3 py-2 text-[11px] text-[#8A8F98] ring-1 ring-[#F3E7C4]">
+                    <b className="text-[#374151]">
+                      ID:
+                    </b>{" "}
+                    {viewLottery._id}
+                  </div>
+                </div>
+              </div>
+
+              {/* ENTRIES */}
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm font-black text-[#1F2A6B]">
+                    User Entries (
+                    {viewLottery.users
+                      ?.length || 0}
+                    )
+                  </p>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl ring-1 ring-[#F3E7C4]">
+                  {viewLottery.users?.length >
+                  0 ? (
+                    <table className="min-w-full">
+                      <thead className="bg-[#FFF9E3]">
+                        <tr>
+                          <th
+                            className={
+                              TH_CLS
+                            }
+                          >
+                            #
+                          </th>
+
+                          <th
+                            className={
+                              TH_CLS
+                            }
+                          >
+                            User
+                          </th>
+
+                          <th
+                            className={
+                              TH_CLS
+                            }
+                          >
+                            Number
+                          </th>
+
+                          <th
+                            className={
+                              TH_CLS
+                            }
+                          >
+                            Amount
+                          </th>
+
+                          <th
+                            className={
+                              TH_CLS
+                            }
+                          >
+                            Prize
+                          </th>
+
+                          <th
+                            className={
+                              TH_CLS
+                            }
+                          >
+                            Date
+                          </th>
+
+                          <th
+                            className={
+                              TH_CLS
+                            }
+                          >
+                            Status
+                          </th>
+
+                          <th
+                            className={
+                              TH_CLS
+                            }
+                          >
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+
+                      <tbody className="divide-y divide-[#F3E7C4]">
+                        {viewLottery.users.map(
+                          (
+                            entry,
+                            index
+                          ) => (
+                            <tr
+                              key={
+                                entry._id
+                              }
+                              className="hover:bg-[#FFFDF7]"
+                            >
+                              <td className="px-4 py-3 text-sm text-[#8A8F98]">
+                                {index + 1}
+                              </td>
+
+                              <td className="px-4 py-3 text-sm">
+                                <div className="font-semibold text-[#1A1A1A]">
+                                  {getUserName(
+                                    entry.userId
+                                  )}
+                                </div>
+
+                                <div className="mt-0.5 max-w-[180px] truncate text-xs text-[#8A8F98]">
+                                  {typeof entry.userId ===
+                                  "object"
+                                    ? entry
+                                        .userId
+                                        ?._id
+                                    : entry.userId}
+                                </div>
+                              </td>
+
+                              <td className="px-4 py-3">
+                                <span className="inline-flex rounded-full bg-[#FFEFA8] px-3 py-1 text-sm font-black tracking-wider text-[#1A1204] ring-1 ring-[#F2B705]/60">
+                                  {
+                                    entry.number
+                                  }
+                                </span>
+                              </td>
+
+                              <td className="px-4 py-3 text-sm font-semibold text-[#1A1A1A]">
+                                ₹
+                                {Number(
+                                  entry.amount ||
+                                    0
+                                ).toLocaleString(
+                                  "en-IN"
+                                )}
+                              </td>
+
+                              <td className="px-4 py-3 text-sm font-semibold">
+                                {entry.status ===
+                                "win" ? (
+                                  <div>
+                                    <span className="text-[#12A36B]">
+                                      {entry.prizeType ||
+                                        "Winner"}
+                                    </span>
+
+                                    {entry.prize && (
+                                      <div className="mt-1 text-xs text-[#6B7280]">
+                                        ₹
+                                        {Number(
+                                          entry
+                                            .prize
+                                            .first ||
+                                            entry
+                                              .prize
+                                              .second ||
+                                            entry
+                                              .prize
+                                              .third ||
+                                            0
+                                        ).toLocaleString(
+                                          "en-IN"
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  "-"
+                                )}
+                              </td>
+
+                              <td className="px-4 py-3 text-sm text-[#6B7280]">
+                                {entry.entryDate ||
+                                  "-"}
+                              </td>
+
+                              <td className="px-4 py-3">
+                                {entry.status ===
+                                "win" ? (
+                                  <span className="inline-flex rounded-full bg-[#E6F6EF] px-3 py-1 text-xs font-bold text-[#12A36B]">
+                                    Win
+                                  </span>
+                                ) : entry.status ===
+                                  "lost" ? (
+                                  <span className="inline-flex rounded-full bg-[#FDE8E6] px-3 py-1 text-xs font-bold text-[#D93025]">
+                                    Lost
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex rounded-full bg-[#FFEFA8] px-3 py-1 text-xs font-bold text-[#9A5B00]">
+                                    Pending
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="px-4 py-3">
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleEditEntry(
+                                        entry
+                                      )
+                                    }
+                                    className={`rounded-lg px-3 py-1.5 text-xs ${GOLD_BTN}`}
+                                  >
+                                    Edit
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleDeleteEntry(
+                                        viewLottery._id,
+                                        entry._id
+                                      )
+                                    }
+                                    disabled={
+                                      deleteLoading
+                                    }
+                                    className="rounded-lg bg-[#D93025] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#B3261E] disabled:opacity-50"
+                                  >
+                                    {deleteLoading
+                                      ? "..."
+                                      : "Delete"}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        )}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="py-10 text-center text-sm text-[#6B7280]">
+                      No user entries found.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -1432,204 +2399,163 @@ const AdminLottery = () => {
       )}
 
       {/* =====================================================
-          CREATE LOTTERY POPUP (with image upload)
+          DELETE LOTTERY MODAL
       ===================================================== */}
 
-      {showCreate && (
+      {deleteId && (
         <ModalShell
-          title="Create Lottery"
-          subtitle="Create a lottery market and set prize amounts."
-          onClose={closeCreateModal}
-          z="z-[70]"
+          title="Delete Lottery"
+          subtitle="This action cannot be undone."
+          onClose={() =>
+            setDeleteId(null)
+          }
+          z="z-[75]"
         >
-          <form onSubmit={handleCreateSubmit} className="p-5">
-            {(formError || error) && (
-              <div className="mb-4 rounded-xl border border-[#D93025]/30 bg-[#FDE8E6] px-4 py-3 text-sm font-medium text-[#B3261E]">
-                {formError || error}
+          <div className="p-5">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#FDE8E6]">
+                <Trash2
+                  size={25}
+                  className="text-[#D93025]"
+                />
               </div>
-            )}
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_200px]">
-              <LotteryFields
-                data={formData}
-                onChange={handleCreateChange}
-                minDate={getToday()}
-              />
+              <h3 className="mt-4 text-base font-black text-[#1A1A1A]">
+                Are you sure?
+              </h3>
 
-              {/* icon upload */}
-              <div>
-                <label className={LABEL_CLS}>Icon / Banner *</label>
-
-                <div className="flex min-h-[210px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#F2B705] bg-[#FFFDF7] p-3 text-center">
-                  {iconPreview ? (
-                    <img
-                      src={iconPreview}
-                      alt="Lottery icon preview"
-                      className="h-24 w-24 rounded-xl object-cover shadow ring-1 ring-[#F2B705]"
-                    />
-                  ) : (
-                    <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-[#FFEFA8]">
-                      <ImagePlus size={30} className="text-[#9A5B00]" />
-                    </div>
-                  )}
-
-                  <label
-                    className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-xs ${OUTLINE_BTN}`}
-                  >
-                    <Upload size={13} />
-                    {iconPreview ? "Change Icon" : "Upload Icon"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleIconChange}
-                      className="hidden"
-                    />
-                  </label>
-
-                  {iconFile && (
-                    <button
-                      type="button"
-                      onClick={removeIcon}
-                      className="text-[11px] font-semibold text-[#D93025] hover:underline"
-                    >
-                      Remove
-                    </button>
-                  )}
-
-                  <p className="text-[10px] leading-snug text-[#8A8F98]">PNG/JPG, max 2MB</p>
-                </div>
-              </div>
+              <p className="mt-2 max-w-md text-sm text-[#6B7280]">
+                This lottery and its associated
+                entries will be permanently deleted.
+              </p>
             </div>
 
-            <div className="mt-5 flex justify-end gap-3">
+            <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={closeCreateModal}
+                onClick={() =>
+                  setDeleteId(null)
+                }
                 className={`rounded-xl px-5 py-2.5 text-sm ${OUTLINE_BTN}`}
               >
                 Cancel
               </button>
 
               <button
-                type="submit"
-                disabled={createLoading}
-                className={`rounded-xl px-6 py-2.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${BROWN_BTN}`}
-              >
-                {createLoading ? "Creating..." : "Create Lottery"}
-              </button>
-            </div>
-          </form>
-        </ModalShell>
-      )}
-
-      {/* =====================================================
-          UPDATE LOTTERY POPUP
-      ===================================================== */}
-
-      {showUpdate && (
-        <ModalShell
-          title="Update Lottery"
-          subtitle="Change lottery details and prize amounts."
-          onClose={closeUpdatePopup}
-          z="z-[70]"
-        >
-          <form onSubmit={handleUpdateSubmit} className="p-5">
-            {(formError || error) && (
-              <div className="mb-4 rounded-xl border border-[#D93025]/30 bg-[#FDE8E6] px-4 py-3 text-sm font-medium text-[#B3261E]">
-                {formError || error}
-              </div>
-            )}
-
-            <LotteryFields data={updateData} onChange={handleUpdateChange} />
-
-            <div className="mt-5 flex justify-end gap-3">
-              <button
                 type="button"
-                onClick={closeUpdatePopup}
-                className={`rounded-xl px-5 py-2.5 text-sm ${OUTLINE_BTN}`}
+                onClick={handleDelete}
+                disabled={deleteLoading}
+                className="rounded-xl bg-[#D93025] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#B3261E] disabled:opacity-50"
               >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                disabled={updateLoading}
-                className={`rounded-xl px-6 py-2.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${BROWN_BTN}`}
-              >
-                {updateLoading ? "Updating..." : "Update Information"}
+                {deleteLoading
+                  ? "Deleting..."
+                  : "Delete Lottery"}
               </button>
             </div>
-          </form>
+          </div>
         </ModalShell>
       )}
 
       {/* =====================================================
-          EDIT USER ENTRY POPUP
+          EDIT USER ENTRY MODAL
       ===================================================== */}
 
       {editingEntry && (
         <ModalShell
-          z="z-[80]"
           title="Edit User Entry"
           subtitle="Update lottery entry details."
-          onClose={closeEditModal}
+          onClose={closeEditEntry}
+          z="z-[80]"
         >
-          <form onSubmit={handleUpdateEntry} className="p-5">
+          <form
+            onSubmit={handleUpdateEntry}
+            className="p-5"
+          >
             <div className="mb-4">
-              <label className={LABEL_CLS}>Lottery Number</label>
+              <label className={LABEL_CLS}>
+                Lottery Number
+              </label>
+
               <input
                 type="text"
                 name="number"
                 value={editData.number}
-                onChange={handleEditChange}
-                maxLength={6}
-                placeholder="123456"
-                className={`${INPUT_CLS} px-4`}
+                onChange={
+                  handleEditEntryChange
+                }
+                maxLength={7}
+                placeholder="1234567"
+                className={INPUT_CLS}
               />
             </div>
 
             <div className="mb-4">
-              <label className={LABEL_CLS}>Entry Amount</label>
+              <label className={LABEL_CLS}>
+                Entry Amount
+              </label>
+
               <input
                 type="number"
                 name="amount"
                 value={editData.amount}
-                onChange={handleEditChange}
+                onChange={
+                  handleEditEntryChange
+                }
                 min="0"
                 placeholder="100"
-                className={`${INPUT_CLS} px-4`}
+                className={INPUT_CLS}
               />
             </div>
 
             <div className="mb-4">
-              <label className={LABEL_CLS}>Status</label>
+              <label className={LABEL_CLS}>
+                Status
+              </label>
+
               <select
                 name="status"
                 value={editData.status}
-                onChange={handleEditChange}
-                className={`${INPUT_CLS} px-4`}
+                onChange={
+                  handleEditEntryChange
+                }
+                className={INPUT_CLS}
               >
-                <option value="pending">Pending</option>
-                <option value="win">Win</option>
-                <option value="lost">Lost</option>
+                <option value="pending">
+                  Pending
+                </option>
+
+                <option value="win">
+                  Win
+                </option>
+
+                <option value="lost">
+                  Lost
+                </option>
               </select>
             </div>
 
             <div className="mb-5">
-              <label className={LABEL_CLS}>Entry Date</label>
+              <label className={LABEL_CLS}>
+                Entry Date
+              </label>
+
               <input
                 type="date"
                 name="entryDate"
                 value={editData.entryDate}
-                onChange={handleEditChange}
-                className={`${INPUT_CLS} px-4`}
+                onChange={
+                  handleEditEntryChange
+                }
+                className={INPUT_CLS}
               />
             </div>
 
             <div className="flex justify-end gap-3">
               <button
                 type="button"
-                onClick={closeEditModal}
+                onClick={
+                  closeEditEntry
+                }
                 className={`rounded-xl px-5 py-2.5 text-sm ${OUTLINE_BTN}`}
               >
                 Cancel
@@ -1638,9 +2564,11 @@ const AdminLottery = () => {
               <button
                 type="submit"
                 disabled={updateLoading}
-                className={`rounded-xl px-5 py-2.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${GOLD_BTN}`}
+                className={`rounded-xl px-5 py-2.5 text-sm disabled:opacity-60 ${GOLD_BTN}`}
               >
-                {updateLoading ? "Updating..." : "Update Entry"}
+                {updateLoading
+                  ? "Updating..."
+                  : "Update Entry"}
               </button>
             </div>
           </form>
@@ -1649,5 +2577,15 @@ const AdminLottery = () => {
     </div>
   );
 };
+
+/* =========================================================
+   SMALL ICON
+========================================================= */
+
+const UsersIcon = () => (
+  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FFF9E3] text-[#9A5B00]">
+    <Ticket size={14} />
+  </span>
+);
 
 export default AdminLottery;

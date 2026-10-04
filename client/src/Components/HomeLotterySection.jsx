@@ -23,6 +23,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { fetchProfile } from "../reducer/slice/authSlice";
 
+// DAILY lottery slice (existing)
 import {
   getActiveLotteryConfig,
   selectActiveLotteryConfig,
@@ -30,6 +31,13 @@ import {
   selectLotteryError,
   selectLotterySuccessMessage,
 } from "../reducer/slice/createLotteryConfigSlice";
+
+// FESTIVAL lottery slice (existing) - aliased to avoid name clash
+// NOTE: agar tumhari file ka naam festivalLotteryReducer.js hai to path wahi kar lena
+import {
+  getActiveLotteryConfig as getActiveFestivalConfig,
+  selectActiveLottery as selectActiveFestivalLottery,
+} from "../reducer/slice/festivalLotteryReducer";
 
 import {
   getActiveBanners,
@@ -316,6 +324,7 @@ const HomeLotterySection = () => {
   // REDUX STATE
   // =====================================================
 
+  // Daily active lottery
   const activeConfig = useSelector(selectActiveLotteryConfig);
 
   const loading = useSelector(selectLotteryActiveLoading);
@@ -325,6 +334,19 @@ const HomeLotterySection = () => {
   const successMessage = useSelector(
     selectLotterySuccessMessage
   );
+
+  // Festival active lottery
+  const festivalConfig = useSelector(
+    selectActiveFestivalLottery
+  );
+
+  // =====================================================
+  // DYNAMIC IMAGES (from backend imageUrl)
+  // =====================================================
+
+  const dailyImageUrl = activeConfig?.imageUrl || null;
+
+  const festivalImageUrl = festivalConfig?.imageUrl || null;
 
   // =====================================================
   // BANNERS
@@ -378,11 +400,12 @@ const HomeLotterySection = () => {
   }, [dispatch]);
 
   // =====================================================
-  // FETCH ACTIVE LOTTERY
+  // FETCH ACTIVE LOTTERIES (DAILY + FESTIVAL)
   // =====================================================
 
   useEffect(() => {
-    dispatch(getActiveLotteryConfig());
+    dispatch(getActiveLotteryConfig()); // Daily
+    dispatch(getActiveFestivalConfig()); // Festival
   }, [dispatch]);
 
   // =====================================================
@@ -620,18 +643,14 @@ const HomeLotterySection = () => {
 
               <div className="relative overflow-hidden bg-[#d9dee8] shadow-[0_8px_22px_rgba(0,0,0,0.15)]">
 
-                {/* =================================================
-                  LOADING
-              ================================================== */}
+                {/* LOADING */}
 
                 {activeBannerLoading &&
                   !activeBanners.length && (
                     <div className="aspect-[16/7] w-full animate-pulse bg-[#dfe4ec]" />
                   )}
 
-                {/* =================================================
-                  BANNER IMAGE
-              ================================================== */}
+                {/* BANNER IMAGE */}
 
                 {currentBanner && (
                   <div className="relative aspect-[16/7] w-full overflow-hidden">
@@ -658,9 +677,7 @@ const HomeLotterySection = () => {
                       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/35 to-transparent" />
                     )}
 
-                    {/* =================================================
-                      SLIDER DOTS
-                  ================================================== */}
+                    {/* SLIDER DOTS */}
 
                     {activeBanners.length > 1 && (
                       <div className="absolute bottom-2.5 left-1/2 flex -translate-x-1/2 items-center gap-1.5">
@@ -830,6 +847,7 @@ const HomeLotterySection = () => {
 
             <LotteryTypeCard
               daily
+              imageUrl={dailyImageUrl}
               title="Daily Lottery"
               subtitle="Small Ticket, Big Opportunities"
               button="Buy Daily Lottery"
@@ -857,6 +875,7 @@ const HomeLotterySection = () => {
             />
 
             <LotteryTypeCard
+              imageUrl={festivalImageUrl}
               title="Festival Lottery"
               subtitle="Bigger Draws, Bigger Celebrations"
               button="Buy Festival Lottery"
@@ -1180,6 +1199,8 @@ const TrustFeature = ({ icon, text }) => (
 
 // =====================================================
 // LOTTERY TYPE CARD
+// imageUrl (backend) -> show uploaded image
+// imageUrl missing / null / load error -> existing ticket mock fallback
 // =====================================================
 
 const LotteryTypeCard = ({
@@ -1193,136 +1214,162 @@ const LotteryTypeCard = ({
   label,
   number,
   price,
-}) => (
-  <div className="flex flex-col overflow-hidden rounded-2xl border border-[#d7d0c6] bg-[#fffaf4] p-1.5 shadow-[0_8px_22px_rgba(0,0,0,0.15)]">
+  imageUrl,
+}) => {
+  const [imgFailed, setImgFailed] = useState(false);
 
-    <div
-      className={`relative flex h-[84px] items-center justify-center overflow-hidden rounded-xl ${daily
-        ? "bg-gradient-to-br from-[#ffb3a8] via-[#ffd9c2] to-[#ffefe0]"
-        : "bg-gradient-to-br from-[#123c75] via-[#2a5ea8] to-[#f2c95a]"
-        }`}
-    >
+  // imageUrl change ho to error state reset
+  useEffect(() => {
+    setImgFailed(false);
+  }, [imageUrl]);
 
-      <Sparkles
-        size={13}
-        className={`absolute right-2 top-2 ${daily
-          ? "text-[#ff3155]"
-          : "text-[#ffd34e]"
-          }`}
-      />
+  const showImage = Boolean(imageUrl) && !imgFailed;
 
-      <div className="absolute h-[68%] w-[72%] -rotate-[10deg] rounded-md border border-[#e5c8a4] bg-[#fdf1dc]" />
-
-      <div className="absolute h-[68%] w-[72%] rotate-[8deg] rounded-md border border-[#e5c8a4] bg-[#fdf1dc]" />
+  return (
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-[#d7d0c6] bg-[#fffaf4] p-1.5 shadow-[0_8px_22px_rgba(0,0,0,0.15)]">
 
       <div
-        className="relative w-[76%] -rotate-[4deg] rounded-md border-[2px] border-[#f2d1b8] bg-[#fffaf0] p-[0.45em] shadow-xl"
-        style={{
-          fontSize:
-            "clamp(5px, 1.6vw, 11px)",
-        }}
+        className={`relative flex h-[84px] items-center justify-center overflow-hidden rounded-xl ${daily
+          ? "bg-gradient-to-br from-[#ffb3a8] via-[#ffd9c2] to-[#ffefe0]"
+          : "bg-gradient-to-br from-[#123c75] via-[#2a5ea8] to-[#f2c95a]"
+          }`}
       >
 
-        <p className="text-[1.5em] font-black leading-none text-[#d7193f]">
-          DEAR
+        {showImage ? (
+          /* Backend se aayi uploaded image */
+          <img
+            src={imageUrl}
+            alt={title}
+            loading="lazy"
+            onError={() => setImgFailed(true)}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          /* Fallback: existing ticket mock UI */
+          <>
+            <Sparkles
+              size={13}
+              className={`absolute right-2 top-2 ${daily
+                ? "text-[#ff3155]"
+                : "text-[#ffd34e]"
+                }`}
+            />
+
+            <div className="absolute h-[68%] w-[72%] -rotate-[10deg] rounded-md border border-[#e5c8a4] bg-[#fdf1dc]" />
+
+            <div className="absolute h-[68%] w-[72%] rotate-[8deg] rounded-md border border-[#e5c8a4] bg-[#fdf1dc]" />
+
+            <div
+              className="relative w-[76%] -rotate-[4deg] rounded-md border-[2px] border-[#f2d1b8] bg-[#fffaf0] p-[0.45em] shadow-xl"
+              style={{
+                fontSize:
+                  "clamp(5px, 1.6vw, 11px)",
+              }}
+            >
+
+              <p className="text-[1.5em] font-black leading-none text-[#d7193f]">
+                DEAR
+              </p>
+
+              <p className="text-[0.65em] font-bold text-[#153c78]">
+                {label}
+              </p>
+
+              <div className="mt-[0.15em] flex items-center justify-between gap-1">
+
+                <div>
+
+                  <p className="text-[0.52em] font-bold leading-tight text-[#d7193f]">
+                    First Prize
+                  </p>
+
+                  <p className="whitespace-nowrap text-[1.55em] font-black leading-none text-[#153c78]">
+                    {prize}
+                  </p>
+
+                </div>
+
+                <div className="flex h-[2.5em] w-[2.5em] shrink-0 flex-col items-center justify-center rounded-full bg-[#d7198c] text-center text-[0.5em] font-black leading-tight text-white">
+
+                  Price
+
+                  <span className="text-[1.25em]">
+                    {price}
+                  </span>
+
+                </div>
+
+              </div>
+
+              <p className="mt-[0.25em] border-t border-[#d7bba5] pt-[0.15em] text-center text-[0.98em] font-black tracking-[0.15em] text-[#173e70]">
+                {number}
+              </p>
+
+            </div>
+          </>
+        )}
+
+      </div>
+
+      <div className="flex flex-1 flex-col px-1 pt-2">
+
+        <h3
+          className={`font-serif text-[18px] font-black leading-none ${daily
+            ? "text-[#d7193f]"
+            : "text-[#173e70]"
+            }`}
+        >
+          {title}
+        </h3>
+
+        <p className="mt-1 text-[9px] leading-snug text-[#4b5563]">
+          {subtitle}
         </p>
 
-        <p className="text-[0.65em] font-bold text-[#153c78]">
-          {label}
-        </p>
+        <div className="mt-2 space-y-1">
 
-        <div className="mt-[0.15em] flex items-center justify-between gap-1">
+          {items.map((item, index) => (
+            <div
+              key={index}
+              className="flex items-center gap-1.5 text-[10px] font-medium text-[#344054]"
+            >
 
-          <div>
+              <span
+                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white ${daily
+                  ? "bg-[#ed1d43]"
+                  : "bg-[#173e70]"
+                  }`}
+              >
+                {item.icon}
+              </span>
 
-            <p className="text-[0.52em] font-bold leading-tight text-[#d7193f]">
-              First Prize
-            </p>
+              {item.text}
 
-            <p className="whitespace-nowrap text-[1.55em] font-black leading-none text-[#153c78]">
-              {prize}
-            </p>
-
-          </div>
-
-          <div className="flex h-[2.5em] w-[2.5em] shrink-0 flex-col items-center justify-center rounded-full bg-[#d7198c] text-center text-[0.5em] font-black leading-tight text-white">
-
-            Price
-
-            <span className="text-[1.25em]">
-              {price}
-            </span>
-
-          </div>
+            </div>
+          ))}
 
         </div>
 
-        <p className="mt-[0.25em] border-t border-[#d7bba5] pt-[0.15em] text-center text-[0.98em] font-black tracking-[0.15em] text-[#173e70]">
-          {number}
-        </p>
+        <button
+          type="button"
+          onClick={onClick}
+          className={`mb-0.5 mt-2.5 flex h-9 w-full items-center justify-center gap-1 rounded-xl text-[11px] font-extrabold text-white shadow-lg transition active:scale-[0.98] ${daily
+            ? "bg-gradient-to-r from-[#ff1744] to-[#d60f38] hover:brightness-110"
+            : "bg-gradient-to-r from-[#173e70] to-[#0d2547] hover:brightness-110"
+            }`}
+        >
+
+          {button}
+
+          <ArrowRight size={13} />
+
+        </button>
 
       </div>
 
     </div>
-
-    <div className="flex flex-1 flex-col px-1 pt-2">
-
-      <h3
-        className={`font-serif text-[18px] font-black leading-none ${daily
-          ? "text-[#d7193f]"
-          : "text-[#173e70]"
-          }`}
-      >
-        {title}
-      </h3>
-
-      <p className="mt-1 text-[9px] leading-snug text-[#4b5563]">
-        {subtitle}
-      </p>
-
-      <div className="mt-2 space-y-1">
-
-        {items.map((item, index) => (
-          <div
-            key={index}
-            className="flex items-center gap-1.5 text-[10px] font-medium text-[#344054]"
-          >
-
-            <span
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white ${daily
-                ? "bg-[#ed1d43]"
-                : "bg-[#173e70]"
-                }`}
-            >
-              {item.icon}
-            </span>
-
-            {item.text}
-
-          </div>
-        ))}
-
-      </div>
-
-      <button
-        type="button"
-        onClick={onClick}
-        className={`mb-0.5 mt-2.5 flex h-9 w-full items-center justify-center gap-1 rounded-xl text-[11px] font-extrabold text-white shadow-lg transition active:scale-[0.98] ${daily
-          ? "bg-gradient-to-r from-[#ff1744] to-[#d60f38] hover:brightness-110"
-          : "bg-gradient-to-r from-[#173e70] to-[#0d2547] hover:brightness-110"
-          }`}
-      >
-
-        {button}
-
-        <ArrowRight size={13} />
-
-      </button>
-
-    </div>
-
-  </div>
-);
+  );
+};
 
 // =====================================================
 // RULE ROW
