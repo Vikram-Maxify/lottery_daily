@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { ClipboardList, RefreshCw, Plus, X } from "lucide-react";
+import { ClipboardList, RefreshCw, Plus, X, Info } from "lucide-react";
 
 import {
   getAllResults,
@@ -14,18 +14,7 @@ import {
 import { getAllLotteryConfigs } from "../../reducer/slice/lotteryConfigSlice";
 
 /* =========================================================
-   WINZOX THEME TOKENS  (Bright Gold + White)
-   bg          #FFFDF7
-   border      #F3E7C4
-   gold        #FFD83D -> #F7B500 -> #E39A00
-   gold-soft   #FFEFA8
-   gold-line   #F2B705
-   on-gold     #1A1204  (text on gold is DARK)
-   text        #1A1A1A
-   muted       #6B7280
-   brown       #9A5B00
-   success     #12A36B
-   danger      #D93025
+   WINZOX THEME TOKENS
 ========================================================= */
 
 const GOLD_BTN =
@@ -46,9 +35,22 @@ const TH_CLS =
   "px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#9A5B00]";
 
 // =====================================================
+// WINNING NUMBER FORMAT — 8 chars: 2 digits + 1 letter + 5 digits
+// Example: 12A12345
+// =====================================================
+const WINNING_NUMBER_REGEX = /^[0-9]{2}[A-Z][0-9]{5}$/;
+
+const isValidWinningNumber = (value) => {
+  const v = String(value || "").trim().toUpperCase();
+  return WINNING_NUMBER_REGEX.test(v);
+};
+
+const NUMBER_FORMAT_HINT =
+  "8 characters — 2 digits, 1 letter (A-Z), 5 digits. Example: 12A12345";
+
+// =====================================================
 // SAFE DATE-ONLY STRING (YYYY-MM-DD)
 // =====================================================
-
 const toDateOnlyString = (value) => {
   if (!value) return "";
 
@@ -59,13 +61,14 @@ const toDateOnlyString = (value) => {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "";
 
-  return (
-    `${d.getFullYear()}-` +
-    `${String(d.getMonth() + 1).padStart(2, "0")}-` +
-    `${String(d.getDate()).padStart(2, "0")}`
-  );
+  // ✅ UTC use karo (backend bhi UTC use karta hai)
+  // Isse timezone ka 1-din difference nahi hoga
+  return d.toISOString().split("T")[0];
 };
 
+// =====================================================
+// COMPONENT
+// =====================================================
 const Results = () => {
   const dispatch = useDispatch();
 
@@ -104,22 +107,15 @@ const Results = () => {
     if (success || error) {
       const timer = setTimeout(() => {
         dispatch(clearResultMessage());
-      }, 3000);
+      }, 6000);
       return () => clearTimeout(timer);
     }
   }, [success, error, dispatch]);
 
-  // =====================================================
-  // ACTIVE CONFIGS
-  // =====================================================
-
-  const activeConfigs = useMemo(() => {
-    return configs.filter((config) => config?.isActive === true);
+  // ALL CONFIGS (active filter hata diya)
+  const selectableConfigs = useMemo(() => {
+    return Array.isArray(configs) ? configs : [];
   }, [configs]);
-
-  // =====================================================
-  // SELECTED CONFIG
-  // =====================================================
 
   const selectedConfig = useMemo(() => {
     return configs.find(
@@ -128,18 +124,10 @@ const Results = () => {
     );
   }, [configs, formData.lotteryConfigId]);
 
-  // =====================================================
-  // AVAILABLE DATES
-  //
-  // Har config mein `drawDate` (Date) hota hai
-  // → seedha usi ko YYYY-MM-DD mein convert karo
-  // =====================================================
-
   const availableDates = useMemo(() => {
     if (!selectedConfig) return [];
 
     const dateStr = toDateOnlyString(selectedConfig.drawDate);
-
     if (!dateStr) return [];
 
     return [
@@ -150,28 +138,18 @@ const Results = () => {
     ];
   }, [selectedConfig]);
 
-  // =====================================================
-  // AUTO-SELECT DATE JAB CONFIG CHANGE HO
-  // =====================================================
-
   useEffect(() => {
     if (!selectedConfig) return;
 
     const dateStr = toDateOnlyString(selectedConfig.drawDate);
 
     if (dateStr && dateStr !== formData.date) {
-      setFormData((prev) => ({
-        ...prev,
-        date: dateStr,
-      }));
+      setFormData((prev) => ({ ...prev, date: dateStr }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConfig]);
 
-  // =====================================================
-  // INPUT CHANGE
-  // =====================================================
-
+  /* ---------------- INPUT CHANGE ---------------- */
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -187,24 +165,20 @@ const Results = () => {
     }
 
     if (name === "winningNumber") {
-      const onlyNumbers = value.replace(/\D/g, "").slice(0, 6);
-      setFormData((prev) => ({
-        ...prev,
-        winningNumber: onlyNumbers,
-      }));
+      // Uppercase, alphanumeric only, max 8 chars
+      const cleaned = String(value)
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 8);
+
+      setFormData((prev) => ({ ...prev, winningNumber: cleaned }));
       return;
     }
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // =====================================================
-  // CREATE RESULT
-  // =====================================================
-
+  /* ---------------- CREATE RESULT ---------------- */
   const handleCreate = async (e) => {
     e.preventDefault();
 
@@ -218,8 +192,10 @@ const Results = () => {
       return;
     }
 
-    if (!/^\d{6}$/.test(formData.winningNumber)) {
-      setFormError("Winning number must be exactly 6 digits.");
+    if (!isValidWinningNumber(formData.winningNumber)) {
+      setFormError(
+        "Invalid winning number. Format must be: 2 digits + 1 letter + 5 digits (e.g. 12A12345)."
+      );
       return;
     }
 
@@ -228,7 +204,7 @@ const Results = () => {
     const payload = {
       lotteryConfigId: formData.lotteryConfigId,
       date: formData.date,
-      winningNumber: formData.winningNumber,
+      winningNumber: formData.winningNumber.toUpperCase(),
     };
 
     const response = await dispatch(createResult(payload));
@@ -239,22 +215,21 @@ const Results = () => {
         date: "",
         winningNumber: "",
       });
-
       setShowCreate(false);
       setFormError("");
 
       dispatch(getAllResults());
       dispatch(getAllLotteryConfigs());
+    } else if (createResult.rejected.match(response)) {
+      const backendError =
+        response.payload?.message || "Failed to create result";
+      setFormError(backendError);
     }
   };
 
-  // =====================================================
-  // PUBLISH
-  // =====================================================
-
+  /* ---------------- PUBLISH ---------------- */
   const handlePublish = async (id) => {
     setPublishingIds((prev) => [...prev, id]);
-
     try {
       const response = await dispatch(publishResult(id));
       if (publishResult.fulfilled.match(response)) {
@@ -265,13 +240,9 @@ const Results = () => {
     }
   };
 
-  // =====================================================
-  // UNPUBLISH
-  // =====================================================
-
+  /* ---------------- UNPUBLISH ---------------- */
   const handleUnpublish = async (id) => {
     setPublishingIds((prev) => [...prev, id]);
-
     try {
       const response = await dispatch(unpublishResult(id));
       if (unpublishResult.fulfilled.match(response)) {
@@ -282,19 +253,14 @@ const Results = () => {
     }
   };
 
-  // =====================================================
-  // DELETE
-  // =====================================================
-
+  /* ---------------- DELETE ---------------- */
   const handleDelete = async (id) => {
     const confirmed = window.confirm(
       "Are you sure you want to delete this result?"
     );
-
     if (!confirmed) return;
 
     setDeletingIds((prev) => [...prev, id]);
-
     try {
       const response = await dispatch(deleteResult(id));
       if (deleteResult.fulfilled.match(response)) {
@@ -305,13 +271,9 @@ const Results = () => {
     }
   };
 
-  // =====================================================
-  // FORMAT DATE
-  // =====================================================
-
+  /* ---------------- FORMATTERS ---------------- */
   const formatDate = (date) => {
     if (!date) return "-";
-
     const parsedDate = new Date(date);
     if (Number.isNaN(parsedDate.getTime())) return "-";
 
@@ -322,42 +284,15 @@ const Results = () => {
     });
   };
 
-  // =====================================================
-  // FORMAT MONTH / YEAR
-  // =====================================================
-
-  const formatMonthYear = (config) => {
-    if (!config) return "-";
-
-    const month = config.month ?? null;
-    const year = config.year ?? null;
-
-    if (month == null && year == null) return "-";
-    if (month == null) return String(year);
-    if (year == null) return String(month);
-
-    return `${month}/${year}`;
-  };
-
-  // =====================================================
-  // FORMAT CONFIG LABEL (dropdown mein dikhane ke liye)
-  // Ab `drawDate` + `drawTime` bhi dikhayenge
-  // =====================================================
-
   const formatConfigLabel = (config) => {
     if (!config) return "-";
-
     const market = config.marketName || "-";
     const dateStr = toDateOnlyString(config.drawDate) || "-";
     const time = config.drawTime || "-";
-
     return `${market} - ${dateStr} (${time})`;
   };
 
-  // =====================================================
-  // RENDER
-  // =====================================================
-
+  /* ---------------- RENDER ---------------- */
   return (
     <div className="space-y-6">
       {/* HEADER */}
@@ -409,7 +344,7 @@ const Results = () => {
       </div>
 
       {/* SUCCESS */}
-      {success && (
+      {success && message && (
         <div className="rounded-xl border border-[#12A36B]/30 bg-[#E6F6EF] px-4 py-3 text-sm font-medium text-[#0E7A52]">
           {message}
         </div>
@@ -429,8 +364,8 @@ const Results = () => {
             Create Lottery Result
           </h2>
           <p className="mb-6 text-sm text-[#6B7280]">
-            Select the date-wise lottery config, then enter the 6 digit
-            winning number.
+            Select the lottery config, then enter the 8-character winning
+            number.
           </p>
 
           <form
@@ -440,7 +375,7 @@ const Results = () => {
             {/* CONFIG */}
             <div>
               <label htmlFor="lotteryConfigId" className={LABEL_CLS}>
-                Lottery Config (Date-wise)
+                Lottery Config
               </label>
 
               <select
@@ -457,16 +392,17 @@ const Results = () => {
                     : "Select Lottery Config"}
                 </option>
 
-                {activeConfigs.map((config) => (
+                {selectableConfigs.map((config) => (
                   <option key={config._id} value={config._id}>
                     {formatConfigLabel(config)}
+                    {config.isActive ? " ✅" : ""}
                   </option>
                 ))}
               </select>
 
-              {activeConfigs.length === 0 && !configLoading && (
+              {selectableConfigs.length === 0 && !configLoading && (
                 <p className="mt-2 text-xs font-medium text-[#D93025]">
-                  No active lottery config found.
+                  No lottery config found. Please create one first.
                 </p>
               )}
             </div>
@@ -526,17 +462,24 @@ const Results = () => {
               <input
                 id="winningNumber"
                 type="text"
-                inputMode="numeric"
+                inputMode="text"
+                autoComplete="off"
+                spellCheck={false}
                 name="winningNumber"
                 value={formData.winningNumber}
                 onChange={handleChange}
-                maxLength={6}
-                placeholder="Enter 6 digit number"
-                className={`${INPUT_CLS} font-mono font-bold tracking-widest`}
+                maxLength={8}
+                placeholder="e.g. 12A12345"
+                className={`${INPUT_CLS} font-mono font-bold tracking-widest uppercase`}
               />
 
-              <p className="mt-2 text-xs text-[#6B7280]">
-                {formData.winningNumber.length}/6 digits
+              <p className="mt-2 flex items-start gap-1.5 text-xs text-[#6B7280]">
+                <Info size={12} className="mt-0.5 shrink-0" />
+                <span>{NUMBER_FORMAT_HINT}</span>
+              </p>
+
+              <p className="mt-1 text-xs text-[#6B7280]">
+                {formData.winningNumber.length}/8 characters
               </p>
             </div>
 
@@ -594,7 +537,7 @@ const Results = () => {
               </div>
             )}
 
-            {/* VALIDATION ERROR */}
+            {/* FORM ERROR */}
             {formError && (
               <div className="md:col-span-3">
                 <div className="rounded-xl border border-[#D93025]/30 bg-[#FDE8E6] px-4 py-3 text-sm font-medium text-[#B3261E]">

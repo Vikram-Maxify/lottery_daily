@@ -39,6 +39,7 @@ import LeaderboardPage from "./Pages/LeaderboardPage";
 import AdminKycVerification from "./admin/adminPages/AdminKycVerification";
 import AdminFestivalLottery from "./admin/adminPages/AdminFestivalLottery";
 import AdminHomeBanner from "./admin/adminPages/AdminHomeBanner";
+import FestivalResult from "./admin/adminPages/FestivalResult";
 
 // ==========================================================
 // WHATSAPP SUPPORT NUMBER
@@ -225,6 +226,10 @@ function App() {
             <Route
               path="/admin/results"
               element={<AdminResults />}
+            />
+            <Route
+              path="/admin/festival_result"
+              element={<FestivalResult />}
             />
 
             {/* Lottery Config */}
