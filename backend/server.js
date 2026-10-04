@@ -105,6 +105,8 @@ app.use("/api/festival", require("./routes/fes_lottery_routes"));
 // Lottery Result
 app.use("/api/lottery-result", lotteryResultRoutes);
 
+app.use('/api/festival-result',require('./routes/festiv.result'))
+
 // Admin Gateway
 app.use("/api", adminGatewayRoutes);
 

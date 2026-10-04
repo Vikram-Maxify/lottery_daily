@@ -189,7 +189,7 @@ const validateNumber = (number) => {
   if (number === undefined || number === null || number === "") {
     return {
       valid: false,
-      message: "7 character alphanumeric lottery number is required",
+      message: "8 character alphanumeric lottery number is required",
     };
   }
 
