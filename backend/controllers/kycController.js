@@ -31,8 +31,6 @@ const deleteFile = (filePath) => {
 //   front = PAN card
 // =====================================================
 
-
-
 exports.uploadKycDocument = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -57,7 +55,7 @@ exports.uploadKycDocument = async (req, res) => {
     }
 
     // -------------------------------------------------
-    // Get uploaded files (memory storage => req.files)
+    // Get uploaded files (multer.memoryStorage())
     // -------------------------------------------------
 
     const frontFile = req.files?.front?.[0];
@@ -126,10 +124,7 @@ exports.uploadKycDocument = async (req, res) => {
     let frontUpload;
 
     try {
-      frontUpload = await uploadToImgBB(
-        frontFile.buffer,
-        frontFile.originalname
-      );
+      frontUpload = await uploadToImgBB(frontFile);
     } catch (err) {
       console.error("ImgBB front upload error:", err.message);
 
@@ -147,10 +142,7 @@ exports.uploadKycDocument = async (req, res) => {
 
     if (backFile) {
       try {
-        backUpload = await uploadToImgBB(
-          backFile.buffer,
-          backFile.originalname
-        );
+        backUpload = await uploadToImgBB(backFile);
       } catch (err) {
         console.error("ImgBB back upload error:", err.message);
 
@@ -162,14 +154,14 @@ exports.uploadKycDocument = async (req, res) => {
     }
 
     // -------------------------------------------------
-    // Prepare URLs
+    // Prepare URLs (matching your utility's return shape)
     // -------------------------------------------------
 
-    const documentUrl = frontUpload.url;
-    const documentPublicId = frontUpload.id; // ImgBB image id (used as deletehash/id)
+    const documentUrl = frontUpload.imageUrl;
+    const documentPublicId = frontUpload.deleteUrl; // ImgBB delete URL
 
-    const backDocumentUrl = backUpload ? backUpload.url : null;
-    const backDocumentPublicId = backUpload ? backUpload.id : null;
+    const backDocumentUrl = backUpload ? backUpload.imageUrl : null;
+    const backDocumentPublicId = backUpload ? backUpload.deleteUrl : null;
 
     // -------------------------------------------------
     // Update existing document
@@ -229,6 +221,35 @@ exports.uploadKycDocument = async (req, res) => {
     });
   }
 };
+
+// =====================================================
+// GET MY KYC
+// GET /api/kyc/my
+// =====================================================
+
+exports.getMyKyc = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const documents = await KycDocument.find({ userId }).sort({
+      createdAt: -1,
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: documents.length,
+      data: documents,
+    });
+  } catch (error) {
+    console.error("Get My KYC Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 
 // =====================================================
 // GET MY KYC
