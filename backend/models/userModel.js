@@ -42,7 +42,6 @@ const userSchema = new mongoose.Schema(
             default: false,
         },
 
-        // 🔥 NEW: profile image
         profileImage: {
             type: String,
             default: null,
