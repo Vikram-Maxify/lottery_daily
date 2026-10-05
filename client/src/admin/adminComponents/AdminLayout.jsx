@@ -27,6 +27,7 @@ import {
   ChevronDown,
   ChevronRight,
   Sparkles,
+  Trophy,
 } from "lucide-react";
 
 import { adminLogout } from "../../reducer/slice/adminAuthReducer";
@@ -97,6 +98,7 @@ const AdminLayout = () => {
     { to: "/admin/withdrawals", label: "Withdrawals", icon: Wallet },
     { to: "/amount", label: "Amount", icon: Cog },
     { to: "/home_banner", label: "Home Banner", icon: Cog },
+    { to: "/admin/top-winners", label: "Top Winners", icon: Trophy },
     { to: "/settings", label: "Settings", icon: Settings },
   ];
 

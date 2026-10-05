@@ -21,6 +21,7 @@ import adminKycReducer from './slice/adminKycReducer'
 import festivalLotteryReducer from './slice/festivalLotteryReducer'
 import bannerReducer from './slice/bannerReducer'
 import festivalReducer from './slice/festivalResultReducer'
+import topWinnerReducer from './slice/topWinnerSlice'
 
 export const store = configureStore({
   reducer: {
@@ -40,7 +41,8 @@ export const store = configureStore({
     adminKyc: adminKycReducer,
     festivalLottery: festivalLotteryReducer,
     banner: bannerReducer,
-    festivalResult: festivalReducer
+    festivalResult: festivalReducer,
+    topWinner: topWinnerReducer
 
   },
 });

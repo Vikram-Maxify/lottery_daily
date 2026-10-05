@@ -40,6 +40,7 @@ import AdminKycVerification from "./admin/adminPages/AdminKycVerification";
 import AdminFestivalLottery from "./admin/adminPages/AdminFestivalLottery";
 import AdminHomeBanner from "./admin/adminPages/AdminHomeBanner";
 import FestivalResult from "./admin/adminPages/FestivalResult";
+import AdminTopWinners from "./admin/adminPages/AdminTopWinners";
 
 // ==========================================================
 // WHATSAPP SUPPORT NUMBER
@@ -259,6 +260,12 @@ function App() {
             <Route
               path="/admin/withdrawals"
               element={<WithdrawalManagement />}
+            />
+
+            {/* Admin Top Winners */}
+            <Route
+              path="/admin/top-winners"
+              element={<AdminTopWinners />}
             />
 
           </Route>

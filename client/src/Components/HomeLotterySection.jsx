@@ -45,6 +45,11 @@ import {
   selectActiveBannerLoading,
 } from "../reducer/slice/bannerReducer";
 
+import {
+  getActiveTopWinners,
+  selectActiveTopWinners,
+} from "../reducer/slice/topWinnerSlice";
+
 // =====================================================
 // HELPERS
 // =====================================================
@@ -112,6 +117,28 @@ const getDaysRemaining = (date, month, year) => {
   const diffMs = target.getTime() - now.getTime();
 
   return Math.round(diffMs / (1000 * 60 * 60 * 24));
+};
+
+const getTimeAgo = (dateStr) => {
+  if (!dateStr) return "Recently";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "Recently";
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMinutes / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMinutes < 1) return "Just now";
+  if (diffMinutes < 60) return `${diffMinutes} mins ago`;
+  if (diffHours < 24) return `${diffHours} hr${diffHours > 1 ? "s" : ""} ago`;
+  if (diffDays === 1) return "1 day ago";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) {
+    const weeks = Math.floor(diffDays / 7);
+    return `${weeks} week${weeks > 1 ? "s" : ""} ago`;
+  }
+  const months = Math.floor(diffDays / 30);
+  return `${months} mo${months > 1 ? "s" : ""} ago`;
 };
 
 // =====================================================
@@ -416,6 +443,36 @@ const HomeLotterySection = () => {
   useEffect(() => {
     dispatch(getActiveBanners());
   }, [dispatch]);
+
+  // =====================================================
+  // FETCH ACTIVE TOP WINNERS
+  // =====================================================
+
+  const activeWinners = useSelector(selectActiveTopWinners);
+
+  useEffect(() => {
+    dispatch(getActiveTopWinners());
+  }, [dispatch]);
+
+  const displayWinners = useMemo(() => {
+    let list = WINNERS;
+    if (activeWinners && activeWinners.length > 0) {
+      list = activeWinners.map((w) => ({
+        name: w.name,
+        amount: `₹${Number(w.winningAmount || 0).toLocaleString("en-IN")}`,
+        ticket: w.ticketNumber,
+        time: getTimeAgo(w.wonAt),
+        image:
+          w.image ||
+          "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80",
+      }));
+    }
+    let filled = [...list];
+    while (filled.length < 4) {
+      filled = [...filled, ...list];
+    }
+    return filled;
+  }, [activeWinners]);
 
   // =====================================================
   // BANNER INDEX SAFETY
@@ -765,9 +822,9 @@ const HomeLotterySection = () => {
                     className="flex shrink-0"
                     aria-hidden={set === 1}
                   >
-                    {WINNERS.map((winner) => (
+                    {displayWinners.map((winner, idx) => (
                       <WinnerCard
-                        key={`${set}-${winner.name}`}
+                        key={`${set}-${winner.name}-${idx}`}
                         {...winner}
                       />
                     ))}
