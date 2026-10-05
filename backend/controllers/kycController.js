@@ -1,6 +1,5 @@
 const KycDocument = require("../models/KycDocument");
-const fs = require("fs");
-const path = require("path");
+const uploadToImgBB = require("../utils/imgbbUpload");
 
 // =====================================================
 // DELETE LOCAL FILE SAFELY
@@ -32,6 +31,8 @@ const deleteFile = (filePath) => {
 //   front = PAN card
 // =====================================================
 
+
+
 exports.uploadKycDocument = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -56,7 +57,7 @@ exports.uploadKycDocument = async (req, res) => {
     }
 
     // -------------------------------------------------
-    // Get uploaded files
+    // Get uploaded files (memory storage => req.files)
     // -------------------------------------------------
 
     const frontFile = req.files?.front?.[0];
@@ -81,9 +82,6 @@ exports.uploadKycDocument = async (req, res) => {
     // -------------------------------------------------
 
     if (documentType === "aadhaar" && !backFile) {
-      // Delete front because request is incomplete
-      deleteFile(`/uploads/kyc/${frontFile.filename}`);
-
       return res.status(400).json({
         success: false,
         message: "Please upload Aadhaar back image",
@@ -95,9 +93,6 @@ exports.uploadKycDocument = async (req, res) => {
     // -------------------------------------------------
 
     if (documentType === "pan" && backFile) {
-      deleteFile(`/uploads/kyc/${frontFile.filename}`);
-      deleteFile(`/uploads/kyc/${backFile.filename}`);
-
       return res.status(400).json({
         success: false,
         message: "PAN does not require back document",
@@ -114,16 +109,10 @@ exports.uploadKycDocument = async (req, res) => {
     });
 
     // -------------------------------------------------
-    // Already approved
+    // Already approved -> block re-upload
     // -------------------------------------------------
 
     if (existingDocument?.status === "approved") {
-      deleteFile(`/uploads/kyc/${frontFile.filename}`);
-
-      if (backFile) {
-        deleteFile(`/uploads/kyc/${backFile.filename}`);
-      }
-
       return res.status(400).json({
         success: false,
         message: `${documentType.toUpperCase()} is already approved`,
@@ -131,37 +120,67 @@ exports.uploadKycDocument = async (req, res) => {
     }
 
     // -------------------------------------------------
-    // New file URLs
+    // Upload FRONT image to ImgBB
     // -------------------------------------------------
 
-    const documentUrl = `/uploads/kyc/${frontFile.filename}`;
+    let frontUpload;
 
-    const backDocumentUrl = backFile
-      ? `/uploads/kyc/${backFile.filename}`
-      : null;
+    try {
+      frontUpload = await uploadToImgBB(
+        frontFile.buffer,
+        frontFile.originalname
+      );
+    } catch (err) {
+      console.error("ImgBB front upload error:", err.message);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to upload front document to ImgBB",
+      });
+    }
 
     // -------------------------------------------------
-    // Delete old files if replacing document
+    // Upload BACK image to ImgBB (Aadhaar only)
+    // -------------------------------------------------
+
+    let backUpload = null;
+
+    if (backFile) {
+      try {
+        backUpload = await uploadToImgBB(
+          backFile.buffer,
+          backFile.originalname
+        );
+      } catch (err) {
+        console.error("ImgBB back upload error:", err.message);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to upload back document to ImgBB",
+        });
+      }
+    }
+
+    // -------------------------------------------------
+    // Prepare URLs
+    // -------------------------------------------------
+
+    const documentUrl = frontUpload.url;
+    const documentPublicId = frontUpload.id; // ImgBB image id (used as deletehash/id)
+
+    const backDocumentUrl = backUpload ? backUpload.url : null;
+    const backDocumentPublicId = backUpload ? backUpload.id : null;
+
+    // -------------------------------------------------
+    // Update existing document
     // -------------------------------------------------
 
     if (existingDocument) {
-      if (existingDocument.documentUrl) {
-        deleteFile(existingDocument.documentUrl);
-      }
-
-      if (existingDocument.backDocumentUrl) {
-        deleteFile(existingDocument.backDocumentUrl);
-      }
-
-      // -------------------------------------------------
-      // Update existing document
-      // -------------------------------------------------
-
       existingDocument.documentUrl = documentUrl;
-      existingDocument.documentPublicId = null;
+      existingDocument.documentPublicId = documentPublicId;
 
       existingDocument.backDocumentUrl = backDocumentUrl;
-      existingDocument.backDocumentPublicId = null;
+      existingDocument.backDocumentPublicId = backDocumentPublicId;
 
       existingDocument.status = "pending";
       existingDocument.rejectionReason = null;
@@ -187,11 +206,11 @@ exports.uploadKycDocument = async (req, res) => {
 
       // Front
       documentUrl,
-      documentPublicId: null,
+      documentPublicId,
 
       // Back - Aadhaar only
       backDocumentUrl,
-      backDocumentPublicId: null,
+      backDocumentPublicId,
 
       status: "pending",
     });
@@ -203,15 +222,6 @@ exports.uploadKycDocument = async (req, res) => {
     });
   } catch (error) {
     console.error("Upload KYC Error:", error);
-
-    // Cleanup uploaded files if DB operation fails
-    if (req.files?.front?.[0]) {
-      deleteFile(`/uploads/kyc/${req.files.front[0].filename}`);
-    }
-
-    if (req.files?.back?.[0]) {
-      deleteFile(`/uploads/kyc/${req.files.back[0].filename}`);
-    }
 
     return res.status(500).json({
       success: false,
