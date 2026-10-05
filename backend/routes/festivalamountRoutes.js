@@ -11,24 +11,15 @@ const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
 
 // =====================================================
-// ADMIN: GET AMOUNT
+// GET FESTIVAL AMOUNT (matches / and /amount)
 // =====================================================
-
-router.get(
-  "/amount",
-  authMiddleware,
-  getAmount
-);
+router.get("/", authMiddleware, getAmount);
+router.get("/amount", authMiddleware, getAmount);
 
 // =====================================================
-// ADMIN: UPDATE AMOUNT
+// UPDATE FESTIVAL AMOUNT (matches / and /amount)
 // =====================================================
-
-router.put(
-  "/amount",
-  authMiddleware,
-  adminMiddleware,
-  updateAmount
-);
+router.put("/", authMiddleware, adminMiddleware, updateAmount);
+router.put("/amount", authMiddleware, adminMiddleware, updateAmount);
 
 module.exports = router;

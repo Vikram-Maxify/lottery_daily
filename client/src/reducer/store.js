@@ -22,6 +22,7 @@ import festivalLotteryReducer from './slice/festivalLotteryReducer'
 import bannerReducer from './slice/bannerReducer'
 import festivalReducer from './slice/festivalResultReducer'
 import topWinnerReducer from './slice/topWinnerSlice'
+import settingsReducer from './slice/settingsSlice'
 
 export const store = configureStore({
   reducer: {
@@ -42,7 +43,8 @@ export const store = configureStore({
     festivalLottery: festivalLotteryReducer,
     banner: bannerReducer,
     festivalResult: festivalReducer,
-    topWinner: topWinnerReducer
+    topWinner: topWinnerReducer,
+    settings: settingsReducer
 
   },
 });

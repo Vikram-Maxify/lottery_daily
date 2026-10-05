@@ -10,6 +10,7 @@ import {
   Trash2,
   Trophy,
   Users,
+  ChevronDown,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -31,6 +32,7 @@ import {
 } from "../reducer/slice/lotteryConfigSlice";
 
 import { getAmount } from "../reducer/slice/amountReducer";
+import { fetchAllSettings } from "../reducer/slice/settingsSlice";
 
 import {
   getMyKyc,
@@ -43,7 +45,13 @@ import {
 // =====================================================
 
 const MAX_TICKETS = 100;
-const DEFAULT_TICKET_PRICE = 20;
+const MIN_TICKETS = 10;
+const TICKET_STEP = 10;
+const INITIAL_VISIBLE_TICKETS = 10;
+const QUICK_OPTIONS = [10, 20, 30, 50, 100];
+const PRICE_SET_SIZE = 10;
+const DEFAULT_SET_PRICE = 250;
+const DEFAULT_TICKET_PRICE = 25;
 
 const ALL_DATES_COUNT = 30;
 
@@ -338,6 +346,17 @@ const makeTicket = (code = "") => ({
   code,
 });
 
+const generateUniqueTickets = (count, existing = []) => {
+  const used = new Set(existing.map((t) => t.code).filter(Boolean));
+  const newTickets = [];
+  while (newTickets.length < count) {
+    const code = randomUniqueCode(used);
+    used.add(code);
+    newTickets.push(makeTicket(code));
+  }
+  return newTickets;
+};
+
 // =====================================================
 // DRAW TIMESTAMP
 // =====================================================
@@ -527,17 +546,28 @@ const BuyTicket = () => {
       }
   );
 
+  const dailyPriceFromSettings = useSelector(
+    (state) => state.settings?.dailyLotteryAmount
+  );
+
+  const rawApiAmount =
+    dailyPriceFromSettings ?? ticketPriceFromApi;
+
   const apiPrice = readPrice(
-    ticketPriceFromApi
+    rawApiAmount
   );
 
   const hasApiPrice =
     Number.isFinite(apiPrice) &&
     apiPrice > 0;
 
-  const TICKET_PRICE = hasApiPrice
+  // Admin se 10 tickets ka price aata hai (e.g. ₹250 for 10 tickets -> ₹25/ticket)
+  const SET_PRICE = hasApiPrice
     ? apiPrice
-    : DEFAULT_TICKET_PRICE;
+    : DEFAULT_SET_PRICE;
+
+  const TICKET_PRICE =
+    Math.round((SET_PRICE / PRICE_SET_SIZE) * 100) / 100;
 
   // ===================================================
   // DEPOSIT
@@ -575,9 +605,9 @@ const BuyTicket = () => {
   // STATE
   // ===================================================
 
-  const [tickets, setTickets] = useState(() => [
-    makeTicket(),
-  ]);
+  const [showQuick, setShowQuick] = useState(true);
+  const [quantity, setQuantity] = useState(10);
+  const [ticketCode, setTicketCode] = useState(() => randomCode());
 
   const [localError, setLocalError] =
     useState("");
@@ -650,6 +680,7 @@ const BuyTicket = () => {
   useEffect(() => {
     dispatch(getActiveLotteryConfig());
     dispatch(getAmount());
+    dispatch(fetchAllSettings());
     dispatch(clearDepositState());
     dispatch(getMyKyc());
   }, [dispatch]);
@@ -775,32 +806,10 @@ const BuyTicket = () => {
   // TICKET CALCULATIONS
   // ===================================================
 
-  const totalTickets = tickets.length;
-
-  const codeCounts = useMemo(() => {
-    const counts = {};
-
-    tickets.forEach((ticket) => {
-      if (
-        ticket.code.length ===
-        TICKET_LENGTH
-      ) {
-        counts[ticket.code] =
-          (counts[ticket.code] || 0) +
-          1;
-      }
-    });
-
-    return counts;
-  }, [tickets]);
-
-  const hasDuplicates =
-    Object.values(codeCounts).some(
-      (count) => count > 1
-    );
-
+  const totalTickets = quantity;
+  const isTicketValid = TICKET_REGEX.test(ticketCode);
   const totalTicketPrice =
-    TICKET_PRICE * totalTickets;
+    Math.round(((SET_PRICE * quantity) / PRICE_SET_SIZE) * 100) / 100;
 
   const priceText =
     `₹${TICKET_PRICE}/-`;
@@ -845,14 +854,8 @@ const BuyTicket = () => {
   // INPUT HELPERS
   // ===================================================
 
-  const focusBox = (
-    ticketId,
-    index
-  ) => {
-    const element =
-      inputRefs.current[
-        `${ticketId}-${index}`
-      ];
+  const focusBox = (index) => {
+    const element = inputRefs.current[index];
 
     if (element) {
       element.focus();
@@ -863,44 +866,19 @@ const BuyTicket = () => {
     }
   };
 
-  const setTicketCode = (
-    ticketId,
-    code
-  ) => {
-    setTickets((previous) =>
-      previous.map((ticket) =>
-        ticket.id === ticketId
-          ? {
-              ...ticket,
-              code,
-            }
-          : ticket
-      )
-    );
-
-    setLocalError("");
-    setLocalSuccess("");
-  };
-
   // ===================================================
   // INPUT CHANGE
   // ===================================================
 
-  const handleBoxChange = (
-    ticket,
-    index,
-    event
-  ) => {
+  const handleBoxChange = (index, event) => {
     if (depositLoading) return;
 
     const raw = event.target.value;
 
     if (raw === "") {
-      setTicketCode(
-        ticket.id,
-        ticket.code.slice(0, index)
-      );
-
+      setTicketCode((prev) => prev.slice(0, index));
+      setLocalError("");
+      setLocalSuccess("");
       return;
     }
 
@@ -911,33 +889,21 @@ const BuyTicket = () => {
 
     if (!ch) return;
 
-    const pos = Math.min(
-      index,
-      ticket.code.length
-    );
+    const pos = Math.min(index, ticketCode.length);
 
     if (!slotAccepts(pos, ch)) {
       return;
     }
 
     const next =
-      ticket.code.slice(0, pos) +
-      ch +
-      ticket.code.slice(pos + 1);
+      ticketCode.slice(0, pos) + ch + ticketCode.slice(pos + 1);
 
-    setTicketCode(
-      ticket.id,
-      next
-    );
+    setTicketCode(next);
+    setLocalError("");
+    setLocalSuccess("");
 
-    if (
-      pos <
-      TICKET_LENGTH - 1
-    ) {
-      focusBox(
-        ticket.id,
-        pos + 1
-      );
+    if (pos < TICKET_LENGTH - 1) {
+      focusBox(pos + 1);
     }
   };
 
@@ -945,58 +911,26 @@ const BuyTicket = () => {
   // INPUT KEYDOWN
   // ===================================================
 
-  const handleBoxKeyDown = (
-    ticket,
-    index,
-    event
-  ) => {
-    if (
-      event.key === "Backspace" &&
-      !ticket.code[index]
-    ) {
+  const handleBoxKeyDown = (index, event) => {
+    if (event.key === "Backspace" && !ticketCode[index]) {
       event.preventDefault();
 
       if (index > 0) {
-        setTicketCode(
-          ticket.id,
-          ticket.code.slice(
-            0,
-            index - 1
-          )
-        );
-
-        focusBox(
-          ticket.id,
-          index - 1
-        );
+        setTicketCode((prev) => prev.slice(0, index - 1));
+        focusBox(index - 1);
       }
 
       return;
     }
 
-    if (
-      event.key === "ArrowLeft" &&
-      index > 0
-    ) {
+    if (event.key === "ArrowLeft" && index > 0) {
       event.preventDefault();
-
-      focusBox(
-        ticket.id,
-        index - 1
-      );
+      focusBox(index - 1);
     }
 
-    if (
-      event.key === "ArrowRight" &&
-      index <
-        TICKET_LENGTH - 1
-    ) {
+    if (event.key === "ArrowRight" && index < TICKET_LENGTH - 1) {
       event.preventDefault();
-
-      focusBox(
-        ticket.id,
-        index + 1
-      );
+      focusBox(index + 1);
     }
   };
 
@@ -1004,33 +938,20 @@ const BuyTicket = () => {
   // PASTE
   // ===================================================
 
-  const handleBoxPaste = (
-    ticket,
-    event
-  ) => {
+  const handleBoxPaste = (event) => {
     event.preventDefault();
 
     if (depositLoading) return;
 
     const code = sanitizeCode(
-      event.clipboardData.getData(
-        "text"
-      )
+      event.clipboardData.getData("text")
     );
 
     if (!code) return;
 
-    setTicketCode(
-      ticket.id,
-      code
-    );
-
+    setTicketCode(code);
     focusBox(
-      ticket.id,
-      Math.min(
-        code.length,
-        TICKET_LENGTH - 1
-      )
+      Math.min(code.length, TICKET_LENGTH - 1)
     );
   };
 
@@ -1038,111 +959,58 @@ const BuyTicket = () => {
   // RANDOM TICKET
   // ===================================================
 
-  const handleRandomTicket = (
-    ticketId
-  ) => {
+  const handleRandomTicket = () => {
     if (depositLoading) return;
-
-    const others = tickets
-      .filter(
-        (ticket) =>
-          ticket.id !== ticketId
-      )
-      .map(
-        (ticket) => ticket.code
-      );
-
-    setTicketCode(
-      ticketId,
-      randomUniqueCode(others)
-    );
+    setTicketCode(randomCode());
+    setLocalError("");
+    setLocalSuccess("");
   };
 
   // ===================================================
   // CLEAR TICKET
   // ===================================================
 
-  const handleClearTicket = (
-    ticketId
-  ) => {
+  const handleClearTicket = () => {
     if (depositLoading) return;
-
-    setTicketCode(
-      ticketId,
-      ""
-    );
-
-    focusBox(
-      ticketId,
-      0
-    );
+    setTicketCode("");
+    focusBox(0);
+    setLocalError("");
+    setLocalSuccess("");
   };
 
   // ===================================================
-  // REMOVE TICKET
+  // QUANTITY STEPPERS & QUICK SELECTION
   // ===================================================
 
-  const handleRemoveTicket = (
-    ticketId
-  ) => {
+  const handleIncrease = () => {
     if (depositLoading) return;
-
-    if (tickets.length === 1) {
-      setLocalError(
-        "At least one ticket is required"
-      );
-
-      return;
-    }
-
-    setTickets((previous) =>
-      previous.filter(
-        (ticket) =>
-          ticket.id !== ticketId
+    setQuantity((q) =>
+      Math.min(
+        MAX_TICKETS,
+        (Math.floor(q / TICKET_STEP) + 1) * TICKET_STEP
       )
     );
-
-    clearMessages();
+    setLocalError("");
+    setLocalSuccess("");
   };
 
-  // ===================================================
-  // ADD TICKET
-  // ===================================================
-
-  const handleAddTicket = () => {
+  const handleDecrease = () => {
     if (depositLoading) return;
-
-    if (
-      tickets.length >=
-      MAX_TICKETS
-    ) {
-      setLocalError(
-        `Maximum ${MAX_TICKETS} tickets allowed`
-      );
-
-      setLocalSuccess("");
-
-      return;
-    }
-
-    const newTicket =
-      makeTicket();
-
-    setTickets((previous) => [
-      ...previous,
-      newTicket,
-    ]);
-
-    clearMessages();
-
-    setTimeout(
-      () =>
-        focusBox(
-          newTicket.id,
-          0
-        ),
-      60
+    setQuantity((q) =>
+      Math.max(
+        MIN_TICKETS,
+        (Math.ceil(q / TICKET_STEP) - 1) * TICKET_STEP
+      )
     );
+    setLocalError("");
+    setLocalSuccess("");
+  };
+
+  const handleQuickSelect = (count) => {
+    if (depositLoading) return;
+    setQuantity(count);
+    setLocalError("");
+    setLocalSuccess("");
   };
 
   // ===================================================
@@ -1176,6 +1044,12 @@ const BuyTicket = () => {
         if (!user) {
           return setLocalError(
             "Please login first"
+          );
+        }
+
+        if (tickets.length < MIN_TICKETS) {
+          return setLocalError(
+            `Minimum ${MIN_TICKETS} tickets are required`
           );
         }
 
@@ -1263,64 +1137,33 @@ const BuyTicket = () => {
         // TICKET VALIDATION
         // -------------------------------------------------
 
-        const invalidTicket =
-          tickets.findIndex(
-            (ticket) =>
-              !TICKET_REGEX.test(
-                ticket.code
-              )
-          );
-
-        if (
-          invalidTicket !== -1
-        ) {
+        if (!TICKET_REGEX.test(ticketCode)) {
           return setLocalError(
-            `Ticket ${
-              invalidTicket + 1
-            } is not valid (e.g. ${TICKET_EXAMPLE})`
+            `Please enter a valid 8-character ticket number (e.g. ${TICKET_EXAMPLE})`
+          );
+        }
+
+        if (quantity < MIN_TICKETS) {
+          return setLocalError(
+            `Minimum ${MIN_TICKETS} tickets are required`
           );
         }
 
         // -------------------------------------------------
-        // LOTTERY NUMBERS
+        // LOTTERY NUMBERS — "ticket 1 hi jayega"
         // -------------------------------------------------
 
-        const lotteryNumbers =
-          tickets.map(
-            (ticket) =>
-              ticket.code
-          );
-
-        // -------------------------------------------------
-        // DUPLICATES
-        // -------------------------------------------------
-
-        const duplicates =
-          lotteryNumbers.filter(
-            (number, index) =>
-              lotteryNumbers.indexOf(
-                number
-              ) !== index
-          );
-
-        if (
-          duplicates.length > 0
-        ) {
-          return setLocalError(
-            "Two tickets cannot have the same number."
-          );
-        }
+        const lotteryNumbers = [ticketCode];
 
         // -------------------------------------------------
         // TOTAL AMOUNT
         // -------------------------------------------------
 
         const totalAmount =
-          ticketAmount *
-          tickets.length;
+          ticketAmount * quantity;
 
         setLocalSuccess(
-          `Creating payment order for ${tickets.length} ticket(s)...`
+          `Creating payment order for ${quantity} ticket(s)...`
         );
 
         // -------------------------------------------------
@@ -1372,9 +1215,7 @@ const BuyTicket = () => {
             paymentUrl;
         }, 600);
 
-        setTickets([
-          makeTicket(),
-        ]);
+        setTicketCode(randomCode());
       } catch (
         purchaseError
       ) {
@@ -1413,14 +1254,8 @@ const BuyTicket = () => {
     !lotteryConfig?._id ||
     !lotteryConfig?.isActive ||
     !hasApiPrice ||
-    tickets.length === 0 ||
-    hasDuplicates ||
-    tickets.some(
-      (ticket) =>
-        !TICKET_REGEX.test(
-          ticket.code
-        )
-    );
+    !isTicketValid ||
+    quantity < MIN_TICKETS;
 
   const visibleDateChips =
     showAllDates
@@ -1777,7 +1612,129 @@ const BuyTicket = () => {
         </section>
 
         {/* =================================================
-            CHOOSE YOUR TICKETS
+            HOW MANY TICKETS
+        ================================================= */}
+
+        <Card>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Ticket
+                size={26}
+                className="-rotate-[30deg] text-[#173e70]"
+                fill="#173e70"
+              />
+              <h2 className="text-[16px] font-extrabold text-[#173e70]">
+                How Many Tickets?
+              </h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowQuick((v) => !v)}
+                className="h-8 whitespace-nowrap rounded-lg border border-[#c9d3e3] bg-white px-3 text-[11px] font-semibold text-[#173e70]"
+              >
+                Quick Select
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowQuick((v) => !v)}
+                aria-label="Toggle quick select"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#eef3fa] text-[#173e70]"
+              >
+                <ChevronDown
+                  size={18}
+                  className={`transition ${showQuick ? "rotate-180" : ""}`}
+                />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-[auto_1fr] gap-2">
+            <div className="flex items-center gap-2 rounded-xl border border-[#dfe5f0] bg-white px-2 py-2 shadow-sm">
+              <button
+                type="button"
+                onClick={handleDecrease}
+                disabled={totalTickets <= MIN_TICKETS || depositLoading}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e9eef7] text-[22px] font-bold text-[#173e70] disabled:opacity-50"
+              >
+                −
+              </button>
+              <span className="min-w-[30px] text-center text-[24px] font-black text-[#173e70]">
+                {totalTickets}
+              </span>
+              <button
+                type="button"
+                onClick={handleIncrease}
+                disabled={totalTickets >= MAX_TICKETS || depositLoading}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e9eef7] text-[22px] font-bold text-[#173e70] disabled:opacity-50"
+              >
+                +
+              </button>
+            </div>
+
+            <div className="grid min-w-0 grid-cols-[1fr_auto_1fr_auto_1.2fr] items-center gap-1 rounded-xl bg-[#f3f6fb] px-2 py-2 text-center">
+              <div className="min-w-0">
+                <p className="text-[9px] text-[#4b5563]">Ticket Price</p>
+                <p className="text-[14px] font-black text-[#d7193f]">₹{TICKET_PRICE}/-</p>
+              </div>
+              <span className="text-[15px] text-[#9aa5b8]">×</span>
+              <div className="min-w-0">
+                <p className="text-[9px] text-[#4b5563]">Total Tickets</p>
+                <p className="text-[14px] font-black text-[#d7193f]">{quantity}</p>
+              </div>
+              <span className="text-[15px] text-[#9aa5b8]">=</span>
+              <div className="min-w-0">
+                <p className="text-[9px] text-[#4b5563]">Total Amount</p>
+                <p className="truncate text-[14px] font-black text-[#14a06a]">
+                  ₹ {totalTicketPrice.toLocaleString("en-IN")} /-
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Select Options */}
+          {showQuick && (
+            <div className="mt-3 grid grid-cols-5 gap-1.5">
+              {QUICK_OPTIONS.map((count) => {
+                const active = quantity === count;
+                return (
+                  <button
+                    key={count}
+                    type="button"
+                    onClick={() => handleQuickSelect(count)}
+                    disabled={depositLoading}
+                    className={`relative min-w-0 rounded-lg border px-0.5 py-2 text-center transition active:scale-95 disabled:opacity-60 ${
+                      active
+                        ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
+                        : "border-[#dfe5f0] bg-white"
+                    }`}
+                  >
+                    <p
+                      className={`whitespace-nowrap text-[9.5px] font-semibold ${
+                        active ? "text-[#ed1d43]" : "text-[#26354b]"
+                      }`}
+                    >
+                      {count} Tickets
+                    </p>
+                    <p
+                      className={`whitespace-nowrap text-[12px] font-black ${
+                        active ? "text-[#ed1d43]" : "text-[#173e70]"
+                      }`}
+                    >
+                      ₹ {(Math.round(((SET_PRICE * count) / PRICE_SET_SIZE) * 100) / 100).toLocaleString("en-IN")}
+                    </p>
+                    {active && (
+                      <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-[#ed1d43]" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+
+        {/* =================================================
+            CHOOSE YOUR TICKET NUMBER (SINGLE INPUT FIELD)
         ================================================= */}
 
         <Card>
@@ -1792,336 +1749,106 @@ const BuyTicket = () => {
 
               <div className="min-w-0 leading-tight">
                 <h2 className="truncate text-[17px] font-extrabold text-[#173e70]">
-                  Choose Your Tickets
+                  Enter Ticket Number
                 </h2>
 
                 <p className="truncate text-[10px] text-[#4b5563]">
-                  Buy one or more
-                  tickets
+                  Format: {TICKET_EXAMPLE} ({ticketCode.length}/{TICKET_LENGTH})
                 </p>
               </div>
             </div>
 
-            <span className="shrink-0 rounded-full border border-[#ed1d43]/30 bg-[#fff0f2] px-2.5 py-1.5 text-[11px] font-extrabold text-[#ed1d43]">
-              {totalTickets}{" "}
-              {totalTickets === 1
-                ? "Ticket"
-                : "Tickets"}
-            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={handleClearTicket}
+                disabled={!ticketCode || depositLoading}
+                className="text-[12px] font-medium text-[#3d4468] underline underline-offset-2 disabled:opacity-40"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={handleRandomTicket}
+                disabled={depositLoading}
+                className="flex items-center gap-1 rounded-lg border border-[#c9d3e3] bg-white px-3 py-1.5 text-[12px] font-bold text-[#173e70] disabled:opacity-50"
+              >
+                <Shuffle size={13} /> Random
+              </button>
+            </div>
           </div>
 
-          <div className="mt-3 space-y-3">
-            {tickets.map(
-              (ticket, index) => {
-                const complete =
-                  TICKET_REGEX.test(
-                    ticket.code
-                  );
-
-                const duplicate =
-                  ticket.code
-                    .length ===
-                    TICKET_LENGTH &&
-                  codeCounts[
-                    ticket.code
-                  ] > 1;
-
-                return (
-                  <div
-                    key={
-                      ticket.id
-                    }
-                    className={`rounded-2xl border p-3 ${
-                      duplicate
-                        ? "border-red-300 bg-red-50/60"
-                        : complete
-                          ? "border-emerald-300 bg-emerald-50/40"
-                          : "border-[#dfe5f0] bg-[#f9fbff]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <span
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white ${
-                            BADGES[
-                              index %
-                                BADGES.length
-                            ]
-                          }`}
-                        >
-                          <Ticket
-                            size={18}
-                            className="-rotate-45"
-                          />
-                        </span>
-
-                        <div className="min-w-0 leading-tight">
-                          <h3 className="text-[14px] font-extrabold text-[#173e70]">
-                            Ticket{" "}
-                            {index +
-                              1}
-                          </h3>
-
-                          <p className="truncate text-[9px] text-[#4b5563]">
-                            Format:{" "}
-                            {
-                              TICKET_EXAMPLE
-                            }
-                          </p>
-                        </div>
-                      </div>
-
-                      {totalTickets >
-                        1 && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleRemoveTicket(
-                              ticket.id
-                            )
-                          }
-                          disabled={
-                            depositLoading
-                          }
-                          aria-label={`Remove ticket ${
-                            index + 1
-                          }`}
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#ed1d43] text-white disabled:opacity-40"
-                        >
-                          <Trash2
-                            size={14}
-                          />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* INPUT BOXES */}
-
-                    <div
-                      className="mt-3 grid gap-1"
-                      style={{
-                        gridTemplateColumns: `repeat(${TICKET_LENGTH}, minmax(0, 1fr))`,
-                      }}
-                    >
-                      {SLOT_PATTERN.map(
-                        (
-                          slot,
-                          slotIndex
-                        ) => {
-                          const filled =
-                            Boolean(
-                              ticket
-                                .code[
-                                slotIndex
-                              ]
-                            );
-
-                          const isLetter =
-                            slot ===
-                            "L";
-
-                          return (
-                            <input
-                              key={
-                                slotIndex
-                              }
-                              ref={(
-                                element
-                              ) => {
-                                inputRefs.current[
-                                  `${ticket.id}-${slotIndex}`
-                                ] =
-                                  element;
-                              }}
-                              value={
-                                ticket
-                                  .code[
-                                  slotIndex
-                                ] ||
-                                ""
-                              }
-                              onChange={(
-                                event
-                              ) =>
-                                handleBoxChange(
-                                  ticket,
-                                  slotIndex,
-                                  event
-                                )
-                              }
-                              onKeyDown={(
-                                event
-                              ) =>
-                                handleBoxKeyDown(
-                                  ticket,
-                                  slotIndex,
-                                  event
-                                )
-                              }
-                              onPaste={(
-                                event
-                              ) =>
-                                handleBoxPaste(
-                                  ticket,
-                                  event
-                                )
-                              }
-                              onFocus={(
-                                event
-                              ) =>
-                                event.target.select()
-                              }
-                              disabled={
-                                depositLoading
-                              }
-                              inputMode={
-                                isLetter
-                                  ? "text"
-                                  : "numeric"
-                              }
-                              autoCapitalize="characters"
-                              autoComplete="off"
-                              spellCheck={
-                                false
-                              }
-                              maxLength={
-                                2
-                              }
-                              placeholder={slotPlaceholder(
-                                slotIndex
-                              )}
-                              aria-label={`Ticket ${
-                                index +
-                                1
-                              } character ${
-                                slotIndex +
-                                1
-                              }`}
-                              className={`h-11 w-full min-w-0 rounded-lg border-2 p-0 text-center text-[17px] font-extrabold outline-none transition placeholder:font-bold placeholder:text-[#c3c8de] focus:border-[#ed1d43] focus:shadow-[0_0_0_3px_rgba(237,29,67,0.15)] disabled:opacity-50 min-[380px]:h-12 min-[380px]:rounded-xl min-[380px]:text-[18px] ${
-                                duplicate
-                                  ? "border-red-400 bg-white text-red-600"
-                                  : filled
-                                    ? isLetter
-                                      ? "border-[#ed1d43] bg-[#fff0f2] text-[#ed1d43]"
-                                      : "border-[#173e70] bg-white text-[#173e70]"
-                                    : isLetter
-                                      ? "border-[#f3b6c1] bg-[#fff7f8] text-[#173e70]"
-                                      : "border-[#c9d3e3] bg-[#f1f3fa] text-[#173e70]"
-                              }`}
-                            />
-                          );
-                        }
-                      )}
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-1.5 text-[10px]">
-                        <span
-                          className={`h-2 w-2 shrink-0 rounded-full ${
-                            duplicate
-                              ? "bg-red-500"
-                              : complete
-                                ? "bg-emerald-500"
-                                : "bg-[#f08a25]"
-                          }`}
-                        />
-
-                        <span
-                          className={`truncate ${
-                            duplicate
-                              ? "font-semibold text-red-600"
-                              : complete
-                                ? "font-semibold text-emerald-600"
-                                : "text-[#4b5563]"
-                          }`}
-                        >
-                          {duplicate
-                            ? "Number already added"
-                            : complete
-                              ? "Ticket ready"
-                              : `Enter ${TICKET_LENGTH} characters (${ticket.code.length}/${TICKET_LENGTH})`}
-                        </span>
-                      </div>
-
-                      <div className="flex shrink-0 items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleClearTicket(
-                              ticket.id
-                            )
-                          }
-                          disabled={
-                            depositLoading ||
-                            !ticket.code
-                          }
-                          className="text-[11px] font-medium text-[#3d4468] underline underline-offset-2 disabled:opacity-40"
-                        >
-                          Clear
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleRandomTicket(
-                              ticket.id
-                            )
-                          }
-                          disabled={
-                            depositLoading
-                          }
-                          className="flex items-center gap-1 rounded-lg border border-[#c9d3e3] bg-white px-3 py-1.5 text-[11px] font-bold text-[#173e70] disabled:opacity-50"
-                        >
-                          <Shuffle
-                            size={13}
-                          />
-                          Random
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={
-              handleAddTicket
-            }
-            disabled={
-              depositLoading ||
-              totalTickets >=
-                MAX_TICKETS
-            }
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#ed1d43]/50 bg-[#fff0f2]/60 py-3.5 text-[14px] font-extrabold text-[#ed1d43] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+          <div
+            className="mt-3 grid gap-1.5"
+            style={{
+              gridTemplateColumns: `repeat(${TICKET_LENGTH}, minmax(0, 1fr))`,
+            }}
           >
-            <span className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#ed1d43]">
-              <Plus
-                size={14}
-                strokeWidth={3}
-              />
-            </span>
+            {SLOT_PATTERN.map((slot, i) => {
+              const filled = Boolean(ticketCode[i]);
+              const isLetter = slot === "L";
+              return (
+                <input
+                  key={i}
+                  ref={(element) => {
+                    inputRefs.current[i] = element;
+                  }}
+                  value={ticketCode[i] || ""}
+                  onChange={(event) => handleBoxChange(i, event)}
+                  onKeyDown={(event) => handleBoxKeyDown(i, event)}
+                  onPaste={handleBoxPaste}
+                  onFocus={(event) => event.target.select()}
+                  disabled={depositLoading}
+                  inputMode={isLetter ? "text" : "numeric"}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={slotPlaceholder(i)}
+                  aria-label={`Ticket character ${i + 1}`}
+                  className={`h-11 w-full min-w-0 rounded-lg border-2 p-0 text-center text-[17px] font-extrabold outline-none transition placeholder:font-bold placeholder:text-[#c3c8de] focus:border-[#ed1d43] focus:shadow-[0_0_0_3px_rgba(237,29,67,0.15)] disabled:opacity-50 min-[380px]:h-12 min-[380px]:rounded-xl min-[380px]:text-[18px] ${
+                    filled
+                      ? isLetter
+                        ? "border-[#ed1d43] bg-[#fff0f2] text-[#ed1d43]"
+                        : "border-[#173e70] bg-white text-[#173e70]"
+                      : isLetter
+                        ? "border-[#f3b6c1] bg-[#fff7f8] text-[#173e70]"
+                        : "border-[#c9d3e3] bg-[#f1f3fa] text-[#173e70]"
+                  }`}
+                />
+              );
+            })}
+          </div>
 
-            Add More Tickets
-          </button>
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-1.5 text-[11px]">
+              <span
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                  isTicketValid ? "bg-emerald-500" : "bg-[#f08a25]"
+                }`}
+              />
+              <span
+                className={`truncate ${
+                  isTicketValid
+                    ? "font-bold text-emerald-700"
+                    : "text-[#4b5563]"
+                }`}
+              >
+                {isTicketValid
+                  ? `Ticket Number Ready: ${ticketCode}`
+                  : `Enter ${TICKET_LENGTH} characters (${ticketCode.length}/${TICKET_LENGTH})`}
+              </span>
+            </div>
+            <span className="shrink-0 rounded-full border border-[#ed1d43]/30 bg-[#fff0f2] px-2.5 py-1 text-[11px] font-extrabold text-[#ed1d43]">
+              {quantity} Tickets Selected
+            </span>
+          </div>
 
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#bfe8d3] bg-[#e7f8ef] px-3 py-2">
             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#14a06a] text-white">
               <Info size={13} />
             </span>
-
             <p className="text-[10.5px] leading-snug text-[#26354b]">
-              {totalTickets}{" "}
-              {totalTickets ===
-              1
-                ? "ticket"
-                : "unique tickets"}{" "}
-              for the draw on{" "}
-              {drawDateText}.
-              Each ticket costs ₹
-              {TICKET_PRICE}.
+              Purchasing <strong>{quantity} tickets</strong> (₹{TICKET_PRICE} × {quantity} = <strong>₹{totalTicketPrice.toLocaleString("en-IN")}</strong>) for the draw on {drawDateText}. Each ticket costs ₹{TICKET_PRICE}.
             </p>
           </div>
         </Card>

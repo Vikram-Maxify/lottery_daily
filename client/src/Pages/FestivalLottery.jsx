@@ -52,6 +52,7 @@ import {
 } from "../reducer/slice/depositSlice";
 
 import { getAmount } from "../reducer/slice/amountReducer";
+import { fetchAllSettings } from "../reducer/slice/settingsSlice";
 
 // 🔥 KYC REDUCER IMPORT
 import {
@@ -87,6 +88,14 @@ const TICKET_EXAMPLE = "12A12345";
 const TICKET_REGEX = /^\d{2}[A-Z]\d{5}$/;
 
 const DEFAULT_TICKET_PRICE = 20;
+
+// Festival price admin se "10 tickets ke set" ke liye aata hai (e.g. ₹270 = 10 tickets)
+const PRICE_SET_SIZE = 10;
+const DEFAULT_SET_PRICE = 270;
+
+// count tickets ka total amount (set price ke hisab se), 2 decimal tak round
+const calcFestivalAmount = (setPrice, count) =>
+  Math.round(((Number(setPrice) || 0) * count * 100) / PRICE_SET_SIZE) / 100;
 
 const CHIP_COLORS = [
   { badge: "bg-[#ed1d43]", row: "bg-[#fff0f2]" },
@@ -256,12 +265,12 @@ const FestivalLottery = () => {
   // ---------- ALL FESTIVAL LOTTERIES (tab images + prizes) ----------
   const allFestivalConfigs = useSelector(selectFestivalConfigs);
 
-  // ---------- TICKET PRICE FROM AMOUNT SLICE ----------
-  const { amount: ticketPriceFromApi } = useSelector(
-    (state) => state.amount || { amount: null, loading: false }
+  // ---------- FESTIVAL SET PRICE (10 tickets) FROM SETTINGS SLICE ----------
+  const festivalPriceFromSettings = useSelector(
+    (state) => state.settings?.festivalLotteryAmount
   );
 
-  const apiPrice = readPrice(ticketPriceFromApi);
+  const apiPrice = readPrice(festivalPriceFromSettings);
 
   // ---------- DEPOSIT / PAYMENT ----------
   const depositLoading = useSelector(selectDepositLoading);
@@ -278,7 +287,9 @@ const FestivalLottery = () => {
   const [selectedDateIndex, setSelectedDateIndex] = useState(0);
   const [showAllDates, setShowAllDates] = useState(false);
   const [showQuick, setShowQuick] = useState(true);
-  const [tickets, setTickets] = useState([]);
+  const [tickets, setTickets] = useState(() =>
+    generateUniqueTickets(MIN_TICKETS, [])
+  );
   const [showAllTickets, setShowAllTickets] = useState(false);
   const [draft, setDraft] = useState("");
   const [manualError, setManualError] = useState("");
@@ -341,17 +352,17 @@ const FestivalLottery = () => {
   );
 
   // =====================================================
-  // PRICE RESOLUTION (BuyTicket-style fallback chain)
+  // PRICE RESOLUTION
+  // SET_PRICE = 10 tickets ka price (admin settings se, default ₹270)
   // =====================================================
-  const TICKET_PRICE = useMemo(() => {
+  const SET_PRICE = useMemo(() => {
     if (Number.isFinite(apiPrice) && apiPrice > 0) return apiPrice;
-    if (Number(festival?.price) > 0) return Number(festival.price);
-    return DEFAULT_TICKET_PRICE;
-  }, [apiPrice, festival]);
+    return DEFAULT_SET_PRICE;
+  }, [apiPrice]);
 
-  const price = TICKET_PRICE;
+  const price = SET_PRICE;
   const totalTickets = tickets.length;
-  const totalAmount = price * totalTickets;
+  const totalAmount = calcFestivalAmount(SET_PRICE, totalTickets);
 
   // Tickets list: first 10 only, rest behind "View More"
   const visibleTickets = showAllTickets
@@ -373,6 +384,7 @@ const FestivalLottery = () => {
     dispatch(getActiveLotteryConfig());
     dispatch(getAllFestivalConfigs()); // 🔥 tab images + prizes
     dispatch(getAmount());
+    dispatch(fetchAllSettings());
     dispatch(clearDepositState());
     // 🔥 FETCH KYC
     dispatch(getMyKyc());
@@ -380,9 +392,10 @@ const FestivalLottery = () => {
 
   // =====================================================
   // RESET LOCAL SELECTION ON FESTIVAL / DATE CHANGE
+  // Default: minimum 10 tickets pre-selected
   // =====================================================
   useEffect(() => {
-    setTickets([]);
+    setTickets(generateUniqueTickets(MIN_TICKETS, []));
     setShowAllTickets(false);
     setDraft("");
     setManualError("");
@@ -513,7 +526,8 @@ const FestivalLottery = () => {
 
   const handleClear = () => {
     if (depositLoading) return;
-    setTickets([]);
+    // 10 se kam allowed nahi — clear karne par fresh 10 tickets
+    setTickets(generateUniqueTickets(MIN_TICKETS, []));
     setShowAllTickets(false);
     setManualError("");
     setLocalSuccess("");
@@ -678,15 +692,10 @@ const FestivalLottery = () => {
         return;
       }
 
-      // ---------- RESOLVE PRICE (fallback chain) ----------
-      const ticketAmount =
-        Number.isFinite(apiPrice) && apiPrice > 0
-          ? apiPrice
-          : Number(festival?.price) > 0
-            ? Number(festival.price)
-            : DEFAULT_TICKET_PRICE;
+      // ---------- RESOLVE PRICE (10 tickets ka set price) ----------
+      const setPriceAmount = SET_PRICE;
 
-      if (!Number.isFinite(ticketAmount) || ticketAmount <= 0) {
+      if (!Number.isFinite(setPriceAmount) || setPriceAmount <= 0) {
         setManualError("Ticket price is not available");
         return;
       }
@@ -709,7 +718,7 @@ const FestivalLottery = () => {
         return;
       }
 
-      const totalPayable = ticketAmount * tickets.length;
+      const totalPayable = calcFestivalAmount(setPriceAmount, tickets.length);
 
       setLocalSuccess(
         `Creating payment order for ${tickets.length} ticket(s)...`
@@ -742,8 +751,8 @@ const FestivalLottery = () => {
         `Order ${orderId} created. Redirecting to payment page...`
       );
 
-      // Reset local selection
-      setTickets([]);
+      // Reset local selection to 10 tickets
+      setTickets(generateUniqueTickets(MIN_TICKETS, []));
       setShowAllTickets(false);
       setDraft("");
 
@@ -1089,15 +1098,15 @@ const FestivalLottery = () => {
 
               <div className="grid min-w-0 grid-cols-[1fr_auto_1fr_auto_1.2fr] items-center gap-1 rounded-xl bg-[#f3f6fb] px-2 py-2 text-center">
                 <div className="min-w-0">
-                  <p className="text-[9px] text-[#4b5563]">Ticket Price</p>
+                  <p className="text-[9px] text-[#4b5563]">Price / {PRICE_SET_SIZE} Tickets</p>
                   <p className="text-[14px] font-black text-[#d7193f]">₹{price}/-</p>
                 </div>
-                <span className="text-[15px] text-[#9aa5b8]">×</span>
+                <span className="text-[15px] text-[#9aa5b8]">•</span>
                 <div className="min-w-0">
                   <p className="text-[9px] text-[#4b5563]">Total Tickets</p>
                   <p className="text-[14px] font-black text-[#d7193f]">{totalTickets}</p>
                 </div>
-                <span className="text-[15px] text-[#9aa5b8]">=</span>
+                <span className="text-[15px] text-[#9aa5b8]">→</span>
                 <div className="min-w-0">
                   <p className="text-[9px] text-[#4b5563]">Total Amount</p>
                   <p className="truncate text-[14px] font-black text-[#14a06a]">
@@ -1225,7 +1234,7 @@ const FestivalLottery = () => {
                         className={`whitespace-nowrap text-[12px] font-black ${active ? "text-[#ed1d43]" : "text-[#173e70]"
                           }`}
                       >
-                        ₹ {(price * count).toLocaleString("en-IN")}
+                        ₹ {calcFestivalAmount(price, count).toLocaleString("en-IN")}
                       </p>
                       {active && (
                         <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-[#ed1d43]" />
@@ -1319,8 +1328,8 @@ const FestivalLottery = () => {
                 <Info size={13} />
               </span>
               <p className="text-[11px] leading-snug text-[#26354b]">
-                {totalTickets} unique tickets for the draw on {summaryDate}. Each
-                ticket costs ₹{price}.
+                {totalTickets} unique tickets for the draw on {summaryDate}. Every{" "}
+                {PRICE_SET_SIZE} tickets cost ₹{price} (minimum {MIN_TICKETS} tickets).
               </p>
             </div>
           </section>

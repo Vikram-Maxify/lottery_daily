@@ -126,6 +126,7 @@ const AdminLayout = () => {
 
     if (path === "/admin/deposits") return "All Deposits";
     if (path === "/lottery-config") return "Lottery Config";
+    if (path === "/admin/settings") return "Settings";
 
     return "Admin Panel";
   };
