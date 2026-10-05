@@ -15,6 +15,7 @@ const {
   deleteLotteryConfig,
   addBulkUserLotteryEntries,
   updateLotteryConfig,
+  checkLotteryResult,
 } = require("../controllers/festival_lottery");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -154,5 +155,13 @@ router.delete(
   adminMiddleware,
   deleteLotteryConfig
 );
+
+
+router.get(
+  "/check-result/:number",
+  authMiddleware,
+  checkLotteryResult
+);
+
 
 module.exports = router;

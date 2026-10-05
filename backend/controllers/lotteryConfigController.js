@@ -2232,6 +2232,149 @@ const updateLotteryConfig = async (req, res) => {
   }
 };
 
+const checkLotteryResult = async (req, res) => {
+  try {
+    const { number } = req.params;
+
+    // Validate lottery number
+    if (!number) {
+      return res.status(400).json({
+        success: false,
+        message: "Lottery number is required",
+      });
+    }
+
+    const lotteryNumber = String(number).trim();
+
+    // Exactly 8 alphanumeric characters
+    if (!/^[a-zA-Z0-9]{8}$/.test(lotteryNumber)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Lottery number must be exactly 8 alphanumeric characters",
+      });
+    }
+
+    // Find lottery config containing this number
+    const lotteryConfig = await LotteryConfig.findOne({
+      "users.number": lotteryNumber,
+    }).lean();
+
+    if (!lotteryConfig) {
+      return res.status(404).json({
+        success: false,
+        message: "Lottery number not found",
+        result: null,
+      });
+    }
+
+    // Find exact entry
+    const entry = lotteryConfig.users.find(
+      (user) => user.number === lotteryNumber
+    );
+
+    if (!entry) {
+      return res.status(404).json({
+        success: false,
+        message: "Lottery number not found",
+        result: null,
+      });
+    }
+
+    // Calculate prize amount
+    let prizeAmount = 0;
+
+    switch (entry.prizeType) {
+      case "1st":
+        prizeAmount =
+          lotteryConfig.prizes?.first ||
+          entry.prize?.first ||
+          0;
+        break;
+
+      case "2nd":
+        prizeAmount =
+          lotteryConfig.prizes?.second ||
+          entry.prize?.second ||
+          0;
+        break;
+
+      case "3rd":
+        prizeAmount =
+          lotteryConfig.prizes?.third ||
+          entry.prize?.third ||
+          0;
+        break;
+
+      case "4th":
+        prizeAmount =
+          lotteryConfig.prizes?.fourth ||
+          entry.prize?.fourth ||
+          0;
+        break;
+
+      case "5th":
+        prizeAmount =
+          lotteryConfig.prizes?.fifth ||
+          entry.prize?.fifth ||
+          0;
+        break;
+
+      default:
+        prizeAmount = 0;
+    }
+
+    return res.status(200).json({
+      success: true,
+
+      message:
+        entry.status === "win"
+          ? "Congratulations! Your lottery number is a winner."
+          : entry.status === "lost"
+            ? "Sorry, this lottery number did not win."
+            : "Lottery result is pending.",
+
+      result: {
+        lotteryNumber: entry.number,
+
+        marketName: lotteryConfig.marketName,
+
+        entryDate: entry.entryDate,
+
+        drawDate: lotteryConfig.drawDate,
+
+        drawTime: lotteryConfig.drawTime,
+
+        amount: entry.amount,
+
+        status: entry.status,
+
+        prizeType: entry.prizeType,
+
+        prizeAmount,
+
+        prize: {
+          first: entry.prize?.first || 0,
+          second: entry.prize?.second || 0,
+          third: entry.prize?.third || 0,
+          fourth: entry.prize?.fourth || 0,
+          fifth: entry.prize?.fifth || 0,
+        },
+
+        isBuy: entry.isBuy,
+      },
+    });
+  } catch (error) {
+    console.error("Check lottery result error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error while checking lottery result",
+      error: error.message,
+    });
+  }
+};
+
 // =====================================================
 // EXPORTS
 // =====================================================
@@ -2256,7 +2399,7 @@ module.exports = {
   deactivateLotteryConfig,
 
   updateEntryStatus,
-
+  checkLotteryResult,
   deleteLotteryConfig,
   updateLotteryConfig,
 };

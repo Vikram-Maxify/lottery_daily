@@ -16,6 +16,7 @@ const {
   addBulkUserLotteryEntries,
   updateLotteryConfig,
   deactivateLotteryConfig,
+  checkLotteryResult,
 } = require("../controllers/lotteryConfigController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -144,5 +145,14 @@ router.delete(
   adminMiddleware,
   deleteLotteryConfig
 );
+
+
+
+router.get(
+  "/check-result/:number",
+  authMiddleware,
+  checkLotteryResult,
+);
+
 
 module.exports = router;
