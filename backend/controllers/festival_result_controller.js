@@ -363,8 +363,8 @@ const createResult = async (req, res) => {
 
     const dateUsers = Array.isArray(config.users)
       ? config.users.filter(
-          (user) => getDateString(user.entryDate) === selectedDate
-        )
+        (user) => getDateString(user.entryDate) === selectedDate
+      )
       : [];
 
     if (dateUsers.length === 0) {
@@ -734,8 +734,8 @@ const updateResult = async (req, res) => {
 
     const dateUsers = Array.isArray(config.users)
       ? config.users.filter(
-          (user) => getDateString(user.entryDate) === selectedDate
-        )
+        (user) => getDateString(user.entryDate) === selectedDate
+      )
       : [];
 
     if (dateUsers.length === 0) {
@@ -1041,21 +1041,43 @@ const getPublishedResultByDate = async (req, res) => {
 };
 
 const getUnbetLotteryNumbers = async (req, res) => {
+  const startTime = Date.now();
+
   try {
     const { lotteryConfigId } = req.query;
 
-    // -------------------------------------------------
-    // VALIDATION
-    // -------------------------------------------------
+    console.log("====================================");
+    console.log("UNBET NUMBERS API");
+    console.log("req.query:", req.query);
+    console.log("lotteryConfigId:", lotteryConfigId);
+    console.log("mongoose readyState:", mongoose.connection.readyState);
+    // 0 = disconnected | 1 = connected | 2 = connecting | 3 = disconnecting
+    console.log("====================================");
 
-    if (!lotteryConfigId) {
+    // -------------------------------------------------
+    // 0. DB CONNECTION GUARD
+    // -------------------------------------------------
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({
+        success: false,
+        message:
+          "Database not connected. Please try again in a moment.",
+      });
+    }
+
+    // -------------------------------------------------
+    // 1. VALIDATE INPUT
+    // -------------------------------------------------
+    const lotteryid = String(lotteryConfigId || "").trim();
+
+    if (!lotteryid) {
       return res.status(400).json({
         success: false,
         message: "lotteryConfigId is required",
       });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(lotteryConfigId)) {
+    if (!mongoose.Types.ObjectId.isValid(lotteryid)) {
       return res.status(400).json({
         success: false,
         message: "Invalid lotteryConfigId",
@@ -1063,158 +1085,139 @@ const getUnbetLotteryNumbers = async (req, res) => {
     }
 
     // -------------------------------------------------
-    // FIND LOTTERY
+    // 2. GET LOTTERY CONFIG (with timeout)
     // -------------------------------------------------
+    console.log("→ Querying LotteryConfig...");
 
-    const lottery = await LotteryConfig.findById(
-      lotteryConfigId
-    ).lean();
+    const lotteryConfig = await LotteryConfig.findOne({
+      _id: lotteryid,
+    })
+      .maxTimeMS(8000) // hard stop after 8s
+      .lean();
 
-    if (!lottery) {
+    console.log(
+      "← LotteryConfig result:",
+      lotteryConfig ? lotteryConfig._id : null
+    );
+
+    if (!lotteryConfig) {
       return res.status(404).json({
         success: false,
-        message: "Lottery not found",
+        message: "Lottery configuration not found",
       });
     }
 
     // -------------------------------------------------
-    // GET ALL BETTED NUMBERS
+    // 3. EXTRACT ALL NUMBERS FROM LOTTERY CONFIG
     // -------------------------------------------------
+    const allNumbers = Array.isArray(lotteryConfig.numbers)
+      ? lotteryConfig.numbers
+        .map((item) => {
+          if (typeof item === "string") {
+            return item.trim();
+          }
 
-    const betNumbers = new Set();
+          if (item && typeof item === "object") {
+            return String(item.number ?? "").trim();
+          }
 
-    for (const user of lottery.users || []) {
-      if (!user.number) continue;
+          if (typeof item === "number") {
+            return String(item).trim();
+          }
 
-      const number = String(user.number)
-        .trim()
-        .toUpperCase();
+          return "";
+        })
+        .filter(Boolean)
+      : [];
 
-      betNumbers.add(number);
+    const uniqueNumbers = [...new Set(allNumbers)];
+
+    console.log("Total lottery numbers:", uniqueNumbers.length);
+
+    // -------------------------------------------------
+    // 4. GET BETTED NUMBERS (with timeout)
+    // -------------------------------------------------
+    console.log("→ Querying LotteryUserEntry...");
+
+    const entries = await LotteryConfig.find({
+      lotteryConfigId: lotteryConfig._id, // use normalized ObjectId
+    })
+      .select("number -_id")
+      .maxTimeMS(8000)
+      .lean();
+
+    console.log("← Total entries:", entries.length);
+
+    // -------------------------------------------------
+    // 5. BUILD BETTED SET
+    // -------------------------------------------------
+    const bettedNumbers = new Set();
+
+    for (const entry of entries) {
+      if (entry && entry.number !== undefined && entry.number !== null) {
+        const n = String(entry.number).trim();
+        if (n) bettedNumbers.add(n);
+      }
     }
 
-    // -------------------------------------------------
-    // TOTAL POSSIBLE NUMBERS
-    //
-    // 00-99
-    // A-Z
-    // 00000-99999
-    //
-    // 100 × 26 × 100000
-    // = 260,000,000 possible numbers
-    // -------------------------------------------------
-
-    const TOTAL_NUMBERS =
-      100 * 26 * 100000;
+    console.log("Betted numbers:", [...bettedNumbers]);
 
     // -------------------------------------------------
-    // HOW MANY UNBET NUMBERS?
+    // 6. FIND UNBET NUMBERS
     // -------------------------------------------------
-
-    const unbetCount =
-      TOTAL_NUMBERS - betNumbers.size;
-
-    // -------------------------------------------------
-    // RETURN SOME RANDOM UNBET NUMBERS
-    //
-    // DO NOT generate all 260 million numbers.
-    // -------------------------------------------------
-
-    const requestedLimit = Number(
-      req.query.limit || 20
+    const unbetNumbers = uniqueNumbers.filter(
+      (number) => !bettedNumbers.has(number)
     );
 
-    const limit = Math.min(
-      Math.max(requestedLimit, 1),
-      100
+    // -------------------------------------------------
+    // 7. RESPONSE
+    // -------------------------------------------------
+    console.log(
+      `✅ Unbet numbers computed in ${Date.now() - startTime}ms`
     );
-
-    const unbetNumbers = [];
-
-    const usedRandomNumbers = new Set();
-
-    let attempts = 0;
-
-    const maxAttempts = limit * 100;
-
-    while (
-      unbetNumbers.length < limit &&
-      attempts < maxAttempts
-    ) {
-      attempts++;
-
-      // 00 - 99
-      const firstTwo = String(
-        Math.floor(Math.random() * 100)
-      ).padStart(2, "0");
-
-      // A - Z
-      const letter = String.fromCharCode(
-        65 + Math.floor(Math.random() * 26)
-      );
-
-      // 00000 - 99999
-      const lastFive = String(
-        Math.floor(Math.random() * 100000)
-      ).padStart(5, "0");
-
-      const number =
-        `${firstTwo}${letter}${lastFive}`;
-
-      // Already selected in this response
-      if (usedRandomNumbers.has(number)) {
-        continue;
-      }
-
-      // Already has a bet
-      if (betNumbers.has(number)) {
-        continue;
-      }
-
-      usedRandomNumbers.add(number);
-      unbetNumbers.push(number);
-    }
-
-    // -------------------------------------------------
-    // RESPONSE
-    // -------------------------------------------------
 
     return res.status(200).json({
       success: true,
+      message: "Unbet lottery numbers fetched successfully",
 
-      data: {
-        lotteryConfigId: lottery._id,
+      lotteryConfigId: lotteryConfig._id,
+      lotteryName: lotteryConfig.marketName || null,
+      drawDate: lotteryConfig.drawDate || null,
+      drawTime: lotteryConfig.drawTime || null,
 
-        marketName: lottery.marketName,
+      totalNumbers: uniqueNumbers.length,
+      totalBettedNumbers: bettedNumbers.size,
+      totalUnbetNumbers: unbetNumbers.length,
 
-        drawDate: lottery.drawDate,
-
-        drawTime: lottery.drawTime,
-
-        totalPossibleNumbers: TOTAL_NUMBERS,
-
-        totalBetNumbers: betNumbers.size,
-
-        totalUnbetNumbers: unbetCount,
-
-        requestedLimit: limit,
-
-        unbetNumbers,
-      },
+      numbers: unbetNumbers,
     });
   } catch (error) {
-    console.error(
-      "Get Unbet Lottery Numbers Error:",
-      error
-    );
+    console.error("❌ getUnbetLotteryNumbers ERROR:", error);
+
+    // Mongoose maxTimeMS error
+    if (error.name === "MongooseError" || error.message?.includes("maxTimeMS")) {
+      return res.status(504).json({
+        success: false,
+        message: "Database query timed out. Please try again.",
+      });
+    }
+
+    // Mongoose validation/cast error
+    if (error.name === "CastError") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid ID format",
+      });
+    }
 
     return res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Failed to fetch unbet lottery numbers",
       error: error.message,
     });
   }
 };
+
 
 // =====================================================
 // EXPORTS
