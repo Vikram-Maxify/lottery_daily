@@ -1,4 +1,5 @@
 const KycDocument = require("../models/KycDocument");
+const User = require("../models/User"); // ✅ ADD
 
 // =====================================================
 // GET ALL KYC DOCUMENTS
@@ -11,19 +12,14 @@ exports.getAllKyc = async (req, res) => {
 
     const filter = {};
 
-    if (
-      status &&
-      ["pending", "approved", "rejected"].includes(status)
-    ) {
+    if (status && ["pending", "approved", "rejected"].includes(status)) {
       filter.status = status;
     }
 
     const documents = await KycDocument.find(filter)
       .populate("userId", "name email phone")
       .populate("reviewedBy", "name email")
-      .sort({
-        createdAt: -1,
-      });
+      .sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
@@ -32,7 +28,6 @@ exports.getAllKyc = async (req, res) => {
     });
   } catch (error) {
     console.error("Get All KYC Error:", error);
-
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -47,9 +42,7 @@ exports.getAllKyc = async (req, res) => {
 
 exports.getSingleKyc = async (req, res) => {
   try {
-    const document = await KycDocument.findById(
-      req.params.id
-    )
+    const document = await KycDocument.findById(req.params.id)
       .populate("userId", "name email phone")
       .populate("reviewedBy", "name email");
 
@@ -79,9 +72,7 @@ exports.getSingleKyc = async (req, res) => {
 
 exports.approveKyc = async (req, res) => {
   try {
-    const document = await KycDocument.findById(
-      req.params.id
-    );
+    const document = await KycDocument.findById(req.params.id);
 
     if (!document) {
       return res.status(404).json({
@@ -104,6 +95,13 @@ exports.approveKyc = async (req, res) => {
 
     await document.save();
 
+    // -------------------------------------------------
+    // ✅ User ko KYC verified mark karo
+    // -------------------------------------------------
+    await User.findByIdAndUpdate(document.userId, {
+      isKycVerified: true,
+    });
+
     return res.status(200).json({
       success: true,
       message: "KYC document approved successfully",
@@ -111,7 +109,6 @@ exports.approveKyc = async (req, res) => {
     });
   } catch (error) {
     console.error("Approve KYC Error:", error);
-
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -135,9 +132,7 @@ exports.rejectKyc = async (req, res) => {
       });
     }
 
-    const document = await KycDocument.findById(
-      req.params.id
-    );
+    const document = await KycDocument.findById(req.params.id);
 
     if (!document) {
       return res.status(404).json({
@@ -153,6 +148,21 @@ exports.rejectKyc = async (req, res) => {
 
     await document.save();
 
+    // -------------------------------------------------
+    // ✅ Agar user ke paas koi bhi approved doc nahi bacha
+    //    to isKycVerified = false kar do
+    // -------------------------------------------------
+    const approvedCount = await KycDocument.countDocuments({
+      userId: document.userId,
+      status: "approved",
+    });
+
+    if (approvedCount === 0) {
+      await User.findByIdAndUpdate(document.userId, {
+        isKycVerified: false,
+      });
+    }
+
     return res.status(200).json({
       success: true,
       message: "KYC document rejected",
@@ -160,7 +170,6 @@ exports.rejectKyc = async (req, res) => {
     });
   } catch (error) {
     console.error("Reject KYC Error:", error);
-
     return res.status(500).json({
       success: false,
       message: error.message,
