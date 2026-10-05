@@ -3,9 +3,10 @@ const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 
 const User = require("../models/userModel");
+const uploadToImgBB = require("../utils/imgbbUpload");
 
 // =======================
-// HELPERS (register + login dono same use karenge)
+// HELPERS
 // =======================
 const COOKIE_NAME = "usertoken";
 
@@ -31,6 +32,13 @@ const setAuthCookie = (res, user) => {
   const token = generateToken(user);
   res.cookie(COOKIE_NAME, token, cookieOptions);
   return token;
+};
+
+// 🔥 Helper: upload image if file present, return url or null
+const handleProfileImageUpload = async (req) => {
+  if (!req.file) return null;
+  const { imageUrl } = await uploadToImgBB(req.file);
+  return imageUrl;
 };
 
 // =======================
@@ -63,6 +71,12 @@ const register = async (req, res) => {
       });
     }
 
+    // 🔥 Upload profile image if provided
+    let profileImage = null;
+    if (req.file) {
+      profileImage = await handleProfileImageUpload(req);
+    }
+
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const user = await User.create({
@@ -70,9 +84,9 @@ const register = async (req, res) => {
       name,
       mobile,
       password: hashedPassword,
+      profileImage,
     });
 
-    // 🔥 FIX: register ke baad bhi cookie set karo (login jaisa)
     setAuthCookie(res, user);
 
     return res.status(201).json({
@@ -83,6 +97,7 @@ const register = async (req, res) => {
         name: user.name,
         mobile: user.mobile,
         role: user.role,
+        profileImage: user.profileImage,
       },
     });
   } catch (error) {
@@ -97,7 +112,7 @@ const register = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: error.message || "Internal server error",
     });
   }
 };
@@ -144,6 +159,7 @@ const login = async (req, res) => {
         name: user.name,
         mobile: user.mobile,
         role: user.role,
+        profileImage: user.profileImage,
       },
     });
   } catch (error) {
@@ -181,6 +197,8 @@ const getProfile = async (req, res) => {
         mobile: user.mobile,
         wallet: user.wallet,
         role: user.role,
+        profileImage: user.profileImage,
+        isKycVerified: user.isKycVerified,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
@@ -258,6 +276,12 @@ const updateProfile = async (req, res) => {
       user.password = await bcrypt.hash(password, 12);
     }
 
+    // 🔥 Profile image update
+    if (req.file) {
+      const imageUrl = await handleProfileImageUpload(req);
+      if (imageUrl) user.profileImage = imageUrl;
+    }
+
     await user.save();
 
     return res.status(200).json({
@@ -267,6 +291,7 @@ const updateProfile = async (req, res) => {
         uuid: user.uuid,
         name: user.name,
         mobile: user.mobile,
+        profileImage: user.profileImage,
         updatedAt: user.updatedAt,
       },
     });
@@ -282,7 +307,7 @@ const updateProfile = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: error.message || "Internal server error",
     });
   }
 };
@@ -381,6 +406,12 @@ const adminUpdateUserProfile = async (req, res) => {
       user.password = await bcrypt.hash(password, 12);
     }
 
+    // 🔥 Admin can also update image
+    if (req.file) {
+      const imageUrl = await handleProfileImageUpload(req);
+      if (imageUrl) user.profileImage = imageUrl;
+    }
+
     await user.save();
 
     return res.status(200).json({
@@ -392,6 +423,8 @@ const adminUpdateUserProfile = async (req, res) => {
         mobile: user.mobile,
         role: user.role,
         wallet: user.wallet,
+        profileImage: user.profileImage,
+        isKycVerified: user.isKycVerified,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
@@ -408,7 +441,7 @@ const adminUpdateUserProfile = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: error.message || "Internal server error",
     });
   }
 };
@@ -418,7 +451,6 @@ const adminUpdateUserProfile = async (req, res) => {
 // =======================
 const logout = async (req, res) => {
   try {
-    // maxAge ko chhodkar baaki options same hone chahiye
     const { maxAge, ...clearOptions } = cookieOptions;
     res.clearCookie(COOKIE_NAME, clearOptions);
 

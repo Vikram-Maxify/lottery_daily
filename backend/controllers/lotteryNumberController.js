@@ -1,6 +1,13 @@
 const LotteryNumber = require("../models/LotteryNumber");
 
 // =====================================================
+// CONFIG
+// =====================================================
+
+const DAILY_NUMBER_COUNT = 43200; // 100 -> 43200
+const INSERT_CHUNK_SIZE = 5000;   // MongoDB insertMany chunk size
+
+// =====================================================
 // GET INDIA DATE (YYYY-MM-DD)
 // =====================================================
 
@@ -48,7 +55,32 @@ function generateRandomNumber() {
 }
 
 // =====================================================
-// GENERATE UNIQUE NUMBER (max 50 attempts)
+// GENERATE BULK UNIQUE NUMBERS (IN-MEMORY)
+// No DB round-trip per number. Uses Set for uniqueness.
+// =====================================================
+
+function generateUniqueNumbersBulk(count) {
+  const set = new Set();
+  let safety = 0;
+  const maxAttempts = count * 10; // safety valve
+
+  while (set.size < count) {
+    set.add(generateRandomNumber());
+    safety++;
+
+    if (safety > maxAttempts) {
+      throw new Error(
+        "Failed to generate enough unique numbers. Increase format space."
+      );
+    }
+  }
+
+  return Array.from(set);
+}
+
+// =====================================================
+// GENERATE UNIQUE NUMBER (single, max 50 attempts)
+// Kept for backward compatibility.
 // =====================================================
 
 async function generateUniqueNumber() {
@@ -66,9 +98,10 @@ async function generateUniqueNumber() {
 }
 
 // =====================================================
-// CORE: CREATE DAILY 100 NUMBERS FOR A DATE
+// CORE: CREATE DAILY NUMBERS FOR A DATE
 // Reused by HTTP controller AND cron job.
 // Idempotent — creates only the remaining numbers.
+// Bulk generated in memory + chunked insertMany.
 // =====================================================
 
 async function createDailyNumbersForDate(batchDate) {
@@ -76,49 +109,91 @@ async function createDailyNumbersForDate(batchDate) {
     throw new Error("Invalid date. Use YYYY-MM-DD format.");
   }
 
-  const existingCount = await LotteryNumber.countDocuments({
-    batchDate,
-  });
+  const existingCount = await LotteryNumber.countDocuments({ batchDate });
 
-  if (existingCount >= 100) {
+  if (existingCount >= DAILY_NUMBER_COUNT) {
     return {
       batchDate,
       existing: existingCount,
       created: 0,
-      message: "100 numbers already exist for this date.",
+      message: `${DAILY_NUMBER_COUNT} numbers already exist for this date.`,
     };
   }
 
-  const remaining = 100 - existingCount;
-  const numbers = [];
+  const remaining = DAILY_NUMBER_COUNT - existingCount;
 
-  for (let i = 0; i < remaining; i++) {
-    const number = await generateUniqueNumber();
+  // 1. Bulk generate unique candidates in memory
+  const candidates = generateUniqueNumbersBulk(remaining);
 
-    numbers.push({
-      number,
+  // 2. Fetch existing numbers for this date to avoid collisions
+  const existingDocs = await LotteryNumber.find(
+    { batchDate },
+    { number: 1, _id: 0 }
+  ).lean();
+
+  const existingSet = new Set(existingDocs.map((d) => d.number));
+
+  // 3. Filter out any that already exist for this date
+  const freshNumbers = candidates.filter((n) => !existingSet.has(n));
+
+  if (freshNumbers.length === 0) {
+    return {
       batchDate,
-      status: "available",
-      betCount: 0,
-      soldAt: null,
-    });
+      existing: existingCount,
+      created: 0,
+      message: "No new numbers to insert (all candidates already exist).",
+    };
   }
 
-  const createdNumbers = await LotteryNumber.insertMany(numbers, {
-    ordered: true,
-  });
+  // 4. Prepare documents
+  const docs = freshNumbers.map((number) => ({
+    number,
+    batchDate,
+    status: "available",
+    betCount: 0,
+    soldAt: null,
+  }));
+
+  // 5. Chunked insertMany (ordered: false so duplicates don't kill the batch)
+  let createdTotal = 0;
+  const createdNumbers = [];
+
+  for (let i = 0; i < docs.length; i += INSERT_CHUNK_SIZE) {
+    const chunk = docs.slice(i, i + INSERT_CHUNK_SIZE);
+
+    try {
+      const inserted = await LotteryNumber.insertMany(chunk, {
+        ordered: false,
+      });
+      createdTotal += inserted.length;
+      createdNumbers.push(...inserted);
+    } catch (err) {
+      // insertMany with ordered:false may throw on partial dup key errors.
+      // Inserted docs are still in err.insertedDocs (Mongoose) or err.result.
+      if (err && err.insertedDocs && err.insertedDocs.length) {
+        createdTotal += err.insertedDocs.length;
+        createdNumbers.push(...err.insertedDocs);
+      } else if (err && err.writeErrors) {
+        const insertedCount = chunk.length - err.writeErrors.length;
+        createdTotal += insertedCount;
+      } else {
+        // Unknown error — rethrow
+        throw err;
+      }
+    }
+  }
 
   return {
     batchDate,
     existing: existingCount,
-    created: createdNumbers.length,
-    message: `${createdNumbers.length} new numbers created successfully.`,
+    created: createdTotal,
+    message: `${createdTotal} new numbers created successfully.`,
     numbers: createdNumbers,
   };
 }
 
 // =====================================================
-// CONTROLLER: CREATE DAILY 100 NUMBERS
+// CONTROLLER: CREATE DAILY NUMBERS
 // =====================================================
 
 const createDailyNumbers = async (req, res) => {
@@ -137,7 +212,7 @@ const createDailyNumbers = async (req, res) => {
     if (result.created === 0) {
       return res.status(400).json({
         success: false,
-        message: "100 numbers already exist for this date.",
+        message: `${DAILY_NUMBER_COUNT} numbers already exist for this date.`,
         batchDate: result.batchDate,
         count: result.existing,
       });
@@ -148,7 +223,9 @@ const createDailyNumbers = async (req, res) => {
       message: result.message,
       batchDate: result.batchDate,
       count: result.created,
-      numbers: result.numbers,
+      // NOTE: 43200 numbers response me bhejna heavy hoga.
+      // Isliye sirf count bhej rahe hain. Agar chahiye to uncomment karo.
+      // numbers: result.numbers,
     });
   } catch (error) {
     console.error("CREATE DAILY NUMBERS ERROR:", error);
@@ -163,6 +240,7 @@ const createDailyNumbers = async (req, res) => {
 
 // =====================================================
 // GET AVAILABLE NUMBERS (today or by query date)
+// Added pagination for 43200 scale.
 // =====================================================
 
 const getAvailableNumbers = async (req, res) => {
@@ -176,16 +254,30 @@ const getAvailableNumbers = async (req, res) => {
       });
     }
 
-    const numbers = await LotteryNumber.find({
-      batchDate,
-      status: "available",
-    })
-      .sort({ createdAt: 1 })
-      .lean();
+    const page = Math.max(1, parseInt(req.query?.page, 10) || 1);
+    const limit = Math.min(
+      1000,
+      Math.max(1, parseInt(req.query?.limit, 10) || 100)
+    );
+    const skip = (page - 1) * limit;
+
+    const filter = { batchDate, status: "available" };
+
+    const [numbers, total] = await Promise.all([
+      LotteryNumber.find(filter)
+        .sort({ createdAt: 1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      LotteryNumber.countDocuments(filter),
+    ]);
 
     return res.status(200).json({
       success: true,
       batchDate,
+      page,
+      limit,
+      total,
       count: numbers.length,
       numbers,
     });
@@ -201,20 +293,37 @@ const getAvailableNumbers = async (req, res) => {
 };
 
 // =====================================================
-// GET TODAY'S ALL NUMBERS
+// GET TODAY'S ALL NUMBERS (paginated)
 // =====================================================
 
 const getTodayNumbers = async (req, res) => {
   try {
     const batchDate = getIndiaDate();
 
-    const numbers = await LotteryNumber.find({ batchDate })
-      .sort({ createdAt: 1 })
-      .lean();
+    const page = Math.max(1, parseInt(req.query?.page, 10) || 1);
+    const limit = Math.min(
+      1000,
+      Math.max(1, parseInt(req.query?.limit, 10) || 100)
+    );
+    const skip = (page - 1) * limit;
+
+    const filter = { batchDate };
+
+    const [numbers, total] = await Promise.all([
+      LotteryNumber.find(filter)
+        .sort({ createdAt: 1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      LotteryNumber.countDocuments(filter),
+    ]);
 
     return res.status(200).json({
       success: true,
       batchDate,
+      page,
+      limit,
+      total,
       count: numbers.length,
       numbers,
     });
@@ -230,7 +339,7 @@ const getTodayNumbers = async (req, res) => {
 };
 
 // =====================================================
-// GET ALL NUMBERS (filters: date, status)
+// GET ALL NUMBERS (filters: date, status) — paginated
 // =====================================================
 
 const getAllNumbers = async (req, res) => {
@@ -251,12 +360,27 @@ const getAllNumbers = async (req, res) => {
       filter.status = req.query.status;
     }
 
-    const numbers = await LotteryNumber.find(filter)
-      .sort({ createdAt: -1 })
-      .lean();
+    const page = Math.max(1, parseInt(req.query?.page, 10) || 1);
+    const limit = Math.min(
+      1000,
+      Math.max(1, parseInt(req.query?.limit, 10) || 100)
+    );
+    const skip = (page - 1) * limit;
+
+    const [numbers, total] = await Promise.all([
+      LotteryNumber.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      LotteryNumber.countDocuments(filter),
+    ]);
 
     return res.status(200).json({
       success: true,
+      page,
+      limit,
+      total,
       count: numbers.length,
       numbers,
     });
@@ -487,6 +611,10 @@ module.exports = {
   reserveNumberForBet,
   createDailyNumbersForDate,
   generateUniqueNumber,
+  generateUniqueNumbersBulk,
   getIndiaDate,
   isValidDateString,
+
+  // Constants (agar bahar use karna ho)
+  DAILY_NUMBER_COUNT,
 };

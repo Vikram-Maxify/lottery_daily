@@ -13,13 +13,13 @@ const {
 
 function scheduleCreateDailyNumbers() {
   cron.schedule(
-    "1 0 * * *", // minute 1, hour 0 → 00:01
+    "00 01 * * *", // 10:55 AM IST (for testing)
     async () => {
       try {
         const batchDate = getIndiaDate();
 
         console.log(
-          `[CRON] 00:01 AM — Auto-creating numbers for ${batchDate}`
+          `[CRON] 01:00 AM — Auto-creating numbers for ${batchDate}`
         );
 
         const result = await createDailyNumbersForDate(batchDate);
@@ -36,7 +36,7 @@ function scheduleCreateDailyNumbers() {
   );
 
   console.log(
-    "[CRON] Auto-create job scheduled (00:01 AM IST)."
+    "[CRON] Auto-create job scheduled (10:55 AM IST)."
   );
 }
 
@@ -46,16 +46,13 @@ function scheduleCreateDailyNumbers() {
 
 function scheduleSellDailyNumbers() {
   cron.schedule(
-    "0 9 * * *", // 09:00 AM
+    "*/4 * * * * *", // every 2 seconds
     async () => {
       try {
         const batchDate = getIndiaDate();
 
-        console.log(
-          `[CRON] 09:00 AM — Selling numbers for ${batchDate}`
-        );
-
-        const result = await LotteryNumber.updateMany(
+        // Create ONE ticket per run
+        const result = await LotteryNumber.updateOne(
           {
             batchDate,
             status: "available",
@@ -68,9 +65,15 @@ function scheduleSellDailyNumbers() {
           }
         );
 
-        console.log(
-          `[CRON] Sold count: ${result.modifiedCount}`
-        );
+        if (result.modifiedCount > 0) {
+          console.log(
+            `[CRON] Sold 1 ticket for ${batchDate}`
+          );
+        } else {
+          console.log(
+            `[CRON] No available tickets left for ${batchDate}`
+          );
+        }
       } catch (error) {
         console.error(
           "[CRON] Sell daily numbers error:",
@@ -82,7 +85,7 @@ function scheduleSellDailyNumbers() {
   );
 
   console.log(
-    "[CRON] Sell job scheduled (09:00 AM IST)."
+    "[CRON] Sell job scheduled (every 2 seconds IST)."
   );
 }
 
