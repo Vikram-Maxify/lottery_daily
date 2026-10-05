@@ -1,5 +1,5 @@
 const KycDocument = require("../models/KycDocument");
-const User = require("../models/User"); // ✅ ADD
+const User = require("../models/userModel"); // ✅ ADD
 
 // =====================================================
 // GET ALL KYC DOCUMENTS
