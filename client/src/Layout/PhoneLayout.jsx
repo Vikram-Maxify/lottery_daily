@@ -4,7 +4,7 @@ import BottomNavbar from "./BottomNavbar";
 
 const PhoneLayout = () => {
   return (
-    <div className="min-h-screen w-full flex justify-center">
+    <div className="min-h-screen w-full flex justify-center bg-gray-600">
       <div
         className="
           w-full
@@ -21,8 +21,6 @@ const PhoneLayout = () => {
         <main className="">
           <Outlet />
         </main>
-
-        {/* ❌ WhatsApp yahan se hata diya */}
 
         <BottomNavbar />
       </div>
