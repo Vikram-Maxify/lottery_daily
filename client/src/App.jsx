@@ -41,6 +41,7 @@ import AdminFestivalLottery from "./admin/adminPages/AdminFestivalLottery";
 import AdminHomeBanner from "./admin/adminPages/AdminHomeBanner";
 import FestivalResult from "./admin/adminPages/FestivalResult";
 import AdminTopWinners from "./admin/adminPages/AdminTopWinners";
+import AdminSettings from "./admin/adminPages/AdminSettings";
 
 // ==========================================================
 // WHATSAPP SUPPORT NUMBER
@@ -266,6 +267,16 @@ function App() {
             <Route
               path="/admin/top-winners"
               element={<AdminTopWinners />}
+            />
+
+            {/* Admin Settings (Daily amount, Festival amount, Referral %) */}
+            <Route
+              path="/settings"
+              element={<AdminSettings />}
+            />
+            <Route
+              path="/admin/settings"
+              element={<AdminSettings />}
             />
 
           </Route>

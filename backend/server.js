@@ -142,7 +142,7 @@ app.use(
 
 app.use("/api/top-winners", topWinnerRoutes);
 
-app.use('./api/festival-amount',require('./routes/festivalamountRoutes'))
+app.use("/api/festival-amount", require("./routes/festivalamountRoutes"));
 
 // =======================
 // LOTTERY CRON

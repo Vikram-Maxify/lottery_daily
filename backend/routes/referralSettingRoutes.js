@@ -3,20 +3,22 @@ const express = require("express");
 const router = express.Router();
 
 const {
+  getAllSettings,
+  updateAllSettings,
   getReferralPercentage,
   setReferralPercentage,
 } = require("../controllers/referralSettingController");
 
-// Get current referral percentage
-router.get(
-  "/referral-percentage",
-  getReferralPercentage
-);
+// =====================================================
+// ALL SETTINGS (Daily Amount, Festival Amount, Referral %)
+// =====================================================
+router.get("/", getAllSettings);
+router.put("/", updateAllSettings);
 
-// Set / update referral percentage
-router.put(
-  "/referral-percentage",
-  setReferralPercentage
-);
+// =====================================================
+// SPECIFIC REFERRAL PERCENTAGE
+// =====================================================
+router.get("/referral-percentage", getReferralPercentage);
+router.put("/referral-percentage", setReferralPercentage);
 
 module.exports = router;
