@@ -15,6 +15,7 @@ const {
   deleteLotteryConfig,
   addBulkUserLotteryEntries,
   updateLotteryConfig,
+  checkLotteryResult,
 } = require("../controllers/festival_lottery");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -110,8 +111,6 @@ router.put(
   updateLotteryConfig
 );
 
-// GET all lottery configs
-// GET /api/lottery-config/all
 router.get(
   "/all",
   authMiddleware,
@@ -119,8 +118,6 @@ router.get(
   getAllLotteryConfigs
 );
 
-// GET lottery config by ID
-// GET /api/lottery-config/:id
 router.get(
   "/:id",
   authMiddleware,
@@ -128,8 +125,6 @@ router.get(
   getLotteryConfigById
 );
 
-// ACTIVATE lottery config
-// PATCH /api/lottery-config/:id/activate
 router.patch(
   "/:id/activate",
   authMiddleware,
@@ -137,8 +132,7 @@ router.patch(
   activateLotteryConfig
 );
 
-// UPDATE user entry status
-// PATCH /api/lottery-config/:configId/entry/:entryId/status
+
 router.patch(
   "/:configId/entry/:entryId/status",
   authMiddleware,
@@ -146,13 +140,19 @@ router.patch(
   updateEntryStatus
 );
 
-// DELETE lottery config
-// DELETE /api/lottery-config/:id
 router.delete(
   "/:id",
   authMiddleware,
   adminMiddleware,
   deleteLotteryConfig
 );
+
+
+router.get(
+  "/check-result/:number",
+  authMiddleware,
+  checkLotteryResult
+);
+
 
 module.exports = router;

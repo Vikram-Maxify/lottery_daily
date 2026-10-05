@@ -59,11 +59,21 @@ const lotteryUserEntrySchema = new mongoose.Schema(
         default: 0,
         min: 0,
       },
+      fourth: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      fifth: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
     },
 
     prizeType: {
       type: String,
-      enum: ["1st", "2nd", "3rd", null],
+      enum: ["1st", "2nd", "3rd", "4th", "5th", null],
       default: null,
     },
 
@@ -167,6 +177,18 @@ const lotteryConfigSchema = new mongoose.Schema(
       third: {
         type: Number,
         required: true,
+        min: 0,
+      },
+
+      fourth: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+
+      fifth: {
+        type: Number,
+        default: 0,
         min: 0,
       },
     },

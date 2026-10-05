@@ -39,12 +39,24 @@ const lotteryUserEntrySchema = new mongoose.Schema(
         default: 0,
         min: 0,
       },
+
       second: {
         type: Number,
         default: 0,
         min: 0,
       },
+
       third: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      fourth: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      fifth: {
         type: Number,
         default: 0,
         min: 0,
@@ -120,6 +132,16 @@ const festivalSchema = new mongoose.Schema(
         min: 0,
       },
       third: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
+      fourth: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
+      fifth: {
         type: Number,
         required: true,
         min: 0,
