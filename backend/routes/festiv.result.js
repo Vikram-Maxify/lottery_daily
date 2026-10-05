@@ -9,6 +9,7 @@ const {
   updateResult,
   deleteResult,
   checkNumber,
+  getUnbetLotteryNumbers,
 } = require("../controllers/festival_result_controller");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -86,6 +87,11 @@ router.delete(
   authMiddleware,
   adminMiddleware,
   deleteResult
+);
+
+router.get(
+  "/unbet-numbers",
+  getUnbetLotteryNumbers
 );
 
 module.exports = router;

@@ -472,6 +472,182 @@ const getAllResults = async (req, res) => {
   }
 };
 
+const getUnbetLotteryNumbers = async (req, res) => {
+  try {
+    const { lotteryConfigId } = req.query;
+
+    // -------------------------------------------------
+    // VALIDATION
+    // -------------------------------------------------
+
+    if (!lotteryConfigId) {
+      return res.status(400).json({
+        success: false,
+        message: "lotteryConfigId is required",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(lotteryConfigId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid lotteryConfigId",
+      });
+    }
+
+    // -------------------------------------------------
+    // FIND LOTTERY
+    // -------------------------------------------------
+
+    const lottery = await LotteryConfig.findById(
+      lotteryConfigId
+    ).lean();
+
+    if (!lottery) {
+      return res.status(404).json({
+        success: false,
+        message: "Lottery not found",
+      });
+    }
+
+    // -------------------------------------------------
+    // GET ALL BETTED NUMBERS
+    // -------------------------------------------------
+
+    const betNumbers = new Set();
+
+    for (const user of lottery.users || []) {
+      if (!user.number) continue;
+
+      const number = String(user.number)
+        .trim()
+        .toUpperCase();
+
+      betNumbers.add(number);
+    }
+
+    // -------------------------------------------------
+    // TOTAL POSSIBLE NUMBERS
+    //
+    // 00-99
+    // A-Z
+    // 00000-99999
+    //
+    // 100 × 26 × 100000
+    // = 260,000,000 possible numbers
+    // -------------------------------------------------
+
+    const TOTAL_NUMBERS =
+      100 * 26 * 100000;
+
+    // -------------------------------------------------
+    // HOW MANY UNBET NUMBERS?
+    // -------------------------------------------------
+
+    const unbetCount =
+      TOTAL_NUMBERS - betNumbers.size;
+
+    // -------------------------------------------------
+    // RETURN SOME RANDOM UNBET NUMBERS
+    //
+    // DO NOT generate all 260 million numbers.
+    // -------------------------------------------------
+
+    const requestedLimit = Number(
+      req.query.limit || 20
+    );
+
+    const limit = Math.min(
+      Math.max(requestedLimit, 1),
+      100
+    );
+
+    const unbetNumbers = [];
+
+    const usedRandomNumbers = new Set();
+
+    let attempts = 0;
+
+    const maxAttempts = limit * 100;
+
+    while (
+      unbetNumbers.length < limit &&
+      attempts < maxAttempts
+    ) {
+      attempts++;
+
+      // 00 - 99
+      const firstTwo = String(
+        Math.floor(Math.random() * 100)
+      ).padStart(2, "0");
+
+      // A - Z
+      const letter = String.fromCharCode(
+        65 + Math.floor(Math.random() * 26)
+      );
+
+      // 00000 - 99999
+      const lastFive = String(
+        Math.floor(Math.random() * 100000)
+      ).padStart(5, "0");
+
+      const number =
+        `${firstTwo}${letter}${lastFive}`;
+
+      // Already selected in this response
+      if (usedRandomNumbers.has(number)) {
+        continue;
+      }
+
+      // Already has a bet
+      if (betNumbers.has(number)) {
+        continue;
+      }
+
+      usedRandomNumbers.add(number);
+      unbetNumbers.push(number);
+    }
+
+    // -------------------------------------------------
+    // RESPONSE
+    // -------------------------------------------------
+
+    return res.status(200).json({
+      success: true,
+
+      data: {
+        lotteryConfigId: lottery._id,
+
+        marketName: lottery.marketName,
+
+        drawDate: lottery.drawDate,
+
+        drawTime: lottery.drawTime,
+
+        totalPossibleNumbers: TOTAL_NUMBERS,
+
+        totalBetNumbers: betNumbers.size,
+
+        totalUnbetNumbers: unbetCount,
+
+        requestedLimit: limit,
+
+        unbetNumbers,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Get Unbet Lottery Numbers Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
 // =====================================================
 // GET RESULT BY ID
 // GET /:id
@@ -945,4 +1121,5 @@ module.exports = {
   getPublishedResults,
   getPublishedResultByDate,
   getPrize,
+  getUnbetLotteryNumbers,
 };
