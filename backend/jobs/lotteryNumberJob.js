@@ -46,13 +46,12 @@ function scheduleCreateDailyNumbers() {
 
 function scheduleSellDailyNumbers() {
   cron.schedule(
-    "*/4 * * * * *", // every 2 seconds
+    "*/4 * * * * *", // every 4 seconds
     async () => {
       try {
         const batchDate = getIndiaDate();
 
-        // Create ONE ticket per run
-        const result = await LotteryNumber.updateOne(
+        const ticket = await LotteryNumber.findOneAndUpdate(
           {
             batchDate,
             status: "available",
@@ -62,12 +61,17 @@ function scheduleSellDailyNumbers() {
               status: "sold",
               soldAt: new Date(),
             },
+          },
+          {
+            returnDocument: "after",
           }
         );
 
-        if (result.modifiedCount > 0) {
+        if (ticket) {
           console.log(
-            `[CRON] Sold 1 ticket for ${batchDate}`
+            `[CRON] Sold 1 ticket | Date: ${batchDate} | Ticket Number: ${
+              ticket.number || ticket.ticketNumber
+            }`
           );
         } else {
           console.log(
@@ -81,11 +85,13 @@ function scheduleSellDailyNumbers() {
         );
       }
     },
-    { timezone: "Asia/Kolkata" }
+    {
+      timezone: "Asia/Kolkata",
+    }
   );
 
   console.log(
-    "[CRON] Sell job scheduled (every 2 seconds IST)."
+    "[CRON] Sell job scheduled (every 4 seconds IST)."
   );
 }
 

@@ -117,6 +117,7 @@ const kycRoutes = require("./routes/kycRoutes");
 const adminKycRoutes = require("./routes/adminKycRoutes");
 const bannerRoutes = require("./routes/bannerRoutes");
 const {startLotteryNumberJobs} = require("./jobs/lotteryNumberJob");
+const topWinnerRoutes = require("./routes/topWinnerRoutes");
 
 
 app.use("/uploads", express.static("uploads"));
@@ -132,6 +133,8 @@ app.use(
   "/api/lottery-numbers",
   lotteryNumberRoutes
 );
+
+app.use("/api/top-winners", topWinnerRoutes);
 
 // =======================
 // LOTTERY CRON
