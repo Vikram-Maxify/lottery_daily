@@ -1,10 +1,9 @@
 const express = require("express");
 
+const multer = require("multer");
 const router = express.Router();
 
 const storage = multer.memoryStorage();
-const multer = require("multer");
-
 
 const upload = multer({
   storage,
@@ -14,28 +13,16 @@ const upload = multer({
   },
 
   fileFilter: (req, file, cb) => {
-    const allowedTypes = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/webp",
-    ];
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
     if (!allowedTypes.includes(file.mimetype)) {
-      return cb(
-        new Error(
-          "Only JPG, JPEG, PNG and WEBP images are allowed."
-        )
-      );
+      return cb(new Error("Only JPG, JPEG, PNG and WEBP images are allowed."));
     }
 
     cb(null, true);
   },
 });
-const {
-  uploadKycDocument,
-  getMyKyc,
-} = require("../controllers/kycController");
+const { uploadKycDocument, getMyKyc } = require("../controllers/kycController");
 
 const authMiddleware = require("../middleware/authMiddleware");
 
@@ -62,17 +49,13 @@ router.post(
       maxCount: 1,
     },
   ]),
-  uploadKycDocument
+  uploadKycDocument,
 );
 
 // =====================================================
 // USER'S KYC
 // =====================================================
 
-router.get(
-  "/my",
-  authMiddleware,
-  getMyKyc
-);
+router.get("/my", authMiddleware, getMyKyc);
 
 module.exports = router;
