@@ -181,6 +181,7 @@ const getProfile = async (req, res) => {
         mobile: user.mobile,
         wallet: user.wallet,
         role: user.role,
+        isKycVerified: Boolean(user.isKycVerified),
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },

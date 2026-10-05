@@ -36,7 +36,7 @@ const PrivateRoute = () => {
 
   // IMPORTANT:
   // Do not redirect before fetchProfile() has completed.
-  if (checkingAuth || profileLoading) {
+  if (checkingAuth || (profileLoading && !user)) {
     return (
       <div className="min-h-screen bg-seth-bg flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">

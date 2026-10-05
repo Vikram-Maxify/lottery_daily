@@ -5,6 +5,9 @@ const API = "/withdrawal";
 
 // ======================================================
 // CREATE WITHDRAWAL
+// Controller: exports.createWithdrawal
+// Expects: { amount, paymentMethod ('bank' | 'upi'), accountHolderName, accountNumber, ifscCode, bankName, branchName, upiId }
+// Returns: { success: true, message: "...", data: withdrawal, walletBalance: Number }
 // ======================================================
 
 export const createWithdrawal = createAsyncThunk(
@@ -19,19 +22,30 @@ export const createWithdrawal = createAsyncThunk(
                 }
             );
 
-            return data.data;
+            // Backend returns { success: true, message, data: withdrawal, walletBalance }
+            return data;
         } catch (err) {
-            return rejectWithValue(
-                err?.response?.data?.message ||
+            const resData = err?.response?.data;
+            const message =
+                resData?.message ||
                 err?.message ||
-                "Failed to create withdrawal"
-            );
+                "Failed to create withdrawal";
+
+            return rejectWithValue({
+                message,
+                kycVerified: resData?.kycVerified,
+                balance: resData?.balance,
+                requestedAmount: resData?.requestedAmount,
+                status: err?.response?.status,
+            });
         }
     }
 );
 
 // ======================================================
 // FETCH MY WITHDRAWALS
+// Controller: exports.getMyWithdrawals
+// Returns: { success: true, count: Number, data: Array }
 // ======================================================
 
 export const fetchMyWithdrawals = createAsyncThunk(
@@ -58,12 +72,14 @@ export const fetchMyWithdrawals = createAsyncThunk(
 
 // ======================================================
 // FETCH ALL WITHDRAWALS - ADMIN
+// Controller: exports.getAllWithdrawals
+// Returns: { success: true, data: Array, pagination: Object }
 // ======================================================
 
 export const fetchAllWithdrawals = createAsyncThunk(
     "withdrawal/fetchAll",
     async (
-        { status, page = 1 } = {},
+        { status, page = 1, limit = 20 } = {},
         { rejectWithValue }
     ) => {
         try {
@@ -73,6 +89,7 @@ export const fetchAllWithdrawals = createAsyncThunk(
                     params: {
                         status,
                         page,
+                        limit,
                     },
                     withCredentials: true,
                 }
@@ -91,6 +108,8 @@ export const fetchAllWithdrawals = createAsyncThunk(
 
 // ======================================================
 // UPDATE WITHDRAWAL STATUS - ADMIN
+// Controller: exports.updateWithdrawalStatus
+// Returns: { success: true, message: "...", data: withdrawal }
 // ======================================================
 
 export const updateWithdrawalStatus =
@@ -118,7 +137,7 @@ export const updateWithdrawalStatus =
                     }
                 );
 
-                return data.data;
+                return data;
             } catch (err) {
                 return rejectWithValue(
                     err?.response?.data?.message ||
@@ -145,6 +164,11 @@ const initialState = {
     updateStatusLoading: false,
 
     error: null,
+    errorDetails: null,
+    kycRequired: false,
+    successMessage: null,
+    walletBalance: null,
+
     myWithdrawalsError: null,
     allWithdrawalsError: null,
     updateStatusError: null,
@@ -169,6 +193,9 @@ const withdrawalSlice = createSlice({
         resetWithdrawalState: (state) => {
             state.success = false;
             state.error = null;
+            state.errorDetails = null;
+            state.kycRequired = false;
+            state.successMessage = null;
         },
 
         // --------------------------------------------------
@@ -196,6 +223,8 @@ const withdrawalSlice = createSlice({
 
         clearWithdrawalErrors: (state) => {
             state.error = null;
+            state.errorDetails = null;
+            state.kycRequired = false;
             state.myWithdrawalsError = null;
             state.allWithdrawalsError = null;
             state.updateStatusError = null;
@@ -217,7 +246,10 @@ const withdrawalSlice = createSlice({
             .addCase(createWithdrawal.pending, (state) => {
                 state.loading = true;
                 state.error = null;
+                state.errorDetails = null;
+                state.kycRequired = false;
                 state.success = false;
+                state.successMessage = null;
             })
 
             .addCase(
@@ -226,11 +258,19 @@ const withdrawalSlice = createSlice({
                     state.loading = false;
                     state.success = true;
                     state.error = null;
+                    state.errorDetails = null;
+                    state.kycRequired = false;
+                    state.successMessage =
+                        action.payload?.message ||
+                        "Withdrawal request submitted successfully";
+                    state.walletBalance =
+                        action.payload?.walletBalance;
 
-                    if (action.payload) {
-                        state.myWithdrawals.unshift(
-                            action.payload
-                        );
+                    const newWithdrawal =
+                        action.payload?.data || action.payload;
+
+                    if (newWithdrawal && newWithdrawal._id) {
+                        state.myWithdrawals.unshift(newWithdrawal);
                     }
                 }
             )
@@ -241,9 +281,24 @@ const withdrawalSlice = createSlice({
                     state.loading = false;
                     state.success = false;
 
-                    state.error =
-                        action.payload ||
-                        "Failed to create withdrawal";
+                    const payload = action.payload;
+                    if (typeof payload === "string") {
+                        state.error = payload;
+                        state.errorDetails = { message: payload };
+                        state.kycRequired = false;
+                    } else if (payload && typeof payload === "object") {
+                        state.error =
+                            payload.message ||
+                            "Failed to create withdrawal";
+                        state.errorDetails = payload;
+                        state.kycRequired =
+                            payload.kycVerified === false;
+                    } else {
+                        state.error =
+                            "Failed to create withdrawal";
+                        state.errorDetails = null;
+                        state.kycRequired = false;
+                    }
                 }
             );
 
@@ -267,21 +322,8 @@ const withdrawalSlice = createSlice({
                     state.myWithdrawalsLoading = false;
                     state.myWithdrawalsError = null;
 
-                    /*
-                     Backend response:
-          
-                     {
-                       success: true,
-                       count: 10,
-                       data: [...]
-                     }
-          
-                     Isliye data ko safely handle kar rahe hain.
-                    */
-
                     if (Array.isArray(action.payload)) {
-                        state.myWithdrawals =
-                            action.payload;
+                        state.myWithdrawals = action.payload;
                     } else {
                         state.myWithdrawals =
                             action.payload?.data || [];
@@ -294,14 +336,14 @@ const withdrawalSlice = createSlice({
                 (state, action) => {
                     state.myWithdrawalsLoading = false;
 
-                    state.myWithdrawalsError =
-                        action.payload ||
-                        "Failed to fetch withdrawals";
+                    const errorMsg =
+                        typeof action.payload === "string"
+                            ? action.payload
+                            : action.payload?.message ||
+                              "Failed to fetch withdrawals";
 
-                    state.error =
-                        action.payload ||
-                        "Failed to fetch withdrawals";
-
+                    state.myWithdrawalsError = errorMsg;
+                    state.error = errorMsg;
                     state.myWithdrawals = [];
                 }
             );
@@ -339,8 +381,10 @@ const withdrawalSlice = createSlice({
                     state.allWithdrawalsLoading = false;
 
                     state.allWithdrawalsError =
-                        action.payload ||
-                        "Failed to fetch withdrawals";
+                        typeof action.payload === "string"
+                            ? action.payload
+                            : action.payload?.message ||
+                              "Failed to fetch withdrawals";
 
                     state.allWithdrawals = [];
                     state.pagination = null;
@@ -367,21 +411,16 @@ const withdrawalSlice = createSlice({
                     state.updateStatusError = null;
 
                     const updatedWithdrawal =
-                        action.payload;
+                        action.payload?.data || action.payload;
 
                     if (!updatedWithdrawal?._id) {
                         return;
                     }
 
-                    // --------------------------------------------
                     // Update admin list
-                    // --------------------------------------------
-
                     const index =
                         state.allWithdrawals.findIndex(
-                            (withdrawal) =>
-                                withdrawal._id ===
-                                updatedWithdrawal._id
+                            (w) => w._id === updatedWithdrawal._id
                         );
 
                     if (index !== -1) {
@@ -389,15 +428,10 @@ const withdrawalSlice = createSlice({
                             updatedWithdrawal;
                     }
 
-                    // --------------------------------------------
-                    // Update user list also if same withdrawal
-                    // --------------------------------------------
-
+                    // Update user list if matching
                     const myIndex =
                         state.myWithdrawals.findIndex(
-                            (withdrawal) =>
-                                withdrawal._id ===
-                                updatedWithdrawal._id
+                            (w) => w._id === updatedWithdrawal._id
                         );
 
                     if (myIndex !== -1) {
@@ -413,8 +447,10 @@ const withdrawalSlice = createSlice({
                     state.updateStatusLoading = false;
 
                     state.updateStatusError =
-                        action.payload ||
-                        "Failed to update withdrawal";
+                        typeof action.payload === "string"
+                            ? action.payload
+                            : action.payload?.message ||
+                              "Failed to update withdrawal";
                 }
             );
     },
@@ -454,13 +490,23 @@ export const selectMyWithdrawalsLoading = (state) =>
 export const selectAllWithdrawalsLoading = (state) =>
     state.withdrawal?.allWithdrawalsLoading || false;
 
-export const selectUpdateWithdrawalLoading = (
-    state
-) =>
+export const selectUpdateWithdrawalLoading = (state) =>
     state.withdrawal?.updateStatusLoading || false;
 
 export const selectWithdrawalError = (state) =>
     state.withdrawal?.error || null;
+
+export const selectWithdrawalErrorDetails = (state) =>
+    state.withdrawal?.errorDetails || null;
+
+export const selectKycRequired = (state) =>
+    state.withdrawal?.kycRequired || false;
+
+export const selectWithdrawalSuccess = (state) =>
+    state.withdrawal?.success || false;
+
+export const selectWithdrawalSuccessMessage = (state) =>
+    state.withdrawal?.successMessage || null;
 
 export const selectMyWithdrawalsError = (state) =>
     state.withdrawal?.myWithdrawalsError || null;
@@ -468,18 +514,10 @@ export const selectMyWithdrawalsError = (state) =>
 export const selectAllWithdrawalsError = (state) =>
     state.withdrawal?.allWithdrawalsError || null;
 
-export const selectUpdateWithdrawalError = (
-    state
-) =>
+export const selectUpdateWithdrawalError = (state) =>
     state.withdrawal?.updateStatusError || null;
 
-export const selectWithdrawalSuccess = (state) =>
-    state.withdrawal?.success || false;
-
-// ======================================================
-// BACKWARD COMPATIBLE SELECTORS
-// ======================================================
-
+// Backward-compatible selectors
 export const selectWithdrawals = (state) =>
     state.withdrawal?.myWithdrawals || [];
 

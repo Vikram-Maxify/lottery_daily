@@ -344,6 +344,15 @@ const authSlice = createSlice({
 
         state.logoutError =
           action.payload || "Logout failed";
+      })
+
+      // ======================================================
+      // WITHDRAWAL SUCCESS -> UPDATE WALLET BALANCE
+      // ======================================================
+      .addCase("withdrawal/create/fulfilled", (state, action) => {
+        if (state.user && action.payload?.walletBalance !== undefined) {
+          state.user.wallet = action.payload.walletBalance;
+        }
       });
   },
 });
