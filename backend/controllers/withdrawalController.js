@@ -55,6 +55,29 @@ exports.createWithdrawal = async (req, res) => {
 
     try {
         // ==================================================
+        // ✅ KYC CHECK (FIRST)
+        // ==================================================
+        const kycUser = await User.findById(userId)
+            .select("_id isKycVerified wallet")
+            .lean();
+
+        if (!kycUser) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        if (!kycUser.isKycVerified) {
+            return res.status(403).json({
+                success: false,
+                message:
+                    "KYC verification required before withdrawal. Please complete your KYC first.",
+                kycVerified: false,
+            });
+        }
+
+        // ==================================================
         // VALIDATION
         // ==================================================
 
@@ -98,15 +121,17 @@ exports.createWithdrawal = async (req, res) => {
         // ==================================================
         // ATOMIC WALLET DEDUCTION
         //
-        // wallet >= amount condition ensures:
+        // Conditions:
         // 1. User exists
-        // 2. Balance is sufficient
-        // 3. Concurrent withdrawals cannot overspend
+        // 2. KYC verified
+        // 3. Balance sufficient
+        // 4. Concurrent withdrawals cannot overspend
         // ==================================================
 
         const user = await User.findOneAndUpdate(
             {
                 _id: userId,
+                isKycVerified: true,
                 wallet: { $gte: amt },
             },
             {
@@ -121,15 +146,24 @@ exports.createWithdrawal = async (req, res) => {
         );
 
         if (!user) {
-            // Check whether user exists
+            // Diagnose exact reason
             const existingUser = await User.findById(userId)
-                .select("_id wallet")
+                .select("_id wallet isKycVerified")
                 .lean();
 
             if (!existingUser) {
                 return res.status(404).json({
                     success: false,
                     message: "User not found",
+                });
+            }
+
+            if (!existingUser.isKycVerified) {
+                return res.status(403).json({
+                    success: false,
+                    message:
+                        "KYC verification required before withdrawal.",
+                    kycVerified: false,
                 });
             }
 
@@ -165,11 +199,8 @@ exports.createWithdrawal = async (req, res) => {
             });
         } catch (createError) {
             // ==================================================
-            // IMPORTANT:
-            // If withdrawal creation fails after wallet deduction,
-            // refund the amount.
+            // REFUND if withdrawal creation fails
             // ==================================================
-
             await User.findByIdAndUpdate(user._id, {
                 $inc: {
                     wallet: amt,
@@ -306,27 +337,17 @@ exports.getMyWithdrawalById = async (req, res) => {
 // ======================================================
 exports.getAllWithdrawals = async (req, res) => {
     try {
-        const {
-            status,
-            page = 1,
-            limit = 20,
-        } = req.query;
+        const { status, page = 1, limit = 20 } = req.query;
 
         // ==================================================
         // PAGINATION
         // ==================================================
 
-        const pageNum = Math.max(
-            1,
-            parseInt(page, 10) || 1
-        );
+        const pageNum = Math.max(1, parseInt(page, 10) || 1);
 
         const limitNum = Math.min(
             100,
-            Math.max(
-                1,
-                parseInt(limit, 10) || 20
-            )
+            Math.max(1, parseInt(limit, 10) || 20)
         );
 
         // ==================================================
@@ -360,13 +381,8 @@ exports.getAllWithdrawals = async (req, res) => {
 
         const [withdrawals, total] = await Promise.all([
             Withdrawal.find(filter)
-                .populate(
-                    "user",
-                    "name mobile uuid wallet"
-                )
-                .sort({
-                    createdAt: -1,
-                })
+                .populate("user", "name mobile uuid wallet")
+                .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limitNum)
                 .lean(),
@@ -390,8 +406,7 @@ exports.getAllWithdrawals = async (req, res) => {
         return res.status(500).json({
             success: false,
             message:
-                error.message ||
-                "Failed to fetch withdrawals",
+                error.message || "Failed to fetch withdrawals",
         });
     }
 };
@@ -412,14 +427,8 @@ exports.getWithdrawalById = async (req, res) => {
         }
 
         const withdrawal = await Withdrawal.findById(id)
-            .populate(
-                "user",
-                "name mobile uuid wallet"
-            )
-            .populate(
-                "processedBy",
-                "name mobile uuid"
-            )
+            .populate("user", "name mobile uuid wallet")
+            .populate("processedBy", "name mobile uuid")
             .lean();
 
         if (!withdrawal) {
@@ -459,11 +468,7 @@ exports.updateWithdrawalStatus = async (req, res) => {
 
     const { id } = req.params;
 
-    const {
-        status,
-        adminRemark,
-        transactionId,
-    } = req.body;
+    const { status, adminRemark, transactionId } = req.body;
 
     // ==================================================
     // VALIDATE
@@ -479,8 +484,7 @@ exports.updateWithdrawalStatus = async (req, res) => {
     if (!["approved", "rejected"].includes(status)) {
         return res.status(400).json({
             success: false,
-            message:
-                "Status must be either approved or rejected",
+            message: "Status must be either approved or rejected",
         });
     }
 
@@ -517,30 +521,26 @@ exports.updateWithdrawalStatus = async (req, res) => {
         }
 
         // ==================================================
-        // REJECTED
-        // REFUND MONEY TO USER
+        // REJECTED -> REFUND
         // ==================================================
 
         if (status === "rejected") {
-            const refundedUser =
-                await User.findByIdAndUpdate(
-                    withdrawal.user,
-                    {
-                        $inc: {
-                            wallet: withdrawal.amount,
-                        },
+            const refundedUser = await User.findByIdAndUpdate(
+                withdrawal.user,
+                {
+                    $inc: {
+                        wallet: withdrawal.amount,
                     },
-                    {
-                        new: true,
-                        session,
-                        runValidators: true,
-                    }
-                );
+                },
+                {
+                    new: true,
+                    session,
+                    runValidators: true,
+                }
+            );
 
             if (!refundedUser) {
-                throw new Error(
-                    "User not found. Refund failed."
-                );
+                throw new Error("User not found. Refund failed.");
             }
 
             withdrawal.status = "rejected";
@@ -563,9 +563,7 @@ exports.updateWithdrawalStatus = async (req, res) => {
         withdrawal.processedBy = adminId;
         withdrawal.processedAt = new Date();
 
-        await withdrawal.save({
-            session,
-        });
+        await withdrawal.save({ session });
 
         // ==================================================
         // COMMIT
@@ -586,16 +584,12 @@ exports.updateWithdrawalStatus = async (req, res) => {
             await session.abortTransaction();
         }
 
-        console.error(
-            "UPDATE WITHDRAWAL STATUS ERROR:",
-            error
-        );
+        console.error("UPDATE WITHDRAWAL STATUS ERROR:", error);
 
         return res.status(400).json({
             success: false,
             message:
-                error.message ||
-                "Failed to update withdrawal",
+                error.message || "Failed to update withdrawal",
         });
     } finally {
         await session.endSession();
