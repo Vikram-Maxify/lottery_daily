@@ -198,6 +198,7 @@ const getProfile = async (req, res) => {
         wallet: user.wallet,
         role: user.role,
         isKycVerified: Boolean(user.isKycVerified),
+        profileImage: user.profileImage || null,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
@@ -275,10 +276,14 @@ const updateProfile = async (req, res) => {
       user.password = await bcrypt.hash(password, 12);
     }
 
-    // 🔥 Profile image update
+    // 🔥 Profile image update (file upload or selected avatar)
     if (req.file) {
       const imageUrl = await handleProfileImageUpload(req);
       if (imageUrl) user.profileImage = imageUrl;
+    } else if (req.body.profileImage !== undefined) {
+      if (typeof req.body.profileImage === "string") {
+        user.profileImage = req.body.profileImage.trim();
+      }
     }
 
     await user.save();
@@ -409,6 +414,10 @@ const adminUpdateUserProfile = async (req, res) => {
     if (req.file) {
       const imageUrl = await handleProfileImageUpload(req);
       if (imageUrl) user.profileImage = imageUrl;
+    } else if (req.body.profileImage !== undefined) {
+      if (typeof req.body.profileImage === "string") {
+        user.profileImage = req.body.profileImage.trim();
+      }
     }
 
     await user.save();
