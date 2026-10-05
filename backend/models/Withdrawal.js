@@ -15,14 +15,54 @@ const withdrawalSchema = new mongoose.Schema(
             min: 1,
         },
 
-        // ✅ Embedded bank details (har request ke saath)
+        // ✅ Kis method se withdraw kar raha hai
+        paymentMethod: {
+            type: String,
+            enum: ["bank", "upi"],
+            required: true,
+        },
+
+        // ✅ Embedded payment details
         bankDetail: {
-            accountHolderName: { type: String, required: true, trim: true },
-            accountNumber:     { type: String, required: true, trim: true },
-            ifscCode:          { type: String, required: true, trim: true, uppercase: true },
-            bankName:          { type: String, required: true, trim: true },
-            branchName:        { type: String, trim: true },
-            upiId:             { type: String, trim: true },
+            accountHolderName: {
+                type: String,
+                trim: true,
+                required: function () {
+                    return this.paymentMethod === "bank";
+                },
+            },
+            accountNumber: {
+                type: String,
+                trim: true,
+                required: function () {
+                    return this.paymentMethod === "bank";
+                },
+            },
+            ifscCode: {
+                type: String,
+                trim: true,
+                uppercase: true,
+                required: function () {
+                    return this.paymentMethod === "bank";
+                },
+            },
+            bankName: {
+                type: String,
+                trim: true,
+                required: function () {
+                    return this.paymentMethod === "bank";
+                },
+            },
+            branchName: { type: String, trim: true },
+
+            // ✅ UPI sirf tab required jab paymentMethod === "upi"
+            upiId: {
+                type: String,
+                trim: true,
+                required: function () {
+                    return this.paymentMethod === "upi";
+                },
+            },
         },
 
         status: {

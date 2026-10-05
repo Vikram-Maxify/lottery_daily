@@ -2,33 +2,57 @@ const cron = require("node-cron");
 
 const LotteryNumber = require("../models/LotteryNumber");
 
+const {
+  createDailyNumbersForDate,
+  getIndiaDate,
+} = require("../controllers/lotteryNumberController");
+
 // =====================================================
-// GET DATE
+// CRON 1: 00:01 AM IST -> AUTO-CREATE 100 NUMBERS
 // =====================================================
 
-function getTodayDate() {
-  const now = new Date();
+function scheduleCreateDailyNumbers() {
+  cron.schedule(
+    "1 0 * * *", // minute 1, hour 0 → 00:01
+    async () => {
+      try {
+        const batchDate = getIndiaDate();
 
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
+        console.log(
+          `[CRON] 00:01 AM — Auto-creating numbers for ${batchDate}`
+        );
 
-  return `${year}-${month}-${day}`;
+        const result = await createDailyNumbersForDate(batchDate);
+
+        console.log("[CRON] Auto-create result:", result);
+      } catch (error) {
+        console.error(
+          "[CRON] Auto-create daily numbers error:",
+          error
+        );
+      }
+    },
+    { timezone: "Asia/Kolkata" }
+  );
+
+  console.log(
+    "[CRON] Auto-create job scheduled (00:01 AM IST)."
+  );
 }
 
 // =====================================================
-// 9:00 AM -> SELL TODAY NUMBERS
+// CRON 2: 09:00 AM IST -> SELL TODAY'S NUMBERS
 // =====================================================
 
-const startLotteryNumberJob = () => {
+function scheduleSellDailyNumbers() {
   cron.schedule(
-    "0 9 * * *",
+    "0 9 * * *", // 09:00 AM
     async () => {
       try {
-        const batchDate = getTodayDate();
+        const batchDate = getIndiaDate();
 
         console.log(
-          `9 AM reached. Selling numbers for ${batchDate}`
+          `[CRON] 09:00 AM — Selling numbers for ${batchDate}`
         );
 
         const result = await LotteryNumber.updateMany(
@@ -45,23 +69,32 @@ const startLotteryNumberJob = () => {
         );
 
         console.log(
-          `Numbers sold: ${result.modifiedCount}`
+          `[CRON] Sold count: ${result.modifiedCount}`
         );
       } catch (error) {
         console.error(
-          "Lottery 9 AM Job Error:",
+          "[CRON] Sell daily numbers error:",
           error
         );
       }
     },
-    {
-      timezone: "Asia/Kolkata",
-    }
+    { timezone: "Asia/Kolkata" }
   );
 
   console.log(
-    "Lottery number 9 AM job started."
+    "[CRON] Sell job scheduled (09:00 AM IST)."
   );
+}
+
+// =====================================================
+// START ALL JOBS
+// =====================================================
+
+const startLotteryNumberJobs = () => {
+  scheduleCreateDailyNumbers();
+  scheduleSellDailyNumbers();
+
+  console.log("[CRON] All lottery number jobs started.");
 };
 
-module.exports = startLotteryNumberJob;
+module.exports = { startLotteryNumberJobs };

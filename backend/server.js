@@ -116,7 +116,7 @@ app.use("/api", adminRoutes);
 const kycRoutes = require("./routes/kycRoutes");
 const adminKycRoutes = require("./routes/adminKycRoutes");
 const bannerRoutes = require("./routes/bannerRoutes");
-const startLotteryNumberJob = require("./jobs/lotteryNumberJob");
+const {startLotteryNumberJobs} = require("./jobs/lotteryNumberJob");
 
 
 app.use("/uploads", express.static("uploads"));
@@ -137,7 +137,7 @@ app.use(
 // LOTTERY CRON
 // =======================
 startLotteryCron();
-startLotteryNumberJob();
+startLotteryNumberJobs();
 
 // =======================
 // HEALTH CHECK

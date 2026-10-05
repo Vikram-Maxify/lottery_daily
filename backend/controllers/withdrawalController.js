@@ -23,6 +23,16 @@ const isValidObjectId = (id) => {
 };
 
 // ======================================================
+// HELPER: BASIC UPI FORMAT CHECK
+// ======================================================
+const isValidUpiId = (upi) => {
+    if (typeof upi !== "string") return false;
+    // e.g. name@bank / 9876543210@paytm / user.name@okhdfcbank
+    const upiRegex = /^[\w.\-]{2,256}@[a-zA-Z]{2,64}$/;
+    return upiRegex.test(upi.trim());
+};
+
+// ======================================================
 // USER
 // CREATE WITHDRAWAL
 // ======================================================
@@ -45,6 +55,7 @@ exports.createWithdrawal = async (req, res) => {
 
     const {
         amount,
+        paymentMethod, // ✅ "bank" | "upi"
         accountHolderName,
         accountNumber,
         ifscCode,
@@ -78,9 +89,8 @@ exports.createWithdrawal = async (req, res) => {
         }
 
         // ==================================================
-        // VALIDATION
+        // AMOUNT VALIDATION
         // ==================================================
-
         const amt = Number(amount);
 
         if (!Number.isFinite(amt) || amt <= 0) {
@@ -90,32 +100,67 @@ exports.createWithdrawal = async (req, res) => {
             });
         }
 
-        if (!accountHolderName?.trim()) {
+        // ==================================================
+        // ✅ PAYMENT METHOD VALIDATION
+        // ==================================================
+        if (!["bank", "upi"].includes(paymentMethod)) {
             return res.status(400).json({
                 success: false,
-                message: "Account holder name is required",
+                message:
+                    "paymentMethod is required and must be either 'bank' or 'upi'",
             });
         }
 
-        if (!accountNumber?.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Account number is required",
-            });
+        // ==================================================
+        // ✅ CONDITIONAL VALIDATION — BANK
+        // ==================================================
+        if (paymentMethod === "bank") {
+            if (!accountHolderName?.trim()) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Account holder name is required",
+                });
+            }
+
+            if (!accountNumber?.trim()) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Account number is required",
+                });
+            }
+
+            if (!ifscCode?.trim()) {
+                return res.status(400).json({
+                    success: false,
+                    message: "IFSC code is required",
+                });
+            }
+
+            if (!bankName?.trim()) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Bank name is required",
+                });
+            }
         }
 
-        if (!ifscCode?.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "IFSC code is required",
-            });
-        }
+        // ==================================================
+        // ✅ CONDITIONAL VALIDATION — UPI
+        // ==================================================
+        if (paymentMethod === "upi") {
+            if (!upiId?.trim()) {
+                return res.status(400).json({
+                    success: false,
+                    message: "UPI ID is required",
+                });
+            }
 
-        if (!bankName?.trim()) {
-            return res.status(400).json({
-                success: false,
-                message: "Bank name is required",
-            });
+            if (!isValidUpiId(upiId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid UPI ID format (e.g. name@bank)",
+                });
+            }
         }
 
         // ==================================================
@@ -127,7 +172,6 @@ exports.createWithdrawal = async (req, res) => {
         // 3. Balance sufficient
         // 4. Concurrent withdrawals cannot overspend
         // ==================================================
-
         const user = await User.findOneAndUpdate(
             {
                 _id: userId,
@@ -135,9 +179,7 @@ exports.createWithdrawal = async (req, res) => {
                 wallet: { $gte: amt },
             },
             {
-                $inc: {
-                    wallet: -amt,
-                },
+                $inc: { wallet: -amt },
             },
             {
                 new: true,
@@ -161,8 +203,7 @@ exports.createWithdrawal = async (req, res) => {
             if (!existingUser.isKycVerified) {
                 return res.status(403).json({
                     success: false,
-                    message:
-                        "KYC verification required before withdrawal.",
+                    message: "KYC verification required before withdrawal.",
                     kycVerified: false,
                 });
             }
@@ -176,25 +217,39 @@ exports.createWithdrawal = async (req, res) => {
         }
 
         // ==================================================
+        // ✅ BUILD bankDetail BASED ON paymentMethod
+        // ==================================================
+        const bankDetail =
+            paymentMethod === "bank"
+                ? {
+                      accountHolderName: accountHolderName.trim(),
+                      accountNumber: accountNumber.trim(),
+                      ifscCode: ifscCode.trim().toUpperCase(),
+                      bankName: bankName.trim(),
+                      branchName: branchName?.trim() || "",
+                      upiId: "",
+                  }
+                : {
+                      // UPI-only: bank fields intentionally blank
+                      accountHolderName: "",
+                      accountNumber: "",
+                      ifscCode: "",
+                      bankName: "",
+                      branchName: "",
+                      upiId: upiId.trim(),
+                  };
+
+        // ==================================================
         // CREATE WITHDRAWAL
         // ==================================================
-
         let withdrawal;
 
         try {
             withdrawal = await Withdrawal.create({
                 user: user._id,
                 amount: amt,
-
-                bankDetail: {
-                    accountHolderName: accountHolderName.trim(),
-                    accountNumber: accountNumber.trim(),
-                    ifscCode: ifscCode.trim().toUpperCase(),
-                    bankName: bankName.trim(),
-                    branchName: branchName?.trim() || "",
-                    upiId: upiId?.trim() || "",
-                },
-
+                paymentMethod,
+                bankDetail,
                 status: "pending",
             });
         } catch (createError) {
@@ -202,9 +257,7 @@ exports.createWithdrawal = async (req, res) => {
             // REFUND if withdrawal creation fails
             // ==================================================
             await User.findByIdAndUpdate(user._id, {
-                $inc: {
-                    wallet: amt,
-                },
+                $inc: { wallet: amt },
             });
 
             throw createError;
@@ -213,7 +266,6 @@ exports.createWithdrawal = async (req, res) => {
         // ==================================================
         // SUCCESS
         // ==================================================
-
         return res.status(201).json({
             success: true,
             message: "Withdrawal request submitted successfully",
@@ -255,9 +307,7 @@ exports.getMyWithdrawals = async (req, res) => {
         const withdrawals = await Withdrawal.find({
             user: userId,
         })
-            .sort({
-                createdAt: -1,
-            })
+            .sort({ createdAt: -1 })
             .lean();
 
         return res.status(200).json({
@@ -342,7 +392,6 @@ exports.getAllWithdrawals = async (req, res) => {
         // ==================================================
         // PAGINATION
         // ==================================================
-
         const pageNum = Math.max(1, parseInt(page, 10) || 1);
 
         const limitNum = Math.min(
@@ -353,7 +402,6 @@ exports.getAllWithdrawals = async (req, res) => {
         // ==================================================
         // FILTER
         // ==================================================
-
         const filter = {};
 
         if (status) {
@@ -378,7 +426,6 @@ exports.getAllWithdrawals = async (req, res) => {
         // ==================================================
         // FETCH
         // ==================================================
-
         const [withdrawals, total] = await Promise.all([
             Withdrawal.find(filter)
                 .populate("user", "name mobile uuid wallet")
@@ -405,8 +452,7 @@ exports.getAllWithdrawals = async (req, res) => {
 
         return res.status(500).json({
             success: false,
-            message:
-                error.message || "Failed to fetch withdrawals",
+            message: error.message || "Failed to fetch withdrawals",
         });
     }
 };
@@ -467,13 +513,11 @@ exports.updateWithdrawalStatus = async (req, res) => {
     }
 
     const { id } = req.params;
-
     const { status, adminRemark, transactionId } = req.body;
 
     // ==================================================
     // VALIDATE
     // ==================================================
-
     if (!isValidObjectId(id)) {
         return res.status(400).json({
             success: false,
@@ -491,7 +535,6 @@ exports.updateWithdrawalStatus = async (req, res) => {
     // ==================================================
     // TRANSACTION
     // ==================================================
-
     const session = await mongoose.startSession();
 
     try {
@@ -500,7 +543,6 @@ exports.updateWithdrawalStatus = async (req, res) => {
         // ==================================================
         // FIND PENDING WITHDRAWAL
         // ==================================================
-
         const withdrawal = await Withdrawal.findOne({
             _id: id,
             status: "pending",
@@ -515,7 +557,6 @@ exports.updateWithdrawalStatus = async (req, res) => {
         // ==================================================
         // APPROVED
         // ==================================================
-
         if (status === "approved") {
             withdrawal.status = "approved";
         }
@@ -523,7 +564,6 @@ exports.updateWithdrawalStatus = async (req, res) => {
         // ==================================================
         // REJECTED -> REFUND
         // ==================================================
-
         if (status === "rejected") {
             const refundedUser = await User.findByIdAndUpdate(
                 withdrawal.user,
@@ -549,7 +589,6 @@ exports.updateWithdrawalStatus = async (req, res) => {
         // ==================================================
         // ADMIN DETAILS
         // ==================================================
-
         withdrawal.adminRemark =
             typeof adminRemark === "string"
                 ? adminRemark.trim()
@@ -568,7 +607,6 @@ exports.updateWithdrawalStatus = async (req, res) => {
         // ==================================================
         // COMMIT
         // ==================================================
-
         await session.commitTransaction();
 
         return res.status(200).json({

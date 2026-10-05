@@ -1,7 +1,7 @@
 const LotteryNumber = require("../models/LotteryNumber");
 
 // =====================================================
-// GET INDIA DATE
+// GET INDIA DATE (YYYY-MM-DD)
 // =====================================================
 
 function getIndiaDate() {
@@ -16,125 +16,142 @@ function getIndiaDate() {
 }
 
 // =====================================================
+// DATE VALIDATION
+// =====================================================
+
+function isValidDateString(date) {
+  if (typeof date !== "string") return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return (
+    !isNaN(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === date
+  );
+}
+
+// =====================================================
 // GENERATE RANDOM NUMBER
-//
-// FORMAT:
-// 10A78965
-//
-// 2 digits + 1 uppercase letter + 5 digits
-// Total = 8 characters
+// FORMAT: 10A78965  (2 digits + letter + 5 digits)
 // =====================================================
 
 function generateRandomNumber() {
-  const firstTwo = Math.floor(
-    10 + Math.random() * 90
-  );
+  const firstTwo = Math.floor(10 + Math.random() * 90);
 
   const letter = String.fromCharCode(
     65 + Math.floor(Math.random() * 26)
   );
 
-  const lastFive = Math.floor(
-    10000 + Math.random() * 90000
-  );
+  const lastFive = Math.floor(10000 + Math.random() * 90000);
 
   return `${firstTwo}${letter}${lastFive}`;
 }
 
 // =====================================================
-// GENERATE ONE UNIQUE NUMBER
-//
-// Existing database ke against check karta hai.
+// GENERATE UNIQUE NUMBER (max 50 attempts)
 // =====================================================
 
 async function generateUniqueNumber() {
-  while (true) {
+  for (let attempt = 0; attempt < 50; attempt++) {
     const number = generateRandomNumber();
 
-    const exists = await LotteryNumber.exists({
-      number,
-    });
+    const exists = await LotteryNumber.exists({ number });
 
-    if (!exists) {
-      return number;
-    }
+    if (!exists) return number;
   }
+
+  throw new Error(
+    "Failed to generate a unique number after 50 attempts."
+  );
 }
 
 // =====================================================
-// CREATE DAILY 100 NUMBERS
-//
-// Har din exactly 100 numbers.
-// Agar kisi reason se already kuch create ho chuke hain,
-// to remaining numbers create karega.
+// CORE: CREATE DAILY 100 NUMBERS FOR A DATE
+// Reused by HTTP controller AND cron job.
+// Idempotent — creates only the remaining numbers.
+// =====================================================
+
+async function createDailyNumbersForDate(batchDate) {
+  if (!isValidDateString(batchDate)) {
+    throw new Error("Invalid date. Use YYYY-MM-DD format.");
+  }
+
+  const existingCount = await LotteryNumber.countDocuments({
+    batchDate,
+  });
+
+  if (existingCount >= 100) {
+    return {
+      batchDate,
+      existing: existingCount,
+      created: 0,
+      message: "100 numbers already exist for this date.",
+    };
+  }
+
+  const remaining = 100 - existingCount;
+  const numbers = [];
+
+  for (let i = 0; i < remaining; i++) {
+    const number = await generateUniqueNumber();
+
+    numbers.push({
+      number,
+      batchDate,
+      status: "available",
+      betCount: 0,
+      soldAt: null,
+    });
+  }
+
+  const createdNumbers = await LotteryNumber.insertMany(numbers, {
+    ordered: true,
+  });
+
+  return {
+    batchDate,
+    existing: existingCount,
+    created: createdNumbers.length,
+    message: `${createdNumbers.length} new numbers created successfully.`,
+    numbers: createdNumbers,
+  };
+}
+
+// =====================================================
+// CONTROLLER: CREATE DAILY 100 NUMBERS
 // =====================================================
 
 const createDailyNumbers = async (req, res) => {
   try {
-    const batchDate =
-      req.body?.date || getIndiaDate();
+    const batchDate = req.body?.date || getIndiaDate();
 
-    // Date format validation
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(batchDate)) {
+    if (!isValidDateString(batchDate)) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid date. Use YYYY-MM-DD format.",
+        message: "Invalid date. Use YYYY-MM-DD format.",
       });
     }
 
-    const existingCount =
-      await LotteryNumber.countDocuments({
-        batchDate,
-      });
+    const result = await createDailyNumbersForDate(batchDate);
 
-    // Already 100
-    if (existingCount >= 100) {
+    if (result.created === 0) {
       return res.status(400).json({
         success: false,
-        message:
-          "100 numbers already exist for this date.",
-        batchDate,
-        count: existingCount,
+        message: "100 numbers already exist for this date.",
+        batchDate: result.batchDate,
+        count: result.existing,
       });
     }
-
-    const remaining = 100 - existingCount;
-
-    const numbers = [];
-
-    for (let i = 0; i < remaining; i++) {
-      const number = await generateUniqueNumber();
-
-      numbers.push({
-        number,
-        batchDate,
-        status: "available",
-        betCount: 0,
-        soldAt: null,
-      });
-    }
-
-    const createdNumbers =
-      await LotteryNumber.insertMany(
-        numbers,
-        {
-          ordered: true,
-        }
-      );
 
     return res.status(201).json({
       success: true,
-      message: `${createdNumbers.length} new numbers created successfully.`,
-      batchDate,
-      count: createdNumbers.length,
-      numbers: createdNumbers,
+      message: result.message,
+      batchDate: result.batchDate,
+      count: result.created,
+      numbers: result.numbers,
     });
   } catch (error) {
-    console.error(
-      "CREATE DAILY NUMBERS ERROR:",
-      error
-    );
+    console.error("CREATE DAILY NUMBERS ERROR:", error);
 
     return res.status(500).json({
       success: false,
@@ -145,23 +162,26 @@ const createDailyNumbers = async (req, res) => {
 };
 
 // =====================================================
-// GET TODAY AVAILABLE NUMBERS
+// GET AVAILABLE NUMBERS (today or by query date)
 // =====================================================
 
 const getAvailableNumbers = async (req, res) => {
   try {
-    const batchDate =
-      req.query?.date || getIndiaDate();
+    const batchDate = req.query?.date || getIndiaDate();
 
-    const numbers =
-      await LotteryNumber.find({
-        batchDate,
-        status: "available",
-      })
-        .sort({
-          createdAt: 1,
-        })
-        .lean();
+    if (!isValidDateString(batchDate)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid date. Use YYYY-MM-DD format.",
+      });
+    }
+
+    const numbers = await LotteryNumber.find({
+      batchDate,
+      status: "available",
+    })
+      .sort({ createdAt: 1 })
+      .lean();
 
     return res.status(200).json({
       success: true,
@@ -170,10 +190,7 @@ const getAvailableNumbers = async (req, res) => {
       numbers,
     });
   } catch (error) {
-    console.error(
-      "GET AVAILABLE NUMBERS ERROR:",
-      error
-    );
+    console.error("GET AVAILABLE NUMBERS ERROR:", error);
 
     return res.status(500).json({
       success: false,
@@ -184,21 +201,16 @@ const getAvailableNumbers = async (req, res) => {
 };
 
 // =====================================================
-// GET TODAY ALL NUMBERS
+// GET TODAY'S ALL NUMBERS
 // =====================================================
 
 const getTodayNumbers = async (req, res) => {
   try {
     const batchDate = getIndiaDate();
 
-    const numbers =
-      await LotteryNumber.find({
-        batchDate,
-      })
-        .sort({
-          createdAt: 1,
-        })
-        .lean();
+    const numbers = await LotteryNumber.find({ batchDate })
+      .sort({ createdAt: 1 })
+      .lean();
 
     return res.status(200).json({
       success: true,
@@ -207,10 +219,7 @@ const getTodayNumbers = async (req, res) => {
       numbers,
     });
   } catch (error) {
-    console.error(
-      "GET TODAY NUMBERS ERROR:",
-      error
-    );
+    console.error("GET TODAY NUMBERS ERROR:", error);
 
     return res.status(500).json({
       success: false,
@@ -221,7 +230,7 @@ const getTodayNumbers = async (req, res) => {
 };
 
 // =====================================================
-// GET ALL NUMBERS
+// GET ALL NUMBERS (filters: date, status)
 // =====================================================
 
 const getAllNumbers = async (req, res) => {
@@ -229,6 +238,12 @@ const getAllNumbers = async (req, res) => {
     const filter = {};
 
     if (req.query?.date) {
+      if (!isValidDateString(req.query.date)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid date. Use YYYY-MM-DD format.",
+        });
+      }
       filter.batchDate = req.query.date;
     }
 
@@ -236,12 +251,9 @@ const getAllNumbers = async (req, res) => {
       filter.status = req.query.status;
     }
 
-    const numbers =
-      await LotteryNumber.find(filter)
-        .sort({
-          createdAt: -1,
-        })
-        .lean();
+    const numbers = await LotteryNumber.find(filter)
+      .sort({ createdAt: -1 })
+      .lean();
 
     return res.status(200).json({
       success: true,
@@ -249,10 +261,7 @@ const getAllNumbers = async (req, res) => {
       numbers,
     });
   } catch (error) {
-    console.error(
-      "GET ALL NUMBERS ERROR:",
-      error
-    );
+    console.error("GET ALL NUMBERS ERROR:", error);
 
     return res.status(500).json({
       success: false,
@@ -268,13 +277,13 @@ const getAllNumbers = async (req, res) => {
 
 const getNumberByValue = async (req, res) => {
   try {
-    const number =
-      req.params.number.toUpperCase();
+    const number = String(req.params.number || "")
+      .trim()
+      .toUpperCase();
 
-    const lotteryNumber =
-      await LotteryNumber.findOne({
-        number,
-      }).lean();
+    const lotteryNumber = await LotteryNumber.findOne({
+      number,
+    }).lean();
 
     if (!lotteryNumber) {
       return res.status(404).json({
@@ -288,10 +297,7 @@ const getNumberByValue = async (req, res) => {
       number: lotteryNumber,
     });
   } catch (error) {
-    console.error(
-      "GET NUMBER ERROR:",
-      error
-    );
+    console.error("GET NUMBER ERROR:", error);
 
     return res.status(500).json({
       success: false,
@@ -305,73 +311,58 @@ const getNumberByValue = async (req, res) => {
 // CHECK NUMBER BEFORE BET
 // =====================================================
 
-const checkNumberForBet = async (
-  req,
-  res
-) => {
+const checkNumberForBet = async (req, res) => {
   try {
-    const number =
-      req.params.number.toUpperCase();
+    const number = String(req.params.number || "")
+      .trim()
+      .toUpperCase();
 
-    const lotteryNumber =
-      await LotteryNumber.findOne({
-        number,
-      }).lean();
+    const lotteryNumber = await LotteryNumber.findOne({
+      number,
+    }).lean();
 
     if (!lotteryNumber) {
       return res.status(404).json({
         success: false,
         canBet: false,
-        message:
-          "This number does not exist.",
+        message: "This number does not exist.",
       });
     }
 
-    if (
-      lotteryNumber.status !==
-      "available"
-    ) {
+    if (lotteryNumber.status !== "available") {
       return res.status(400).json({
         success: false,
         canBet: false,
-        message:
-          "This number is already sold.",
+        message: "This number is already sold.",
       });
     }
 
     return res.status(200).json({
       success: true,
       canBet: true,
-      message:
-        "Number is available for betting.",
+      message: "Number is available for betting.",
       number: lotteryNumber,
     });
   } catch (error) {
-    console.error(
-      "CHECK NUMBER ERROR:",
-      error
-    );
+    console.error("CHECK NUMBER ERROR:", error);
 
     return res.status(500).json({
       success: false,
       canBet: false,
-      message:
-        "Failed to check number.",
+      message: "Failed to check number.",
     });
   }
 };
 
 // =====================================================
-// SELL ONE NUMBER
-//
-// Atomic operation.
-// Agar already sold hai to update nahi hoga.
+// SELL ONE NUMBER (atomic)
 // =====================================================
 
 const sellNumber = async (req, res) => {
   try {
-    const number =
-      req.body.number?.toUpperCase();
+    const number = String(req.body?.number || "")
+      .trim()
+      .toUpperCase();
 
     if (!number) {
       return res.status(400).json({
@@ -380,28 +371,21 @@ const sellNumber = async (req, res) => {
       });
     }
 
-    const updated =
-      await LotteryNumber.findOneAndUpdate(
-        {
-          number,
-          status: "available",
+    const updated = await LotteryNumber.findOneAndUpdate(
+      { number, status: "available" },
+      {
+        $set: {
+          status: "sold",
+          soldAt: new Date(),
         },
-        {
-          $set: {
-            status: "sold",
-            soldAt: new Date(),
-          },
-        },
-        {
-          new: true,
-        }
-      );
+      },
+      { new: true }
+    );
 
     if (!updated) {
       return res.status(400).json({
         success: false,
-        message:
-          "Number not found or already sold.",
+        message: "Number not found or already sold.",
       });
     }
 
@@ -411,10 +395,7 @@ const sellNumber = async (req, res) => {
       number: updated,
     });
   } catch (error) {
-    console.error(
-      "SELL NUMBER ERROR:",
-      error
-    );
+    console.error("SELL NUMBER ERROR:", error);
 
     return res.status(500).json({
       success: false,
@@ -424,104 +405,75 @@ const sellNumber = async (req, res) => {
 };
 
 // =====================================================
-// SELL ALL TODAY NUMBERS
+// SELL ALL TODAY'S NUMBERS
 // =====================================================
 
-const sellTodayNumbers = async (
-  req,
-  res
-) => {
+const sellTodayNumbers = async (req, res) => {
   try {
     const batchDate = getIndiaDate();
 
-    const result =
-      await LotteryNumber.updateMany(
-        {
-          batchDate,
-          status: "available",
-        },
-        {
-          $set: {
-            status: "sold",
-            soldAt: new Date(),
-          },
-        }
-      );
-
-    return res.status(200).json({
-      success: true,
-      message:
-        "Today's available numbers marked as sold.",
-      batchDate,
-      soldCount: result.modifiedCount,
-    });
-  } catch (error) {
-    console.error(
-      "SELL TODAY NUMBERS ERROR:",
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        "Failed to sell today's numbers.",
-    });
-  }
-};
-
-// =====================================================
-// RESERVE NUMBER FOR BET
-//
-// IMPORTANT:
-// Bet controller me isi function ko use karo.
-//
-// Atomic query:
-// status available hona mandatory hai.
-//
-// Isse 2 users same number ko simultaneously
-// reserve nahi kar sakte.
-// =====================================================
-
-const reserveNumberForBet = async (
-  number
-) => {
-  if (!number) {
-    throw new Error(
-      "Lottery number is required."
-    );
-  }
-
-  const normalizedNumber =
-    number.toUpperCase().trim();
-
-  const updated =
-    await LotteryNumber.findOneAndUpdate(
-      {
-        number: normalizedNumber,
-        status: "available",
-      },
+    const result = await LotteryNumber.updateMany(
+      { batchDate, status: "available" },
       {
         $set: {
           status: "sold",
           soldAt: new Date(),
         },
-        $inc: {
-          betCount: 1,
-        },
-      },
-      {
-        new: true,
       }
     );
 
-  if (!updated) {
-    return null;
-  }
+    return res.status(200).json({
+      success: true,
+      message: "Today's available numbers marked as sold.",
+      batchDate,
+      soldCount: result.modifiedCount,
+    });
+  } catch (error) {
+    console.error("SELL TODAY NUMBERS ERROR:", error);
 
-  return updated;
+    return res.status(500).json({
+      success: false,
+      message: "Failed to sell today's numbers.",
+    });
+  }
 };
 
+// =====================================================
+// RESERVE NUMBER FOR BET (atomic)
+// Bet controller me isi function ko use karo.
+// =====================================================
+
+const reserveNumberForBet = async (number) => {
+  if (!number) {
+    throw new Error("Lottery number is required.");
+  }
+
+  const normalizedNumber = String(number).trim().toUpperCase();
+
+  const updated = await LotteryNumber.findOneAndUpdate(
+    {
+      number: normalizedNumber,
+      status: "available",
+    },
+    {
+      $set: {
+        status: "sold",
+        soldAt: new Date(),
+      },
+      $inc: { betCount: 1 },
+    },
+    { new: true }
+  );
+
+  return updated || null;
+};
+
+// =====================================================
+// EXPORTS
+// =====================================================
+
 module.exports = {
+  // HTTP controllers
   createDailyNumbers,
   getAvailableNumbers,
   getTodayNumbers,
@@ -530,5 +482,11 @@ module.exports = {
   checkNumberForBet,
   sellNumber,
   sellTodayNumbers,
+
+  // Shared services (used by bet controller + cron)
   reserveNumberForBet,
+  createDailyNumbersForDate,
+  generateUniqueNumber,
+  getIndiaDate,
+  isValidDateString,
 };
