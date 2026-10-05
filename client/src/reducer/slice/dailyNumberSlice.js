@@ -83,6 +83,36 @@ export const checkNumberAvailability = createAsyncThunk(
 );
 
 // =====================================================
+// VERIFY NUMBER AVAILABILITY FOR BET (reusable API helper)
+// Reuses existing checkNumberForBet controller: GET /api/lottery-numbers/check/:number
+// =====================================================
+export const verifyNumberForBet = async (number) => {
+  try {
+    const clean = String(number || "").trim().toUpperCase();
+    const response = await api.get(`/lottery-numbers/check/${encodeURIComponent(clean)}`);
+    return {
+      canBet: Boolean(response.data?.canBet),
+      isSold: false,
+      message: response.data?.message || "Number is available",
+      data: response.data,
+    };
+  } catch (err) {
+    const resData = err.response?.data;
+    const isSold =
+      err.response?.status === 400 ||
+      resData?.message?.toLowerCase().includes("sold");
+
+    return {
+      canBet: false,
+      isSold,
+      message:
+        resData?.message ||
+        "This number has already been sold. Please choose another number.",
+    };
+  }
+};
+
+// =====================================================
 // SLICE
 // =====================================================
 const dailyNumberSlice = createSlice({

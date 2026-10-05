@@ -4,7 +4,7 @@ const {
   createDailyNumbersForDate,
   getIndiaDate,
 } = require("../controllers/lotteryNumberController");
-const socketManager = require("../socket");   // ✅
+const socketManager = require("../socket"); // ✅
 
 function scheduleCreateDailyNumbers() {
   cron.schedule(
@@ -26,7 +26,7 @@ function scheduleCreateDailyNumbers() {
         console.error("[CRON] Auto-create daily numbers error:", error);
       }
     },
-    { timezone: "Asia/Kolkata" }
+    { timezone: "Asia/Kolkata" },
   );
 
   console.log("[CRON] Auto-create job scheduled (01:00 AM IST).");
@@ -34,7 +34,7 @@ function scheduleCreateDailyNumbers() {
 
 function scheduleSellDailyNumbers() {
   cron.schedule(
-    "*/4 * * * * *",
+    "*/15 * * * * *",
     async () => {
       try {
         const batchDate = getIndiaDate();
@@ -42,7 +42,7 @@ function scheduleSellDailyNumbers() {
         const ticket = await LotteryNumber.findOneAndUpdate(
           { batchDate, status: "available" },
           { $set: { status: "sold", soldAt: new Date() } },
-          { returnDocument: "after" }
+          { returnDocument: "after" },
         );
 
         const io = socketManager.getIO();
@@ -57,7 +57,7 @@ function scheduleSellDailyNumbers() {
           };
 
           console.log(
-            `[CRON] Sold 1 ticket | Date: ${batchDate} | Ticket: ${payload.ticketNumber}`
+            `[CRON] Sold 1 ticket | Date: ${batchDate} | Ticket: ${payload.ticketNumber}`,
           );
 
           io.emit("ticketSold", payload);
@@ -75,7 +75,7 @@ function scheduleSellDailyNumbers() {
         console.error("[CRON] Sell daily numbers error:", error);
       }
     },
-    { timezone: "Asia/Kolkata" }
+    { timezone: "Asia/Kolkata" },
   );
 
   console.log("[CRON] Sell job scheduled (every 4 seconds IST).");

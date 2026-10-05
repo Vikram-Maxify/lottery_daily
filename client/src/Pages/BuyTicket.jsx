@@ -16,6 +16,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import DailyNumbersSection from "../Components/DailyNumbersSection";
+import NumberSoldNotification from "../Components/NumberSoldNotification";
+import { verifyNumberForBet } from "../reducer/slice/dailyNumberSlice";
 
 import {
   createDeposit,
@@ -614,7 +616,7 @@ const BuyTicket = () => {
     if (urlNum && TICKET_REGEX.test(urlNum.toUpperCase())) {
       return urlNum.toUpperCase();
     }
-    return randomCode();
+    return "";
   });
 
   // Sync if query param changes
@@ -1165,6 +1167,23 @@ const BuyTicket = () => {
         }
 
         // -------------------------------------------------
+        // CHECK NUMBER AVAILABILITY (checkNumberForBet)
+        // -------------------------------------------------
+
+        setLocalSuccess("Checking ticket availability...");
+        const availabilityCheck = await verifyNumberForBet(ticketCode);
+
+        if (!availabilityCheck.canBet) {
+          setLocalSuccess("");
+          return setLocalError(
+            availabilityCheck.isSold
+              ? "This number has already been sold. Please choose another number."
+              : availabilityCheck.message ||
+                  "This number has already been sold. Please choose another number."
+          );
+        }
+
+        // -------------------------------------------------
         // LOTTERY NUMBERS — "ticket 1 hi jayega"
         // -------------------------------------------------
 
@@ -1290,6 +1309,9 @@ const BuyTicket = () => {
           24,
       }}
     >
+      {/* Real-time Number Sold Notification */}
+      <NumberSoldNotification />
+
       {/* =================================================
           HERO
       ================================================= */}
