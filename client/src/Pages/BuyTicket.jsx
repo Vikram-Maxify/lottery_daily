@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import DailyNumbersSection from "../Components/DailyNumbersSection";
 
 import {
   createDeposit,
@@ -605,9 +606,24 @@ const BuyTicket = () => {
   // STATE
   // ===================================================
 
+  const [searchParams] = useSearchParams();
   const [showQuick, setShowQuick] = useState(true);
   const [quantity, setQuantity] = useState(10);
-  const [ticketCode, setTicketCode] = useState(() => randomCode());
+  const [ticketCode, setTicketCode] = useState(() => {
+    const urlNum = new URLSearchParams(window.location.search).get("number");
+    if (urlNum && TICKET_REGEX.test(urlNum.toUpperCase())) {
+      return urlNum.toUpperCase();
+    }
+    return randomCode();
+  });
+
+  // Sync if query param changes
+  useEffect(() => {
+    const numParam = searchParams.get("number");
+    if (numParam && TICKET_REGEX.test(numParam.toUpperCase())) {
+      setTicketCode(numParam.toUpperCase());
+    }
+  }, [searchParams]);
 
   const [localError, setLocalError] =
     useState("");
@@ -1047,7 +1063,7 @@ const BuyTicket = () => {
           );
         }
 
-        if (tickets.length < MIN_TICKETS) {
+        if (quantity < MIN_TICKETS) {
           return setLocalError(
             `Minimum ${MIN_TICKETS} tickets are required`
           );
@@ -1119,14 +1135,13 @@ const BuyTicket = () => {
         // TICKET PRICE
         // -------------------------------------------------
 
-        const ticketAmount =
-          apiPrice;
+        const setPriceAmount = SET_PRICE;
 
         if (
           !Number.isFinite(
-            ticketAmount
+            setPriceAmount
           ) ||
-          ticketAmount <= 0
+          setPriceAmount <= 0
         ) {
           return setLocalError(
             "Ticket price is not available"
@@ -1156,11 +1171,10 @@ const BuyTicket = () => {
         const lotteryNumbers = [ticketCode];
 
         // -------------------------------------------------
-        // TOTAL AMOUNT
+        // TOTAL AMOUNT (10 tickets ka price SET_PRICE h, so totalTicketPrice)
         // -------------------------------------------------
 
-        const totalAmount =
-          ticketAmount * quantity;
+        const totalAmount = totalTicketPrice;
 
         setLocalSuccess(
           `Creating payment order for ${quantity} ticket(s)...`
@@ -1852,6 +1866,15 @@ const BuyTicket = () => {
             </p>
           </div>
         </Card>
+
+        {/* =================================================
+            TODAY'S LUCKY NUMBERS SELECTOR
+        ================================================= */}
+        <DailyNumbersSection
+          mode="buyTicket"
+          selectedNumber={ticketCode}
+          onSelectNumber={(code) => setTicketCode(code)}
+        />
 
         {/* =================================================
             WINNING RULES

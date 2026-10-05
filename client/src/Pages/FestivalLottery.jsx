@@ -23,8 +23,9 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import DailyNumbersSection from "../Components/DailyNumbersSection";
 
 // =====================================================
 // REDUX IMPORTS
@@ -286,12 +287,19 @@ const FestivalLottery = () => {
   const [festivalKey, setFestivalKey] = useState("navratra");
   const [selectedDateIndex, setSelectedDateIndex] = useState(0);
   const [showAllDates, setShowAllDates] = useState(false);
+  const [searchParams] = useSearchParams();
   const [showQuick, setShowQuick] = useState(true);
   const [tickets, setTickets] = useState(() =>
     generateUniqueTickets(MIN_TICKETS, [])
   );
   const [showAllTickets, setShowAllTickets] = useState(false);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(() => {
+    const urlNum = new URLSearchParams(window.location.search).get("number");
+    if (urlNum && TICKET_REGEX.test(urlNum.toUpperCase())) {
+      return urlNum.toUpperCase();
+    }
+    return "";
+  });
   const [manualError, setManualError] = useState("");
   const [localSuccess, setLocalSuccess] = useState("");
   const draftRefs = useRef([]);
@@ -426,6 +434,14 @@ const FestivalLottery = () => {
       dispatch(clearDepositState());
     };
   }, [dispatch]);
+
+  // Handle URL query parameter ?number=
+  useEffect(() => {
+    const numParam = searchParams.get("number");
+    if (numParam && TICKET_REGEX.test(numParam.toUpperCase())) {
+      updateDraft(numParam.toUpperCase());
+    }
+  }, [searchParams]);
 
   // =====================================================
   // DATES
@@ -1245,6 +1261,13 @@ const FestivalLottery = () => {
               </div>
             )}
           </section>
+
+          {/* ================= LUCKY / DAILY NUMBERS SELECTOR ================= */}
+          <DailyNumbersSection
+            mode="festival"
+            selectedNumber={draft}
+            onSelectNumber={(code) => updateDraft(code)}
+          />
 
           {/* ================= SELECTED TICKETS ================= */}
           <section className="rounded-[16px] bg-white p-3 shadow-sm">

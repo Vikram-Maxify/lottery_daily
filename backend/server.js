@@ -25,7 +25,7 @@ const adminGatewayRoutes = require("./routes/adminGatewayRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const startLotteryDepositCron = require("./cron/lotteryDepositCron");
 const { startLotteryCron } = require("./cron/lotteryCron");
-const lotteryNumberRoutes =require('./routes/lotteryNumberRoutes')
+const lotteryNumberRoutes = require("./routes/lotteryNumberRoutes");
 
 // =======================
 // APP
@@ -42,7 +42,7 @@ app.set("trust proxy", 1);
 // =======================
 app.use((req, res, next) => {
   console.log(
-    `[RAW HIT] ${new Date().toISOString()} ${req.method} ${req.originalUrl} ip=${req.ip} ua=${req.headers["user-agent"] || ""}`
+    `[RAW HIT] ${new Date().toISOString()} ${req.method} ${req.originalUrl} ip=${req.ip} ua=${req.headers["user-agent"] || ""}`,
   );
   next();
 });
@@ -58,7 +58,7 @@ app.use(
       "https://setthelife.com",
     ],
     credentials: true,
-  })
+  }),
 );
 
 // =======================
@@ -105,7 +105,7 @@ app.use("/api/festival", require("./routes/fes_lottery_routes"));
 // Lottery Result
 app.use("/api/lottery-result", lotteryResultRoutes);
 
-app.use('/api/festival-result',require('./routes/festiv.result'))
+app.use("/api/festival-result", require("./routes/festiv.result"));
 
 // Admin Gateway
 app.use("/api", adminGatewayRoutes);
@@ -116,11 +116,10 @@ app.use("/api", adminRoutes);
 const kycRoutes = require("./routes/kycRoutes");
 const adminKycRoutes = require("./routes/adminKycRoutes");
 const bannerRoutes = require("./routes/bannerRoutes");
-const {startLotteryNumberJobs} = require("./jobs/lotteryNumberJob");
+const { startLotteryNumberJobs } = require("./jobs/lotteryNumberJob");
 const referralSettingRoutes = require("./routes/referralSettingRoutes");
 
 const topWinnerRoutes = require("./routes/topWinnerRoutes");
-
 
 app.use("/uploads", express.static("uploads"));
 
@@ -131,14 +130,8 @@ app.use("/api/admin/kyc", adminKycRoutes);
 app.use("/api/withdrawal", require("./routes/withdrawalRoutes"));
 app.use("/api/banners", bannerRoutes);
 
-app.use(
-  "/api/lottery-numbers",
-  lotteryNumberRoutes
-);
-app.use(
-  "/api/admin/settings",
-  referralSettingRoutes
-);
+app.use("/api/lottery-numbers", lotteryNumberRoutes);
+app.use("/api/admin/settings", referralSettingRoutes);
 
 app.use("/api/top-winners", topWinnerRoutes);
 
