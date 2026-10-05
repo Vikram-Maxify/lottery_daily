@@ -17,9 +17,9 @@ const adminMiddleware = require("../middleware/adminMiddleware");
 
 const router = express.Router();
 
-// ==========================================
-// STATIC ROUTES PEHLE
-// ==========================================
+// =====================================================
+// STATIC ROUTES — ALWAYS BEFORE /:id
+// =====================================================
 
 // Create result
 router.post(
@@ -45,9 +45,17 @@ router.post(
   checkNumber
 );
 
-// ==========================================
-// DYNAMIC ROUTES (/:id) BAAD ME
-// ==========================================
+// Get lottery numbers on which NO BET was placed
+router.get(
+  "/unbet-numbers",
+  // authMiddleware,
+  // adminMiddleware,
+  getUnbetLotteryNumbers
+);
+
+// =====================================================
+// DYNAMIC ROUTES — AFTER ALL STATIC ROUTES
+// =====================================================
 
 // Update result
 router.patch(
@@ -87,11 +95,6 @@ router.delete(
   authMiddleware,
   adminMiddleware,
   deleteResult
-);
-
-router.get(
-  "/unbet-numbers",
-  getUnbetLotteryNumbers
 );
 
 module.exports = router;

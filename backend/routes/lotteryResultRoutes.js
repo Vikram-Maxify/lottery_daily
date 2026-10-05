@@ -45,7 +45,20 @@ router.post(
   checkNumber
 );
 
-// Get result by ID
+// ==========================================
+// GET UNBET LOTTERY NUMBERS
+// IMPORTANT: This must come BEFORE /:id
+// ==========================================
+router.get(
+  "/unbet-numbers",
+  // authMiddleware,
+  // adminMiddleware,
+  getUnbetLotteryNumbers
+);
+
+// ==========================================
+// GET RESULT BY ID
+// ==========================================
 router.get(
   "/:id",
   authMiddleware,
@@ -83,11 +96,6 @@ router.delete(
   authMiddleware,
   adminMiddleware,
   deleteResult
-);
-
-router.get(
-  "/unbet-numbers",
-  getUnbetLotteryNumbers
 );
 
 module.exports = router;
