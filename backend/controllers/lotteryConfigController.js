@@ -3,6 +3,7 @@ const LotteryConfig = require("../models/LotteryConfig");
 const User = require("../models/userModel");
 const TransactionHistory = require("../models/TransactionHistory");
 const uploadToImgBB = require("../utils/imgbbUpload");
+const LotteryNumber = require("../models/LotteryNumber");
 
 // =====================================================
 // GET USER ID FROM JWT
@@ -182,7 +183,8 @@ const validateYear = (year) => {
 };
 
 // =====================================================
-// VALIDATE 7 CHARACTER ALPHANUMERIC NUMBER
+// VALIDATE 8 CHARACTER ALPHANUMERIC NUMBER
+// Format: 2 digits + 1 letter + 5 digits (e.g. 10A78965)
 // =====================================================
 
 const validateNumber = (number) => {
@@ -193,12 +195,13 @@ const validateNumber = (number) => {
     };
   }
 
-  const value = String(number).trim();
+  const value = String(number).trim().toUpperCase();
 
-  if (!/^[a-zA-Z0-9]{8}$/.test(value)) {
+  if (!/^\d{2}[A-Z]\d{5}$/.test(value)) {
     return {
       valid: false,
-      message: "Lottery number must be exactly 8 alphanumeric characters",
+      message:
+        "Lottery number must be in format: 2 digits + 1 letter + 5 digits (e.g. 10A78965)",
     };
   }
 
@@ -260,6 +263,35 @@ const validateStatus = (status) => {
     valid: true,
     status,
   };
+};
+
+// =====================================================
+// RESERVE LOTTERY NUMBER (atomic, mark as sold)
+// Ek baar sold = hamesha sold. No rollback.
+// Returns updated doc or null if not available.
+// =====================================================
+
+const reserveLotteryNumber = async (number) => {
+  if (!number) return null;
+
+  const normalized = String(number).trim().toUpperCase();
+
+  const updated = await LotteryNumber.findOneAndUpdate(
+    {
+      number: normalized,
+      status: "available",
+    },
+    {
+      $set: {
+        status: "sold",
+        soldAt: new Date(),
+      },
+      $inc: { betCount: 1 },
+    },
+    { new: true }
+  );
+
+  return updated || null;
 };
 
 // =====================================================
@@ -423,9 +455,33 @@ const createLotteryConfig = async (req, res) => {
       });
     }
 
+    if (
+      parsedPrizes.fourth === undefined ||
+      parsedPrizes.fourth === null ||
+      parsedPrizes.fourth === ""
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Fourth prize is required",
+      });
+    }
+
+    if (
+      parsedPrizes.fifth === undefined ||
+      parsedPrizes.fifth === null ||
+      parsedPrizes.fifth === ""
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Fifth prize is required",
+      });
+    }
+
     const firstPrize = Number(parsedPrizes.first);
     const secondPrize = Number(parsedPrizes.second);
     const thirdPrize = Number(parsedPrizes.third);
+    const fourthPrize = Number(parsedPrizes.fourth);
+    const fifthPrize = Number(parsedPrizes.fifth);
 
     if (!Number.isFinite(firstPrize) || firstPrize < 0) {
       return res.status(400).json({
@@ -476,13 +532,12 @@ const createLotteryConfig = async (req, res) => {
     }
 
     // ================================================
-    // UPLOAD IMAGE TO IMGBB  ✅ FIXED
+    // UPLOAD IMAGE TO IMGBB
     // ================================================
 
     let imageUrl;
 
     try {
-      // Guard: multer must use memoryStorage() so req.file.buffer exists
       if (!req.file.buffer) {
         return res.status(400).json({
           success: false,
@@ -585,7 +640,7 @@ const createLotteryConfig = async (req, res) => {
 //
 // {
 //   "configId": "...",
-//   "number": "123456",
+//   "number": "10A78965",
 //   "amount": 100
 // }
 // =====================================================
@@ -766,6 +821,32 @@ const addUserLotteryEntry = async (req, res) => {
       config.users = [];
     }
 
+    // ================================================
+    // RESERVE LOTTERY NUMBER FIRST (mark as sold)
+    // Ek baar sold = hamesha sold. No rollback.
+    // ================================================
+
+    const reservedNumber = await reserveLotteryNumber(
+      numberValidation.number
+    );
+
+    if (!reservedNumber) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This lottery number is not available or already sold. Please choose another number.",
+        number: numberValidation.number,
+      });
+    }
+
+    console.log(
+      `NUMBER SOLD: ${reservedNumber.number} (betCount: ${reservedNumber.betCount})`
+    );
+
+    // ================================================
+    // DEDUCT WALLET (atomic)
+    // ================================================
+
     const updatedUser = await User.findOneAndUpdate(
       {
         _id: user._id,
@@ -778,6 +859,7 @@ const addUserLotteryEntry = async (req, res) => {
     );
 
     if (!updatedUser) {
+      // Wallet fail — number sold hi rahega (permanent)
       return res.status(400).json({
         success: false,
         message: "Insufficient wallet balance",
@@ -789,6 +871,10 @@ const addUserLotteryEntry = async (req, res) => {
     console.log(
       `WALLET DEDUCTED: ₹${amountValidation.amount} from user ${user._id}. New balance: ₹${updatedUser.wallet}`
     );
+
+    // ================================================
+    // PUSH ENTRY INTO CONFIG
+    // ================================================
 
     config.users.push({
       userId: String(user._id),
@@ -817,6 +903,7 @@ const addUserLotteryEntry = async (req, res) => {
     } catch (saveError) {
       console.error("Config save failed, refunding wallet:", saveError);
 
+      // Sirf wallet refund — number sold hi rahega (permanent)
       await User.findByIdAndUpdate(user._id, {
         $inc: { wallet: Number(amountValidation.amount) },
       });
@@ -1125,6 +1212,39 @@ const addBulkUserLotteryEntries = async (req, res) => {
       config.users = [];
     }
 
+    // ================================================
+    // RESERVE ALL LOTTERY NUMBERS (atomic each)
+    // Ek baar sold = hamesha sold. Koi rollback nahi.
+    // Agar beech me koi fail ho, to jo sold ho chuke
+    // wo sold hi rahenge — sirf wallet refund hoga.
+    // ================================================
+
+    const reservedNumbers = [];
+
+    for (const entry of normalizedEntries) {
+      const reserved = await reserveLotteryNumber(entry.number);
+
+      if (!reserved) {
+        // Jo numbers sold ho chuke hain wo sold hi rahenge.
+        return res.status(400).json({
+          success: false,
+          message: `Lottery number "${entry.number}" is not available or already sold. Please choose another number.`,
+          number: entry.number,
+          soldNumbers: reservedNumbers.map((r) => r.number),
+        });
+      }
+
+      reservedNumbers.push(reserved);
+    }
+
+    console.log(
+      `NUMBERS SOLD: ${reservedNumbers.map((r) => r.number).join(", ")}`
+    );
+
+    // ================================================
+    // DEDUCT WALLET (atomic)
+    // ================================================
+
     const updatedUser = await User.findOneAndUpdate(
       {
         _id: user._id,
@@ -1137,6 +1257,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     );
 
     if (!updatedUser) {
+      // Wallet fail — saare numbers sold hi rahenge (permanent)
       return res.status(400).json({
         success: false,
         message: "Insufficient wallet balance",
@@ -1180,6 +1301,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     } catch (saveError) {
       console.error("Config save failed, refunding wallet:", saveError);
 
+      // Sirf wallet refund — saare numbers sold hi rahenge (permanent)
       await User.findByIdAndUpdate(user._id, {
         $inc: { wallet: totalAmount },
       });
@@ -1750,7 +1872,6 @@ const deleteLotteryConfig = async (req, res) => {
     });
   }
 };
-
 
 // =====================================================
 // UPDATE LOTTERY CONFIG
