@@ -41,12 +41,39 @@ const handleProfileImageUpload = async (req) => {
   return imageUrl;
 };
 
+// 🔥 Helper: generate a unique referral code
+const generateUniqueReferralCode = async (name = "USER") => {
+  const prefix = (name || "USER")
+    .replace(/[^a-zA-Z]/g, "")
+    .toUpperCase()
+    .slice(0, 4)
+    .padEnd(4, "X");
+
+  let code;
+  let exists = true;
+  let attempts = 0;
+
+  while (exists && attempts < 10) {
+    const random = Math.random().toString(36).substring(2, 7).toUpperCase();
+    code = `${prefix}${random}`;
+    exists = await User.exists({ referralCode: code });
+    attempts++;
+  }
+
+  if (exists) {
+    // fallback guarantee uniqueness using uuid fragment
+    code = `REF${uuidv4().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+  }
+
+  return code;
+};
+
 // =======================
 // REGISTER
 // =======================
 const register = async (req, res) => {
   try {
-    const { name, mobile, password } = req.body;
+    const { name, mobile, password, referralBy } = req.body;
 
     if (!name || !mobile || !password) {
       return res.status(400).json({
@@ -71,6 +98,23 @@ const register = async (req, res) => {
       });
     }
 
+    // 🔥 Validate referralBy (if provided)
+    let validReferralBy = null;
+    if (referralBy) {
+      const cleanCode = String(referralBy).trim().toUpperCase();
+
+      const referrer = await User.findOne({ referralCode: cleanCode });
+
+      if (!referrer) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid referral code",
+        });
+      }
+
+      validReferralBy = referrer.referralCode;
+    }
+
     // 🔥 Upload profile image if provided
     let profileImage = null;
     if (req.file) {
@@ -79,12 +123,17 @@ const register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    // 🔥 Generate unique referral code for new user
+    const referralCode = await generateUniqueReferralCode(name);
+
     const user = await User.create({
       uuid: uuidv4(),
       name,
       mobile,
       password: hashedPassword,
       profileImage,
+      referralCode,
+      referralBy: validReferralBy,
     });
 
     setAuthCookie(res, user);
@@ -98,6 +147,8 @@ const register = async (req, res) => {
         mobile: user.mobile,
         role: user.role,
         profileImage: user.profileImage,
+        referralCode: user.referralCode,
+        referralBy: user.referralBy,
       },
     });
   } catch (error) {
@@ -160,6 +211,8 @@ const login = async (req, res) => {
         mobile: user.mobile,
         role: user.role,
         profileImage: user.profileImage,
+        referralCode: user.referralCode,
+        referralBy: user.referralBy,
       },
     });
   } catch (error) {
@@ -198,6 +251,9 @@ const getProfile = async (req, res) => {
         wallet: user.wallet,
         role: user.role,
         isKycVerified: Boolean(user.isKycVerified),
+        profileImage: user.profileImage,
+        referralCode: user.referralCode,
+        referralBy: user.referralBy,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
@@ -291,6 +347,8 @@ const updateProfile = async (req, res) => {
         name: user.name,
         mobile: user.mobile,
         profileImage: user.profileImage,
+        referralCode: user.referralCode,
+        referralBy: user.referralBy,
         updatedAt: user.updatedAt,
       },
     });
@@ -424,6 +482,8 @@ const adminUpdateUserProfile = async (req, res) => {
         wallet: user.wallet,
         profileImage: user.profileImage,
         isKycVerified: user.isKycVerified,
+        referralCode: user.referralCode,
+        referralBy: user.referralBy,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
