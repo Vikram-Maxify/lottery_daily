@@ -1,108 +1,89 @@
 const cron = require("node-cron");
-
 const LotteryNumber = require("../models/LotteryNumber");
-
 const {
   createDailyNumbersForDate,
   getIndiaDate,
 } = require("../controllers/lotteryNumberController");
-
-// =====================================================
-// CRON 1: 00:01 AM IST -> AUTO-CREATE 100 NUMBERS
-// =====================================================
+const socketManager = require("../socket");   // ✅
 
 function scheduleCreateDailyNumbers() {
   cron.schedule(
-    "00 01 * * *", // 10:55 AM IST (for testing)
+    "00 01 * * *",
     async () => {
       try {
         const batchDate = getIndiaDate();
-
-        console.log(
-          `[CRON] 01:00 AM — Auto-creating numbers for ${batchDate}`
-        );
+        console.log(`[CRON] 01:00 AM — Auto-creating numbers for ${batchDate}`);
 
         const result = await createDailyNumbersForDate(batchDate);
-
         console.log("[CRON] Auto-create result:", result);
+
+        socketManager.getIO().emit("numbersCreated", {
+          batchDate,
+          total: result?.total || 100,
+          timestamp: new Date().toISOString(),
+        });
       } catch (error) {
-        console.error(
-          "[CRON] Auto-create daily numbers error:",
-          error
-        );
+        console.error("[CRON] Auto-create daily numbers error:", error);
       }
     },
     { timezone: "Asia/Kolkata" }
   );
 
-  console.log(
-    "[CRON] Auto-create job scheduled (10:55 AM IST)."
-  );
+  console.log("[CRON] Auto-create job scheduled (01:00 AM IST).");
 }
-
-// =====================================================
-// CRON 2: 09:00 AM IST -> SELL TODAY'S NUMBERS
-// =====================================================
 
 function scheduleSellDailyNumbers() {
   cron.schedule(
-    "*/4 * * * * *", // every 4 seconds
+    "*/4 * * * * *",
     async () => {
       try {
         const batchDate = getIndiaDate();
 
         const ticket = await LotteryNumber.findOneAndUpdate(
-          {
-            batchDate,
-            status: "available",
-          },
-          {
-            $set: {
-              status: "sold",
-              soldAt: new Date(),
-            },
-          },
-          {
-            returnDocument: "after",
-          }
+          { batchDate, status: "available" },
+          { $set: { status: "sold", soldAt: new Date() } },
+          { returnDocument: "after" }
         );
+
+        const io = socketManager.getIO();
 
         if (ticket) {
+          const payload = {
+            batchDate,
+            ticketNumber: ticket.number || ticket.ticketNumber,
+            ticketId: ticket._id,
+            soldAt: ticket.soldAt,
+            timestamp: new Date().toISOString(),
+          };
+
           console.log(
-            `[CRON] Sold 1 ticket | Date: ${batchDate} | Ticket Number: ${
-              ticket.number || ticket.ticketNumber
-            }`
+            `[CRON] Sold 1 ticket | Date: ${batchDate} | Ticket: ${payload.ticketNumber}`
           );
+
+          io.emit("ticketSold", payload);
+
+          const remaining = await LotteryNumber.countDocuments({
+            batchDate,
+            status: "available",
+          });
+
+          io.emit("stockUpdate", { batchDate, remaining });
         } else {
-          console.log(
-            `[CRON] No available tickets left for ${batchDate}`
-          );
+          io.emit("soldOut", { batchDate });
         }
       } catch (error) {
-        console.error(
-          "[CRON] Sell daily numbers error:",
-          error
-        );
+        console.error("[CRON] Sell daily numbers error:", error);
       }
     },
-    {
-      timezone: "Asia/Kolkata",
-    }
+    { timezone: "Asia/Kolkata" }
   );
 
-  console.log(
-    "[CRON] Sell job scheduled (every 4 seconds IST)."
-  );
+  console.log("[CRON] Sell job scheduled (every 4 seconds IST).");
 }
-
-// =====================================================
-// START ALL JOBS
-// =====================================================
 
 const startLotteryNumberJobs = () => {
   scheduleCreateDailyNumbers();
   scheduleSellDailyNumbers();
-
   console.log("[CRON] All lottery number jobs started.");
 };
 

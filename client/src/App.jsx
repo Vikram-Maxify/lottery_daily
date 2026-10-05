@@ -42,6 +42,8 @@ import AdminHomeBanner from "./admin/adminPages/AdminHomeBanner";
 import FestivalResult from "./admin/adminPages/FestivalResult";
 import AdminTopWinners from "./admin/adminPages/AdminTopWinners";
 import AdminSettings from "./admin/adminPages/AdminSettings";
+import LiveTickets from "./pages/LiveTickets";
+import TicketDashboard from "./pages/TicketDashboard";
 
 // ==========================================================
 // WHATSAPP SUPPORT NUMBER
@@ -160,6 +162,9 @@ function App() {
               element={<WithdrawHistory />}
             />
             <Route path="/recharge" element={<Recharge />} />
+
+            <Route path="/live-tickets" element={<LiveTickets />} />
+            <Route path="/dashboard" element={<TicketDashboard />} />
 
             {/* <Route
               path="/deposit"
