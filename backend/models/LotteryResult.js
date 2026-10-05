@@ -27,7 +27,7 @@ const winnerSchema = new mongoose.Schema(
 
     prizeType: {
       type: String,
-      enum: ["1st", "2nd", "3rd"],
+      enum: ["1st", "2nd", "3rd","4th","5th", null],
       required: true,
     },
 
@@ -58,7 +58,7 @@ const winnerSchema = new mongoose.Schema(
     // 1st=8, 2nd=7, 3rd=5
     matchedDigits: {
       type: Number,
-      enum: [5, 7, 8],
+      enum: [5, 7, 8,4,3],
       required: true,
     },
   },
