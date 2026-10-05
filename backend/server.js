@@ -45,7 +45,7 @@ app.set("trust proxy", 1);
 // =======================
 app.use((req, res, next) => {
   console.log(
-    `[RAW HIT] ${new Date().toISOString()} ${req.method} ${req.originalUrl} ip=${req.ip} ua=${req.headers["user-agent"] || ""}`
+    `[RAW HIT] ${new Date().toISOString()} ${req.method} ${req.originalUrl} ip=${req.ip} ua=${req.headers["user-agent"] || ""}`,
   );
   next();
 });
@@ -61,7 +61,7 @@ app.use(
       "https://setthelife.com",
     ],
     credentials: true,
-  })
+  }),
 );
 
 // =======================
@@ -88,7 +88,10 @@ app.get("/api/lottery/test", (req, res) => {
 app.use("/api/lottery", lotteryConfigRoutes);
 app.use("/api/festival", require("./routes/fes_lottery_routes"));
 app.use("/api/lottery-result", lotteryResultRoutes);
+
 app.use("/api/festival-result", require("./routes/festiv.result"));
+
+// Admin Gateway
 app.use("/api", adminGatewayRoutes);
 app.use("/api", adminRoutes);
 
@@ -104,8 +107,10 @@ app.use("/api/kyc", kycRoutes);
 app.use("/api/admin/kyc", adminKycRoutes);
 app.use("/api/withdrawal", require("./routes/withdrawalRoutes"));
 app.use("/api/banners", bannerRoutes);
+
 app.use("/api/lottery-numbers", lotteryNumberRoutes);
 app.use("/api/admin/settings", referralSettingRoutes);
+
 app.use("/api/top-winners", topWinnerRoutes);
 app.use("/api/festival-amount", require("./routes/festivalamountRoutes"));
 
