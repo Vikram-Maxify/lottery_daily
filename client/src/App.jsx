@@ -22,7 +22,6 @@ import AdminLogin from "./admin/adminPages/AdminLogin";
 import AdminLottery from "./admin/adminPages/AdminLottery";
 import Amount from "./admin/adminPages/Amount";
 import Dashboard from "./admin/adminPages/Dashboard";
-import LotteryConfig from "./admin/adminPages/LotteryConfig";
 import AdminResults from "./admin/adminPages/Results";
 import Users from "./admin/adminPages/Users";
 import WithdrawalManagement from "./admin/adminPages/WithdrawalManagement";
@@ -42,19 +41,7 @@ import VarifyTicket from "./Pages/VarifyTicket";
 import WithdrawHistory from "./Pages/WithdrawHistory";
 
 // ==========================================================
-// WHATSAPP SUPPORT NUMBER
-// ==========================================================
-const WHATSAPP_NUMBER = "+917234806209";
-
-// ==========================================================
-// ADMIN ROUTES LIST (WhatsApp hide karne ke liye)
-// Saare admin routes /admin se start hote hain
-// ==========================================================
-const ADMIN_ROUTES = ["/admin"];
-
-// ==========================================================
 // HOME ROUTE
-// Home par aane par HomePage fresh mount hoga
 // ==========================================================
 const HomeRoute = () => {
   const location = useLocation();
@@ -155,9 +142,6 @@ function App() {
             {/* ADMIN RESULTS */}
             <Route path="/admin/results" element={<AdminResults />} />
             <Route path="/admin/festival_result" element={<FestivalResult />} />
-
-            {/* Lottery Config */}
-            <Route path="/lottery-config" element={<LotteryConfig />} />
             {/* lottery config */}
             <Route
               path="admin/festival_lottery"

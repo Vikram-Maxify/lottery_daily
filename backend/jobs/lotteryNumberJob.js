@@ -8,7 +8,7 @@ const socketManager = require("../socket"); // ✅
 
 function scheduleCreateDailyNumbers() {
   cron.schedule(
-    "00 01 * * *",
+    "33 10 * * *",
     async () => {
       try {
         const batchDate = getIndiaDate();

@@ -56,6 +56,8 @@ const getDefaultForm = () => ({
   firstPrize: "",
   secondPrize: "",
   thirdPrize: "",
+  fourthPrize: "0",
+  fifthPrize: "0",
 });
 
 // =====================================================
@@ -139,8 +141,49 @@ const LotteryConfig = () => {
     getDefaultForm()
   );
 
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+
   const [validationError, setValidationError] =
     useState("");
+
+  // Clean up object URL on unmount
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
+
+  // ===================================================
+  // IMAGE HANDLERS
+  // ===================================================
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith("image/")) {
+        setValidationError("Please select a valid image file (PNG, JPG, WebP).");
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        setValidationError("Image size must be less than 2MB.");
+        return;
+      }
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+      setValidationError("");
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+      setImagePreview(null);
+    }
+  };
 
   // ===================================================
   // DELETE STATE
@@ -197,6 +240,11 @@ const LotteryConfig = () => {
     // MARKET NAME
     if (!formData.marketName.trim()) {
       return "Market name is required.";
+    }
+
+    // BANNER IMAGE
+    if (!imageFile) {
+      return "Market banner image is required.";
     }
 
     // DRAW DATE
@@ -263,10 +311,30 @@ const LotteryConfig = () => {
       return "Third prize is required.";
     }
 
+    // FOURTH PRIZE
+    if (
+      formData.fourthPrize === "" ||
+      formData.fourthPrize === null ||
+      formData.fourthPrize === undefined
+    ) {
+      return "Fourth prize is required.";
+    }
+
+    // FIFTH PRIZE
+    if (
+      formData.fifthPrize === "" ||
+      formData.fifthPrize === null ||
+      formData.fifthPrize === undefined
+    ) {
+      return "Fifth prize is required.";
+    }
+
     // CONVERT PRIZES
     const firstPrize = Number(formData.firstPrize);
     const secondPrize = Number(formData.secondPrize);
     const thirdPrize = Number(formData.thirdPrize);
+    const fourthPrize = Number(formData.fourthPrize);
+    const fifthPrize = Number(formData.fifthPrize);
 
     if (!Number.isFinite(firstPrize) || firstPrize < 0) {
       return "Please enter a valid first prize.";
@@ -278,6 +346,14 @@ const LotteryConfig = () => {
 
     if (!Number.isFinite(thirdPrize) || thirdPrize < 0) {
       return "Please enter a valid third prize.";
+    }
+
+    if (!Number.isFinite(fourthPrize) || fourthPrize < 0) {
+      return "Please enter a valid fourth prize.";
+    }
+
+    if (!Number.isFinite(fifthPrize) || fifthPrize < 0) {
+      return "Please enter a valid fifth prize.";
     }
 
     return "";
@@ -301,31 +377,34 @@ const LotteryConfig = () => {
       return;
     }
 
-    const payload = {
-      marketName: formData.marketName.trim(),
+    const [year, month] = formData.drawDate.split("-").map(Number);
 
-      drawDate: formData.drawDate,
-
-      drawTime: formData.drawTime,
-
-      prizes: {
+    const data = new FormData();
+    data.append("marketName", formData.marketName.trim());
+    data.append("month", month);
+    data.append("year", year);
+    data.append("drawDate", formData.drawDate);
+    data.append("drawTime", formData.drawTime);
+    data.append(
+      "prizes",
+      JSON.stringify({
         first: Number(formData.firstPrize),
         second: Number(formData.secondPrize),
         third: Number(formData.thirdPrize),
-      },
-    };
-
-    console.log("CREATE LOTTERY PAYLOAD:", payload);
+        fourth: Number(formData.fourthPrize || 0),
+        fifth: Number(formData.fifthPrize || 0),
+      })
+    );
+    data.append("image", imageFile);
 
     try {
       const result = await dispatch(
-        createLotteryConfig(payload)
+        createLotteryConfig(data)
       );
-
-      console.log("CREATE LOTTERY RESPONSE:", result);
 
       if (createLotteryConfig.fulfilled.match(result)) {
         setFormData(getDefaultForm());
+        handleRemoveImage();
         setValidationError("");
 
         dispatch(getAllLotteryConfigs());
@@ -622,6 +701,57 @@ const LotteryConfig = () => {
             </div>
           </div>
 
+          {/* BANNER UPLOAD */}
+
+          <div className="mt-4">
+            <label className="mb-2 block text-sm font-medium text-gray-700">
+              Market Banner / Image <span className="text-red-500">*</span>
+            </label>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-100">
+                <span>Choose Image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+              </label>
+
+              {imagePreview && (
+                <div className="flex items-center gap-3">
+                  <img
+                    src={imagePreview}
+                    alt="Banner Preview"
+                    className="h-14 w-28 rounded-lg border border-gray-200 object-cover shadow-sm"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-xs font-medium text-gray-700 max-w-[200px] truncate">
+                      {imageFile?.name}
+                    </span>
+                    <span className="text-[11px] text-gray-400">
+                      {(imageFile?.size / 1024).toFixed(1)} KB
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="mt-1 text-left text-xs font-semibold text-red-600 hover:text-red-700"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!imagePreview && (
+                <p className="text-xs text-gray-500">
+                  PNG, JPG, or WebP up to 2MB. This banner will be displayed across the platform.
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* PRIZES */}
 
           <div className="mt-6">
@@ -629,12 +759,12 @@ const LotteryConfig = () => {
               Prize Amounts
             </label>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-5">
               {/* 1ST */}
 
               <div>
                 <label className="mb-2 block text-xs font-medium text-gray-500">
-                  1st Prize
+                  1st Prize (₹)
                 </label>
 
                 <input
@@ -654,7 +784,7 @@ const LotteryConfig = () => {
 
               <div>
                 <label className="mb-2 block text-xs font-medium text-gray-500">
-                  2nd Prize
+                  2nd Prize (₹)
                 </label>
 
                 <input
@@ -674,7 +804,7 @@ const LotteryConfig = () => {
 
               <div>
                 <label className="mb-2 block text-xs font-medium text-gray-500">
-                  3rd Prize
+                  3rd Prize (₹)
                 </label>
 
                 <input
@@ -685,6 +815,46 @@ const LotteryConfig = () => {
                   min="0"
                   step="0.01"
                   placeholder="Enter 3rd prize"
+                  required
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+
+              {/* 4TH */}
+
+              <div>
+                <label className="mb-2 block text-xs font-medium text-gray-500">
+                  4th Prize (₹)
+                </label>
+
+                <input
+                  type="number"
+                  name="fourthPrize"
+                  value={formData.fourthPrize}
+                  onChange={handleFormChange}
+                  min="0"
+                  step="0.01"
+                  placeholder="Enter 4th prize"
+                  required
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+
+              {/* 5TH */}
+
+              <div>
+                <label className="mb-2 block text-xs font-medium text-gray-500">
+                  5th Prize (₹)
+                </label>
+
+                <input
+                  type="number"
+                  name="fifthPrize"
+                  value={formData.fifthPrize}
+                  onChange={handleFormChange}
+                  min="0"
+                  step="0.01"
+                  placeholder="Enter 5th prize"
                   required
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
@@ -819,8 +989,31 @@ const LotteryConfig = () => {
                         {/* MARKET */}
 
                         <td className="px-4 py-4">
-                          <div className="font-semibold text-gray-900">
-                            {config?.marketName || "-"}
+                          <div className="flex items-center gap-3">
+                            {config?.imageUrl ? (
+                              <img
+                                src={config.imageUrl}
+                                alt={config.marketName || "Market Banner"}
+                                className="h-10 w-14 shrink-0 rounded-lg object-cover border border-gray-200 shadow-sm"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                }}
+                              />
+                            ) : (
+                              <div className="flex h-10 w-14 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-[10px] font-medium text-gray-400">
+                                No Banner
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-semibold text-gray-900">
+                                {config?.marketName || "-"}
+                              </div>
+                              {config?.month && config?.year && (
+                                <div className="text-xs text-gray-400">
+                                  {config.month}/{config.year}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </td>
 

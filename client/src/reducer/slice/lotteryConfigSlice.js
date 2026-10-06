@@ -12,6 +12,7 @@ const initialState = {
 
   loading: false,
   createLoading: false,
+  updateLoading: false,
   getByIdLoading: false,
   activeLoading: false,
   activateLoading: false,
@@ -25,20 +26,55 @@ const initialState = {
 
 // =====================================================
 // CREATE LOTTERY CONFIG
-// POST /api/lottery/create
+// POST /api/lottery
 // =====================================================
 
 export const createLotteryConfig = createAsyncThunk(
   "lotteryConfig/createLotteryConfig",
   async (data, { rejectWithValue }) => {
     try {
-      const response = await api.post("/lottery/create", data);
+      const headers =
+        data instanceof FormData
+          ? { "Content-Type": "multipart/form-data" }
+          : {};
+
+      const response = await api.post("/lottery", data, { headers });
 
       return response.data;
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message ||
           "Failed to create lottery configuration",
+      );
+    }
+  },
+);
+
+// =====================================================
+// UPDATE LOTTERY CONFIG
+// PUT /api/lottery/update/:id
+// =====================================================
+
+export const updateLotteryConfig = createAsyncThunk(
+  "lotteryConfig/updateLotteryConfig",
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      if (!id) {
+        return rejectWithValue("Lottery configuration ID is required");
+      }
+
+      const headers =
+        data instanceof FormData
+          ? { "Content-Type": "multipart/form-data" }
+          : {};
+
+      const response = await api.put(`/lottery/update/${id}`, data, { headers });
+
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message ||
+          "Failed to update lottery configuration",
       );
     }
   },
@@ -140,7 +176,7 @@ export const activateLotteryConfig = createAsyncThunk(
 
 // =====================================================
 // DEACTIVATE LOTTERY CONFIG
-// PATCH /api/lottery/:id/deactivate
+// PUT /api/lottery/:id/deactivate
 // =====================================================
 
 export const deactivateLotteryConfig = createAsyncThunk(
@@ -151,7 +187,7 @@ export const deactivateLotteryConfig = createAsyncThunk(
         return rejectWithValue("Lottery configuration ID is required");
       }
 
-      const response = await api.patch(`/lottery/${id}/deactivate`);
+      const response = await api.put(`/lottery/${id}/deactivate`);
 
       return response.data;
     } catch (error) {
@@ -534,6 +570,48 @@ const lotteryConfigSlice = createSlice({
         state.error =
           action.payload || "Failed to delete lottery configuration";
       });
+
+    // ===================================================
+    // UPDATE
+    // ===================================================
+
+    builder
+      .addCase(updateLotteryConfig.pending, (state) => {
+        state.updateLoading = true;
+        state.error = null;
+        state.successMessage = null;
+      })
+
+      .addCase(updateLotteryConfig.fulfilled, (state, action) => {
+        state.updateLoading = false;
+
+        const config = action.payload?.data;
+
+        if (config) {
+          state.configs = state.configs.map((item) =>
+            item._id === config._id ? config : item,
+          );
+
+          if (state.selectedConfig?._id === config._id) {
+            state.selectedConfig = config;
+          }
+
+          if (state.activeConfig?._id === config._id) {
+            state.activeConfig = config;
+          }
+        }
+
+        state.successMessage =
+          action.payload?.message ||
+          "Lottery configuration updated successfully";
+      })
+
+      .addCase(updateLotteryConfig.rejected, (state, action) => {
+        state.updateLoading = false;
+
+        state.error =
+          action.payload || "Failed to update lottery configuration";
+      });
   },
 });
 
@@ -565,6 +643,9 @@ export const selectLotteryLoading = (state) => state.lotteryConfig.loading;
 
 export const selectLotteryCreateLoading = (state) =>
   state.lotteryConfig.createLoading;
+
+export const selectLotteryUpdateLoading = (state) =>
+  state.lotteryConfig.updateLoading;
 
 export const selectLotteryGetByIdLoading = (state) =>
   state.lotteryConfig.getByIdLoading;

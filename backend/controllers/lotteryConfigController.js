@@ -593,6 +593,8 @@ const createLotteryConfig = async (req, res) => {
         first: firstPrize,
         second: secondPrize,
         third: thirdPrize,
+        fourth: fourthPrize,
+        fifth: fifthPrize,
       },
 
       users: [],
@@ -2041,6 +2043,8 @@ const updateLotteryConfig = async (req, res) => {
       first: config.prizes?.first || 0,
       second: config.prizes?.second || 0,
       third: config.prizes?.third || 0,
+      fourth: config.prizes?.fourth || 0,
+      fifth: config.prizes?.fifth || 0,
     };
 
     if (parsedPrizes !== undefined && parsedPrizes !== null) {
@@ -2087,6 +2091,14 @@ const updateLotteryConfig = async (req, res) => {
       const firstPrize = Number(parsedPrizes.first);
       const secondPrize = Number(parsedPrizes.second);
       const thirdPrize = Number(parsedPrizes.third);
+      const fourthPrize =
+        parsedPrizes.fourth !== undefined
+          ? Number(parsedPrizes.fourth)
+          : config.prizes?.fourth || 0;
+      const fifthPrize =
+        parsedPrizes.fifth !== undefined
+          ? Number(parsedPrizes.fifth)
+          : config.prizes?.fifth || 0;
 
       if (!Number.isFinite(firstPrize) || firstPrize < 0) {
         return res.status(400).json({
@@ -2113,6 +2125,9 @@ const updateLotteryConfig = async (req, res) => {
         first: firstPrize,
         second: secondPrize,
         third: thirdPrize,
+        fourth:
+          Number.isFinite(fourthPrize) && fourthPrize >= 0 ? fourthPrize : 0,
+        fifth: Number.isFinite(fifthPrize) && fifthPrize >= 0 ? fifthPrize : 0,
       };
     }
 
@@ -2187,6 +2202,16 @@ const updateLotteryConfig = async (req, res) => {
           message: "Failed to upload market image",
           error: uploadError.message,
         });
+      }
+    } else if (!imageUrl) {
+      // If this config currently has no image, inherit from previous config of same market
+      const prevWithImg = await LotteryConfig.findOne({
+        marketName: cleanMarketName,
+        imageUrl: { $exists: true, $nin: [null, ""] },
+      }).lean();
+
+      if (prevWithImg?.imageUrl) {
+        imageUrl = prevWithImg.imageUrl;
       }
     }
 

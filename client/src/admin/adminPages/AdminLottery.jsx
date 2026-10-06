@@ -1,38 +1,38 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import {
   CalendarDays,
+  CheckCircle2,
   Clock3,
+  Crown,
+  Eye,
+  Filter,
+  Image as ImageIcon,
+  Pencil,
+  Plus,
+  Power,
+  RefreshCw,
+  Search,
   Ticket,
   Trash2,
-  RefreshCw,
-  Pencil,
-  Power,
-  X,
-  CheckCircle2,
-  XCircle,
-  Eye,
-  Upload,
-  Image as ImageIcon,
-  Search,
-  Plus,
-  Filter,
   Trophy,
-  Crown,
+  Upload,
+  X,
+  XCircle,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 
 import {
-  createLotteryConfig,
-  updateLotteryConfig,
-  getAllLotteryConfigs,
-  getLotteryConfigById,
   activateLotteryConfig,
-  deactivateLotteryConfig,
-  updateUserLotteryEntry,
-  deleteUserLotteryEntry,
-  deleteLotteryConfig,
   clearLotteryError,
   clearLotteryMessage,
+  createLotteryConfig,
+  deactivateLotteryConfig,
+  deleteLotteryConfig,
+  deleteUserLotteryEntry,
+  getAllLotteryConfigs,
+  getLotteryConfigById,
+  updateLotteryConfig,
+  updateUserLotteryEntry,
 } from "../../reducer/slice/adminLotteryReducer";
 
 import { getAllUsers } from "../../reducer/slice/adminAuthReducer";
@@ -53,8 +53,7 @@ const OUTLINE_BTN =
 const INPUT_CLS =
   "w-full rounded-lg border border-[#F3E7C4] bg-[#FFFDF7] px-3 py-2.5 text-sm text-[#1A1A1A] outline-none transition placeholder:text-[#8A8F98] focus:border-[#F2B705] focus:ring-2 focus:ring-[#FFEFA8] disabled:bg-[#F5F1E4] disabled:text-[#6B7280] disabled:cursor-not-allowed";
 
-const LABEL_CLS =
-  "mb-1.5 block text-xs font-semibold text-[#1A1A1A]";
+const LABEL_CLS = "mb-1.5 block text-xs font-semibold text-[#1A1A1A]";
 
 const CARD_CLS =
   "rounded-2xl border border-[#F3E7C4] bg-white shadow-[0_6px_18px_-10px_rgba(247,181,0,0.35)]";
@@ -84,8 +83,7 @@ const MONTHS = [
   "December",
 ];
 
-const getMonthName = (month) =>
-  MONTHS[Number(month) - 1] || "-";
+const getMonthName = (month) => MONTHS[Number(month) - 1] || "-";
 
 const getToday = () => {
   const now = new Date();
@@ -114,10 +112,7 @@ const formatDate = (date) => {
 const toInputDate = (date) => {
   if (!date) return "";
 
-  if (
-    typeof date === "string" &&
-    /^\d{4}-\d{2}-\d{2}/.test(date)
-  ) {
+  if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}/.test(date)) {
     return date.slice(0, 10);
   }
 
@@ -189,10 +184,7 @@ const validateLotteryForm = (data, checkPast = true) => {
   }
 
   const badPrize = (value) =>
-    value === "" ||
-    value === null ||
-    value === undefined ||
-    Number(value) < 0;
+    value === "" || value === null || value === undefined || Number(value) < 0;
 
   if (badPrize(data.prizes.first)) {
     return "First prize amount is required";
@@ -206,21 +198,40 @@ const validateLotteryForm = (data, checkPast = true) => {
     return "Third prize amount is required";
   }
 
+  if (badPrize(data.prizes.fourth)) {
+    return "Fourth prize amount is required";
+  }
+
+  if (badPrize(data.prizes.fifth)) {
+    return "Fifth prize amount is required";
+  }
+
   return "";
 };
 
-const buildPayload = (data) => ({
-  marketName: data.marketName.trim(),
-  month: Number(data.month),
-  year: Number(data.year),
-  drawDate: data.drawDate,
-  drawTime: data.drawTime,
-  prizes: {
-    first: Number(data.prizes.first),
-    second: Number(data.prizes.second),
-    third: Number(data.prizes.third),
-  },
-});
+const buildPayload = (data) => {
+  let month = Number(data.month);
+  let year = Number(data.year);
+  if (data.drawDate && /^\d{4}-\d{2}-\d{2}/.test(data.drawDate)) {
+    const [y, m] = data.drawDate.split("-").map(Number);
+    if (m >= 1 && m <= 12) month = m;
+    if (y >= 2000 && y <= 2100) year = y;
+  }
+  return {
+    marketName: data.marketName.trim(),
+    month,
+    year,
+    drawDate: data.drawDate,
+    drawTime: data.drawTime,
+    prizes: {
+      first: Number(data.prizes.first),
+      second: Number(data.prizes.second),
+      third: Number(data.prizes.third),
+      fourth: Number(data.prizes.fourth || 0),
+      fifth: Number(data.prizes.fifth || 0),
+    },
+  };
+};
 
 /* =========================================================
    SMALL UI COMPONENTS
@@ -235,7 +246,7 @@ const ModalShell = ({
   z = "z-50",
 }) => (
   <div
-    className={`fixed inset-0 ${z} flex items-start justify-center overflow-y-auto bg-black/50 p-4`}
+    className={`fixed inset-0 ${z} flex items-center justify-center overflow-y-auto bg-black/50 p-4`}
   >
     <div
       className={`my-6 w-full ${
@@ -244,14 +255,10 @@ const ModalShell = ({
     >
       <div className="flex items-center justify-between border-b border-[#F3E7C4] px-5 py-4">
         <div>
-          <h2 className="text-lg font-black text-[#1F2A6B]">
-            {title}
-          </h2>
+          <h2 className="text-lg font-black text-[#1F2A6B]">{title}</h2>
 
           {subtitle && (
-            <p className="mt-1 text-xs text-[#6B7280]">
-              {subtitle}
-            </p>
+            <p className="mt-1 text-xs text-[#6B7280]">{subtitle}</p>
           )}
         </div>
 
@@ -281,12 +288,7 @@ const StatusPill = ({ active }) =>
     </span>
   );
 
-const IconTile = ({
-  src,
-  name,
-  size = "h-24 w-24",
-  compact = false,
-}) =>
+const IconTile = ({ src, name, size = "h-24 w-24", compact = false }) =>
   src ? (
     <img
       src={src}
@@ -297,10 +299,7 @@ const IconTile = ({
     <div
       className={`${size} flex shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-br from-[#EF4444] to-[#991B1B] text-center shadow ring-2 ring-white`}
     >
-      <Crown
-        size={compact ? 16 : 22}
-        className="text-[#FFD83D]"
-      />
+      <Crown size={compact ? 16 : 22} className="text-[#FFD83D]" />
 
       {!compact && (
         <span className="mt-1 line-clamp-2 px-1.5 text-[11px] font-black uppercase leading-tight text-white">
@@ -401,6 +400,8 @@ const LotteryFields = ({ data, onChange, minDate }) => (
       ["firstPrize", "1st Prize Amount", data.prizes.first],
       ["secondPrize", "2nd Prize Amount", data.prizes.second],
       ["thirdPrize", "3rd Prize Amount", data.prizes.third],
+      ["fourthPrize", "4th Prize Amount", data.prizes.fourth],
+      ["fifthPrize", "5th Prize Amount", data.prizes.fifth],
     ].map(([name, label, value]) => (
       <div key={name}>
         <label className={LABEL_CLS}>{label}</label>
@@ -445,9 +446,7 @@ const AdminLottery = () => {
     message,
   } = useSelector((state) => state.adminLottery);
 
-  const { users = [], usersLoading } = useSelector(
-    (state) => state.adminAuth
-  );
+  const { users = [], usersLoading } = useSelector((state) => state.adminAuth);
 
   /* =======================================================
      USERS
@@ -511,6 +510,8 @@ const AdminLottery = () => {
       first: "",
       second: "",
       third: "",
+      fourth: "0",
+      fifth: "0",
     },
   });
 
@@ -571,10 +572,25 @@ const AdminLottery = () => {
   ======================================================= */
 
   const currentLottery =
-    lottery && lottery._id === editingId ? lottery : null;
+    (lottery && lottery._id === editingId ? lottery : null) ||
+    (lotteries || []).find((item) => item._id === editingId) ||
+    null;
 
   const viewLottery =
-    lottery && lottery._id === viewId ? lottery : null;
+    (lottery && lottery._id === viewId ? lottery : null) ||
+    (lotteries || []).find((item) => item._id === viewId) ||
+    null;
+
+  const displayCurrentImg = useMemo(() => {
+    if (updateIconPreview) return updateIconPreview;
+    if (currentLottery?.imageUrl) return currentLottery.imageUrl;
+    const sameMarket = (lotteries || []).find(
+      (item) =>
+        item.marketName?.trim().toLowerCase() ===
+          updateData.marketName?.trim().toLowerCase() && item.imageUrl,
+    );
+    return sameMarket?.imageUrl || null;
+  }, [updateIconPreview, currentLottery, lotteries, updateData.marketName]);
 
   const filteredLotteries = useMemo(() => {
     const list = Array.isArray(lotteries) ? lotteries : [];
@@ -595,9 +611,8 @@ const AdminLottery = () => {
   }, [lotteries, searchTerm, statusFilter]);
 
   const viewedIsActive = viewLottery
-    ? (lotteries || []).find(
-        (item) => item._id === viewLottery._id
-      )?.isActive ?? viewLottery.isActive
+    ? ((lotteries || []).find((item) => item._id === viewLottery._id)
+        ?.isActive ?? viewLottery.isActive)
     : false;
 
   /* =======================================================
@@ -611,6 +626,8 @@ const AdminLottery = () => {
       firstPrize: "first",
       secondPrize: "second",
       thirdPrize: "third",
+      fourthPrize: "fourth",
+      fifthPrize: "fifth",
     }[name];
 
     if (prizeKey) {
@@ -727,7 +744,7 @@ const AdminLottery = () => {
       createLotteryConfig({
         payload,
         imageFile: iconFile,
-      })
+      }),
     );
 
     if (createLotteryConfig.fulfilled.match(result)) {
@@ -758,9 +775,7 @@ const AdminLottery = () => {
     const result = await dispatch(getLotteryConfigById(id));
 
     const data =
-      result?.payload?.lottery ||
-      result?.payload?.data ||
-      result?.payload;
+      result?.payload?.lottery || result?.payload?.data || result?.payload;
 
     if (data) {
       setUpdateData({
@@ -773,12 +788,12 @@ const AdminLottery = () => {
           first: data.prizes?.first ?? "",
           second: data.prizes?.second ?? "",
           third: data.prizes?.third ?? "",
+          fourth: data.prizes?.fourth ?? "0",
+          fifth: data.prizes?.fifth ?? "0",
         },
       });
     } else if (lotteries?.length) {
-      const item = lotteries.find(
-        (lotteryItem) => lotteryItem._id === id
-      );
+      const item = lotteries.find((lotteryItem) => lotteryItem._id === id);
 
       if (item) {
         setUpdateData({
@@ -791,6 +806,8 @@ const AdminLottery = () => {
             first: item.prizes?.first ?? "",
             second: item.prizes?.second ?? "",
             third: item.prizes?.third ?? "",
+            fourth: item.prizes?.fourth ?? "0",
+            fifth: item.prizes?.fifth ?? "0",
           },
         });
       }
@@ -868,7 +885,7 @@ const AdminLottery = () => {
         id: editingId,
         lotteryData: payload,
         imageFile: updateIconFile || undefined,
-      })
+      }),
     );
 
     if (updateLotteryConfig.fulfilled.match(result)) {
@@ -903,9 +920,7 @@ const AdminLottery = () => {
 
     if (item.isActive) {
       if (
-        !window.confirm(
-          "Are you sure you want to deactivate this lottery?"
-        )
+        !window.confirm("Are you sure you want to deactivate this lottery?")
       ) {
         return;
       }
@@ -920,11 +935,7 @@ const AdminLottery = () => {
         }
       }
     } else {
-      if (
-        !window.confirm(
-          "Are you sure you want to activate this lottery?"
-        )
-      ) {
+      if (!window.confirm("Are you sure you want to activate this lottery?")) {
         return;
       }
 
@@ -970,9 +981,7 @@ const AdminLottery = () => {
     setEditData({
       number: entry.number || "",
       amount:
-        entry.amount !== undefined && entry.amount !== null
-          ? entry.amount
-          : "",
+        entry.amount !== undefined && entry.amount !== null ? entry.amount : "",
       status: entry.status || "pending",
       entryDate: entry.entryDate || "",
       prizeType: entry.prizeType || "",
@@ -1042,7 +1051,7 @@ const AdminLottery = () => {
         id: viewLottery._id,
         userEntryId: editingEntry._id,
         data: payloadData,
-      })
+      }),
     );
 
     if (updateUserLotteryEntry.fulfilled.match(result)) {
@@ -1054,11 +1063,7 @@ const AdminLottery = () => {
   };
 
   const handleDeleteEntry = async (configId, entryId) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this user entry?"
-      )
-    ) {
+    if (!window.confirm("Are you sure you want to delete this user entry?")) {
       return;
     }
 
@@ -1066,7 +1071,7 @@ const AdminLottery = () => {
       deleteUserLotteryEntry({
         id: configId,
         userEntryId: entryId,
-      })
+      }),
     );
 
     if (deleteUserLotteryEntry.fulfilled.match(result)) {
@@ -1080,7 +1085,7 @@ const AdminLottery = () => {
   ======================================================= */
 
   return (
-    <div className="min-h-screen bg-[#FFFDF7] p-4 md:p-6">
+    <div className="bg-[#FFFDF7] p-4 md:p-6">
       <div className="mx-auto max-w-[1400px] space-y-5">
         {/* HEADER */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -1090,8 +1095,8 @@ const AdminLottery = () => {
             </h1>
 
             <p className="mt-1 text-sm text-[#6B7280]">
-              Manage daily lotteries, schedule draws, set prizes and
-              publish results.
+              Manage daily lotteries, schedule draws, set prizes and publish
+              results.
             </p>
           </div>
 
@@ -1252,7 +1257,9 @@ const AdminLottery = () => {
                     const totalPrize =
                       Number(item.prizes?.first || 0) +
                       Number(item.prizes?.second || 0) +
-                      Number(item.prizes?.third || 0);
+                      Number(item.prizes?.third || 0) +
+                      Number(item.prizes?.fourth || 0) +
+                      Number(item.prizes?.fifth || 0);
 
                     return (
                       <tr
@@ -1266,7 +1273,15 @@ const AdminLottery = () => {
                         <td className="whitespace-nowrap px-4 py-3">
                           <div className="flex items-center gap-3">
                             <IconTile
-                              src={item.imageUrl}
+                              src={
+                                item.imageUrl ||
+                                (lotteries || []).find(
+                                  (l) =>
+                                    l.marketName?.trim().toLowerCase() ===
+                                      item.marketName?.trim().toLowerCase() &&
+                                    l.imageUrl,
+                                )?.imageUrl
+                              }
                               name={item.marketName}
                               size="h-11 w-11"
                               compact
@@ -1296,10 +1311,7 @@ const AdminLottery = () => {
                               </div>
 
                               <div className="mt-1 flex items-center gap-1.5 text-xs text-[#6B7280]">
-                                <Clock3
-                                  size={13}
-                                  className="text-[#9A5B00]"
-                                />
+                                <Clock3 size={13} className="text-[#9A5B00]" />
                                 {item.drawTime || "-"}
                               </div>
                             </div>
@@ -1317,15 +1329,15 @@ const AdminLottery = () => {
                                 ["1st", item.prizes?.first],
                                 ["2nd", item.prizes?.second],
                                 ["3rd", item.prizes?.third],
+                                ["4th", item.prizes?.fourth],
+                                ["5th", item.prizes?.fifth],
                               ].map(([label, amount]) => (
                                 <span
                                   key={label}
                                   className="rounded-md bg-[#FFF9E3] px-2 py-1 text-[10px] font-semibold text-[#9A5B00] ring-1 ring-[#F3E7C4]"
                                 >
                                   {label} ₹
-                                  {Number(amount || 0).toLocaleString(
-                                    "en-IN"
-                                  )}
+                                  {Number(amount || 0).toLocaleString("en-IN")}
                                 </span>
                               ))}
                             </div>
@@ -1373,9 +1385,7 @@ const AdminLottery = () => {
                                   ? "border-[#D93025]/30 bg-[#FDE8E6] text-[#D93025]"
                                   : "border-[#12A36B]/30 bg-[#E6F6EF] text-[#12A36B]"
                               }`}
-                              title={
-                                item.isActive ? "Deactivate" : "Activate"
-                              }
+                              title={item.isActive ? "Deactivate" : "Activate"}
                             >
                               <Power size={15} />
                             </button>
@@ -1506,10 +1516,7 @@ const AdminLottery = () => {
             )}
 
             <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_200px]">
-              <LotteryFields
-                data={updateData}
-                onChange={handleUpdateChange}
-              />
+              <LotteryFields data={updateData} onChange={handleUpdateChange} />
 
               <div>
                 <label className={LABEL_CLS}>
@@ -1524,9 +1531,9 @@ const AdminLottery = () => {
                       alt="New lottery preview"
                       className="h-28 w-28 rounded-xl object-cover shadow ring-1 ring-[#F2B705]"
                     />
-                  ) : currentLottery?.imageUrl ? (
+                  ) : displayCurrentImg ? (
                     <img
-                      src={currentLottery.imageUrl}
+                      src={displayCurrentImg}
                       alt="Current lottery"
                       className="h-28 w-28 rounded-xl object-cover shadow ring-1 ring-[#F3E7C4]"
                     />
@@ -1540,9 +1547,7 @@ const AdminLottery = () => {
                     className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-xs ${OUTLINE_BTN}`}
                   >
                     <Upload size={13} />
-                    {updateIconPreview
-                      ? "Change Image"
-                      : "Upload New Image"}
+                    {updateIconPreview ? "Change Image" : "Upload New Image"}
                     <input
                       type="file"
                       accept="image/*"
@@ -1596,9 +1601,7 @@ const AdminLottery = () => {
         <ModalShell
           wide
           title={
-            viewLottery
-              ? `View — ${viewLottery.marketName}`
-              : "View Lottery"
+            viewLottery ? `View — ${viewLottery.marketName}` : "View Lottery"
           }
           subtitle={
             viewLottery
@@ -1637,7 +1640,15 @@ const AdminLottery = () => {
               <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-[220px_1fr]">
                 <div className="flex flex-col items-center gap-2 rounded-2xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
                   <IconTile
-                    src={viewLottery.imageUrl}
+                    src={
+                      viewLottery.imageUrl ||
+                      (lotteries || []).find(
+                        (l) =>
+                          l.marketName?.trim().toLowerCase() ===
+                            viewLottery.marketName?.trim().toLowerCase() &&
+                          l.imageUrl,
+                      )?.imageUrl
+                    }
                     name={viewLottery.marketName}
                     size="h-40 w-40"
                   />
@@ -1658,10 +1669,7 @@ const AdminLottery = () => {
                       value={getMonthName(viewLottery.month)}
                     />
 
-                    <ReadField
-                      label="Year"
-                      value={viewLottery.year}
-                    />
+                    <ReadField label="Year" value={viewLottery.year} />
 
                     <ReadField
                       label="Draw Time"
@@ -1689,11 +1697,13 @@ const AdminLottery = () => {
                       Prize Structure
                     </p>
 
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                       {[
                         ["1st Prize", viewLottery.prizes?.first],
                         ["2nd Prize", viewLottery.prizes?.second],
                         ["3rd Prize", viewLottery.prizes?.third],
+                        ["4th Prize", viewLottery.prizes?.fourth],
+                        ["5th Prize", viewLottery.prizes?.fifth],
                       ].map(([label, amount]) => (
                         <div
                           key={label}
@@ -1704,8 +1714,7 @@ const AdminLottery = () => {
                           </p>
 
                           <p className="mt-1 text-lg font-black text-[#1A1204]">
-                            ₹
-                            {Number(amount || 0).toLocaleString("en-IN")}
+                            ₹{Number(amount || 0).toLocaleString("en-IN")}
                           </p>
                         </div>
                       ))}
@@ -1713,8 +1722,7 @@ const AdminLottery = () => {
                   </div>
 
                   <div className="mt-3 rounded-lg bg-[#FFFDF7] px-3 py-2 text-[11px] text-[#8A8F98] ring-1 ring-[#F3E7C4]">
-                    <b className="text-[#374151]">ID:</b>{" "}
-                    {viewLottery._id}
+                    <b className="text-[#374151]">ID:</b> {viewLottery._id}
                   </div>
                 </div>
               </div>
@@ -1744,10 +1752,7 @@ const AdminLottery = () => {
 
                       <tbody className="divide-y divide-[#F3E7C4]">
                         {viewLottery.users.map((entry, index) => (
-                          <tr
-                            key={entry._id}
-                            className="hover:bg-[#FFFDF7]"
-                          >
+                          <tr key={entry._id} className="hover:bg-[#FFFDF7]">
                             <td className="px-4 py-3 text-sm text-[#8A8F98]">
                               {index + 1}
                             </td>
@@ -1773,7 +1778,7 @@ const AdminLottery = () => {
                             <td className="px-4 py-3 text-sm font-semibold text-[#1A1A1A]">
                               ₹
                               {Number(entry.amount || 0).toLocaleString(
-                                "en-IN"
+                                "en-IN",
                               )}
                             </td>
 
@@ -1791,7 +1796,7 @@ const AdminLottery = () => {
                                         entry.prize.first ||
                                           entry.prize.second ||
                                           entry.prize.third ||
-                                          0
+                                          0,
                                       ).toLocaleString("en-IN")}
                                     </div>
                                   )}
@@ -1836,7 +1841,7 @@ const AdminLottery = () => {
                                   onClick={() =>
                                     handleDeleteEntry(
                                       viewLottery._id,
-                                      entry._id
+                                      entry._id,
                                     )
                                   }
                                   disabled={deleteLoading}
@@ -1881,8 +1886,8 @@ const AdminLottery = () => {
               </h3>
 
               <p className="mt-2 max-w-md text-sm text-[#6B7280]">
-                This lottery and its associated entries will be
-                permanently deleted.
+                This lottery and its associated entries will be permanently
+                deleted.
               </p>
             </div>
 

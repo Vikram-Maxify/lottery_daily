@@ -56,13 +56,29 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
     // (jo bhi market us din draw ho rahi thi)
     // =====================================================
 
-    const refLotteries = await LotteryConfig.find({
+    let refLotteries = await LotteryConfig.find({
       drawDate: { $gte: refStart, $lte: refEnd },
     }).lean();
 
     console.log(
       `📋 ${formatDateString(refStart)} ki total lotteries mili: ${refLotteries.length}`
     );
+
+    // If no lotteries found for exact referenceDate, fallback to latest config per market
+    if (!refLotteries || refLotteries.length === 0) {
+      console.log(`ℹ️ Checking latest config per market...`);
+      const distinctMarkets = await LotteryConfig.distinct("marketName");
+      refLotteries = [];
+      for (const mName of distinctMarkets) {
+        const latest = await LotteryConfig.findOne({ marketName: mName })
+          .sort({ drawDate: -1, createdAt: -1 })
+          .lean();
+        if (latest) {
+          refLotteries.push(latest);
+        }
+      }
+      console.log(`📋 Found ${refLotteries.length} latest lotteries by distinct markets`);
+    }
 
     if (refLotteries.length === 0) {
       console.log("ℹ️ Koi lottery nahi mili. Cron job end.");
@@ -81,6 +97,38 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
     for (const refLottery of refLotteries) {
       try {
         const marketName = refLottery.marketName;
+
+        // Resolve banner image: from refLottery, or fallback to any existing config of this market
+        let imageUrl = refLottery.imageUrl || null;
+
+        if (!imageUrl) {
+          const prevWithImg = await LotteryConfig.findOne({
+            marketName,
+            imageUrl: { $exists: true, $nin: [null, ""] },
+          })
+            .sort({ createdAt: -1 })
+            .lean();
+
+          if (prevWithImg?.imageUrl) {
+            imageUrl = prevWithImg.imageUrl;
+            console.log(`🖼️ Auto-resolved banner for ${marketName}: ${imageUrl}`);
+          }
+        }
+
+        // Auto-repair any older configs of this market where imageUrl is missing
+        if (imageUrl) {
+          await LotteryConfig.updateMany(
+            {
+              marketName,
+              $or: [
+                { imageUrl: { $exists: false } },
+                { imageUrl: null },
+                { imageUrl: "" },
+              ],
+            },
+            { $set: { imageUrl } }
+          );
+        }
 
         // =====================================================
         // NEXT DAY DATE CALCULATE KARO (normalized to midnight)
@@ -104,6 +152,16 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
         }).lean();
 
         if (existingNext) {
+          // If existing next lottery has no imageUrl, repair it immediately!
+          if (!existingNext.imageUrl && imageUrl) {
+            await LotteryConfig.findByIdAndUpdate(existingNext._id, {
+              imageUrl,
+            });
+            console.log(
+              `🖼️ REPAIRED existing next lottery: ${marketName} - ${nextDateString} with banner image`
+            );
+          }
+
           console.log(
             `⏭️ SKIP: ${marketName} - ${nextDateString} (already exists)`
           );
@@ -118,6 +176,8 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
         const nextLottery = await LotteryConfig.create({
           marketName,
 
+          imageUrl: imageUrl || null,
+
           month: nextDate.getMonth() + 1,
 
           year: nextDate.getFullYear(),
@@ -130,6 +190,8 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
             first: refLottery.prizes?.first || 0,
             second: refLottery.prizes?.second || 0,
             third: refLottery.prizes?.third || 0,
+            fourth: refLottery.prizes?.fourth || 0,
+            fifth: refLottery.prizes?.fifth || 0,
           },
 
           users: [],
@@ -138,7 +200,7 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
         });
 
         console.log(
-          `✅ CREATED: ${marketName} - ${nextDateString} (id: ${nextLottery._id})`
+          `✅ CREATED: ${marketName} - ${nextDateString} (id: ${nextLottery._id}, image: ${imageUrl ? "yes" : "no"})`
         );
 
         createdCount++;
@@ -190,6 +252,16 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
 // =====================================================
 
 const startLotteryCron = () => {
+  // Run on startup (after 3s) to repair any existing missing images and ensure tomorrow exists
+  setTimeout(async () => {
+    try {
+      console.log("🔄 Initializing lottery check & banner repair...");
+      await createNextDayLotteries(new Date());
+    } catch (err) {
+      console.error("❌ Startup lottery check error:", err.message);
+    }
+  }, 3000);
+
   // Cron expression: "0 0 * * *"  →  Roz raat 12:00 AM
   cron.schedule(
     "0 0 * * *",
