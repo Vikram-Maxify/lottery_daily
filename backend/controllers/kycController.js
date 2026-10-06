@@ -2,215 +2,308 @@ const KycDocument = require("../models/KycDocument");
 const uploadToImgBB = require("../utils/imgbbUpload");
 
 // =====================================================
-// DELETE LOCAL FILE SAFELY
-// =====================================================
-
-const deleteFile = (filePath) => {
-  try {
-    if (!filePath) return;
-
-    const fullPath = path.join(__dirname, "..", filePath);
-
-    if (fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath);
-    }
-  } catch (error) {
-    console.error("File delete error:", error.message);
-  }
-};
-
-// =====================================================
-// UPLOAD KYC DOCUMENT
+// UPLOAD KYC
 // POST /api/kyc/upload
 //
-// Aadhaar:
-//   front = Aadhaar front
-//   back  = Aadhaar back
+// multipart/form-data:
 //
-// PAN:
-//   front = PAN card
+// dob
+// aadhaarFront
+// aadhaarBack
+// panFront
+// selfie
+//
+// All files are optional individually, but at least
+// one KYC document should be uploaded.
 // =====================================================
 
 exports.uploadKycDocument = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { documentType } = req.body;
 
-    // -------------------------------------------------
-    // Validate document type
-    // -------------------------------------------------
+    const { dob } = req.body;
 
-    if (!documentType) {
+    // =================================================
+    // GET FILES
+    // =================================================
+
+    const aadhaarFront = req.files?.aadhaarFront?.[0] || null;
+    const aadhaarBack = req.files?.aadhaarBack?.[0] || null;
+    const panFront = req.files?.panFront?.[0] || null;
+    const selfie = req.files?.selfie?.[0] || null;
+
+    // =================================================
+    // VALIDATION
+    // =================================================
+
+    if (!aadhaarFront && !panFront && !selfie && !dob) {
       return res.status(400).json({
         success: false,
-        message: "Document type is required",
+        message: "Please provide KYC details",
       });
     }
 
-    if (!["aadhaar", "pan"].includes(documentType)) {
+    // Aadhaar front and back must come together
+    if (aadhaarFront && !aadhaarBack) {
       return res.status(400).json({
         success: false,
-        message: "Invalid document type",
+        message: "Aadhaar back image is required",
       });
     }
 
-    // -------------------------------------------------
-    // Get uploaded files (multer.memoryStorage())
-    // -------------------------------------------------
-
-    const frontFile = req.files?.front?.[0];
-    const backFile = req.files?.back?.[0];
-
-    // -------------------------------------------------
-    // Front document required for both
-    // -------------------------------------------------
-
-    if (!frontFile) {
+    if (aadhaarBack && !aadhaarFront) {
       return res.status(400).json({
         success: false,
-        message:
-          documentType === "aadhaar"
-            ? "Please upload Aadhaar front image"
-            : "Please upload PAN card image",
+        message: "Aadhaar front image is required",
       });
     }
 
-    // -------------------------------------------------
-    // Aadhaar back is also required
-    // -------------------------------------------------
+    // =================================================
+    // DOB VALIDATION
+    // =================================================
 
-    if (documentType === "aadhaar" && !backFile) {
-      return res.status(400).json({
-        success: false,
-        message: "Please upload Aadhaar back image",
-      });
-    }
+    let parsedDob = null;
 
-    // -------------------------------------------------
-    // PAN should NOT have back
-    // -------------------------------------------------
+    if (dob) {
+      parsedDob = new Date(dob);
 
-    if (documentType === "pan" && backFile) {
-      return res.status(400).json({
-        success: false,
-        message: "PAN does not require back document",
-      });
-    }
-
-    // -------------------------------------------------
-    // Check existing document
-    // -------------------------------------------------
-
-    const existingDocument = await KycDocument.findOne({
-      userId,
-      documentType,
-    });
-
-    // -------------------------------------------------
-    // Already approved -> block re-upload
-    // -------------------------------------------------
-
-    if (existingDocument?.status === "approved") {
-      return res.status(400).json({
-        success: false,
-        message: `${documentType.toUpperCase()} is already approved`,
-      });
-    }
-
-    // -------------------------------------------------
-    // Upload FRONT image to ImgBB
-    // -------------------------------------------------
-
-    let frontUpload;
-
-    try {
-      frontUpload = await uploadToImgBB(frontFile);
-    } catch (err) {
-      console.error("ImgBB front upload error:", err.message);
-
-      return res.status(500).json({
-        success: false,
-        message: "Failed to upload front document to ImgBB",
-      });
-    }
-
-    // -------------------------------------------------
-    // Upload BACK image to ImgBB (Aadhaar only)
-    // -------------------------------------------------
-
-    let backUpload = null;
-
-    if (backFile) {
-      try {
-        backUpload = await uploadToImgBB(backFile);
-      } catch (err) {
-        console.error("ImgBB back upload error:", err.message);
-
-        return res.status(500).json({
+      if (isNaN(parsedDob.getTime())) {
+        return res.status(400).json({
           success: false,
-          message: "Failed to upload back document to ImgBB",
+          message: "Invalid date of birth",
+        });
+      }
+
+      // Future DOB not allowed
+      if (parsedDob > new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: "Date of birth cannot be in the future",
         });
       }
     }
 
-    // -------------------------------------------------
-    // Prepare URLs (matching your utility's return shape)
-    // -------------------------------------------------
+    // =================================================
+    // FIND USER KYC
+    // =================================================
 
-    const documentUrl = frontUpload.imageUrl;
-    const documentPublicId = frontUpload.deleteUrl; // ImgBB delete URL
+    let kyc = await KycDocument.findOne({
+      userId,
+    });
 
-    const backDocumentUrl = backUpload ? backUpload.imageUrl : null;
-    const backDocumentPublicId = backUpload ? backUpload.deleteUrl : null;
+    // =================================================
+    // CHECK APPROVED DOCUMENTS
+    // =================================================
 
-    // -------------------------------------------------
-    // Update existing document
-    // -------------------------------------------------
+    if (kyc) {
+      if (
+        aadhaarFront &&
+        kyc.aadhaar?.review?.status === "approved"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Aadhaar is already approved",
+        });
+      }
 
-    if (existingDocument) {
-      existingDocument.documentUrl = documentUrl;
-      existingDocument.documentPublicId = documentPublicId;
+      if (
+        panFront &&
+        kyc.pan?.review?.status === "approved"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "PAN is already approved",
+        });
+      }
+    }
 
-      existingDocument.backDocumentUrl = backDocumentUrl;
-      existingDocument.backDocumentPublicId = backDocumentPublicId;
+    // =================================================
+    // UPLOAD AADHAAR FRONT
+    // =================================================
 
-      existingDocument.status = "pending";
-      existingDocument.rejectionReason = null;
-      existingDocument.reviewedBy = null;
-      existingDocument.reviewedAt = null;
+    let aadhaarFrontUpload = null;
 
-      const document = await existingDocument.save();
+    if (aadhaarFront) {
+      try {
+        aadhaarFrontUpload = await uploadToImgBB(
+          aadhaarFront
+        );
+      } catch (error) {
+        console.error(
+          "Aadhaar front ImgBB error:",
+          error.message
+        );
 
-      return res.status(200).json({
-        success: true,
-        message: `${documentType.toUpperCase()} uploaded successfully`,
-        data: document,
+        return res.status(500).json({
+          success: false,
+          message: "Failed to upload Aadhaar front image",
+        });
+      }
+    }
+
+    // =================================================
+    // UPLOAD AADHAAR BACK
+    // =================================================
+
+    let aadhaarBackUpload = null;
+
+    if (aadhaarBack) {
+      try {
+        aadhaarBackUpload = await uploadToImgBB(
+          aadhaarBack
+        );
+      } catch (error) {
+        console.error(
+          "Aadhaar back ImgBB error:",
+          error.message
+        );
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to upload Aadhaar back image",
+        });
+      }
+    }
+
+    // =================================================
+    // UPLOAD PAN
+    // =================================================
+
+    let panUpload = null;
+
+    if (panFront) {
+      try {
+        panUpload = await uploadToImgBB(
+          panFront
+        );
+      } catch (error) {
+        console.error(
+          "PAN ImgBB error:",
+          error.message
+        );
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to upload PAN image",
+        });
+      }
+    }
+
+    // =================================================
+    // UPLOAD SELFIE
+    // =================================================
+
+    let selfieUpload = null;
+
+    if (selfie) {
+      try {
+        selfieUpload = await uploadToImgBB(
+          selfie
+        );
+      } catch (error) {
+        console.error(
+          "Selfie ImgBB error:",
+          error.message
+        );
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to upload selfie",
+        });
+      }
+    }
+
+    // =================================================
+    // CREATE KYC OBJECT IF NOT EXISTS
+    // =================================================
+
+    if (!kyc) {
+      kyc = new KycDocument({
+        userId,
       });
     }
 
-    // -------------------------------------------------
-    // Create new document
-    // -------------------------------------------------
+    // =================================================
+    // DOB
+    // =================================================
 
-    const document = await KycDocument.create({
-      userId,
-      documentType,
+    if (parsedDob) {
+      kyc.dob = parsedDob;
+    }
 
-      // Front
-      documentUrl,
-      documentPublicId,
+    // =================================================
+    // SELFIE
+    // =================================================
 
-      // Back - Aadhaar only
-      backDocumentUrl,
-      backDocumentPublicId,
+    if (selfieUpload) {
+      kyc.selfie = {
+        url: selfieUpload.imageUrl,
+        publicId: selfieUpload.deleteUrl,
+      };
+    }
 
-      status: "pending",
-    });
+    // =================================================
+    // AADHAAR
+    // =================================================
 
-    return res.status(201).json({
+    if (aadhaarFrontUpload) {
+      kyc.aadhaar.front = {
+        url: aadhaarFrontUpload.imageUrl,
+        publicId: aadhaarFrontUpload.deleteUrl,
+      };
+    }
+
+    if (aadhaarBackUpload) {
+      kyc.aadhaar.back = {
+        url: aadhaarBackUpload.imageUrl,
+        publicId: aadhaarBackUpload.deleteUrl,
+      };
+    }
+
+    // If Aadhaar is uploaded/re-uploaded,
+    // reset its review status
+    if (aadhaarFrontUpload || aadhaarBackUpload) {
+      kyc.aadhaar.review = {
+        status: "pending",
+        rejectionReason: null,
+        reviewedBy: null,
+        reviewedAt: null,
+      };
+    }
+
+    // =================================================
+    // PAN
+    // =================================================
+
+    if (panUpload) {
+      kyc.pan.front = {
+        url: panUpload.imageUrl,
+        publicId: panUpload.deleteUrl,
+      };
+
+      // Reset PAN review
+      kyc.pan.review = {
+        status: "pending",
+        rejectionReason: null,
+        reviewedBy: null,
+        reviewedAt: null,
+      };
+    }
+
+    // =================================================
+    // SAVE
+    // =================================================
+
+    await kyc.save();
+
+    // =================================================
+    // RESPONSE
+    // =================================================
+
+    return res.status(200).json({
       success: true,
-      message: `${documentType.toUpperCase()} uploaded successfully`,
-      data: document,
+      message: "KYC details uploaded successfully",
+      data: kyc,
     });
   } catch (error) {
     console.error("Upload KYC Error:", error);
@@ -222,6 +315,7 @@ exports.uploadKycDocument = async (req, res) => {
   }
 };
 
+
 // =====================================================
 // GET MY KYC
 // GET /api/kyc/my
@@ -231,14 +325,29 @@ exports.getMyKyc = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const documents = await KycDocument.find({ userId }).sort({
-      createdAt: -1,
-    });
+    const kyc = await KycDocument.findOne({
+      userId,
+    })
+      .populate("userId", "name email mobile")
+      .populate(
+        "aadhaar.review.reviewedBy",
+        "name email"
+      )
+      .populate(
+        "pan.review.reviewedBy",
+        "name email"
+      );
+
+    if (!kyc) {
+      return res.status(404).json({
+        success: false,
+        message: "KYC not found",
+      });
+    }
 
     return res.status(200).json({
       success: true,
-      count: documents.length,
-      data: documents,
+      data: kyc,
     });
   } catch (error) {
     console.error("Get My KYC Error:", error);
@@ -252,27 +361,94 @@ exports.getMyKyc = async (req, res) => {
 
 
 // =====================================================
-// GET MY KYC
-// GET /api/kyc/my
+// GET KYC STATUS
+// GET /api/kyc/status
 // =====================================================
 
-exports.getMyKyc = async (req, res) => {
+exports.getKycStatus = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const documents = await KycDocument.find({
+    const kyc = await KycDocument.findOne({
       userId,
-    }).sort({
-      createdAt: -1,
-    });
+    }).select(
+      "dob selfie aadhaar pan createdAt updatedAt"
+    );
+
+    if (!kyc) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          exists: false,
+          dob: null,
+          selfie: null,
+          aadhaar: null,
+          pan: null,
+        },
+      });
+    }
 
     return res.status(200).json({
       success: true,
-      count: documents.length,
-      data: documents,
+      data: {
+        exists: true,
+
+        dob: kyc.dob,
+
+        selfie: kyc.selfie
+          ? {
+              url: kyc.selfie.url,
+            }
+          : null,
+
+        aadhaar: kyc.aadhaar
+          ? {
+              front: kyc.aadhaar.front
+                ? {
+                    url: kyc.aadhaar.front.url,
+                  }
+                : null,
+
+              back: kyc.aadhaar.back
+                ? {
+                    url: kyc.aadhaar.back.url,
+                  }
+                : null,
+
+              status:
+                kyc.aadhaar.review?.status ||
+                "pending",
+
+              rejectionReason:
+                kyc.aadhaar.review
+                  ?.rejectionReason || null,
+            }
+          : null,
+
+        pan: kyc.pan
+          ? {
+              front: kyc.pan.front
+                ? {
+                    url: kyc.pan.front.url,
+                  }
+                : null,
+
+              status:
+                kyc.pan.review?.status ||
+                "pending",
+
+              rejectionReason:
+                kyc.pan.review
+                  ?.rejectionReason || null,
+            }
+          : null,
+
+        createdAt: kyc.createdAt,
+        updatedAt: kyc.updatedAt,
+      },
     });
   } catch (error) {
-    console.error("Get My KYC Error:", error);
+    console.error("Get KYC Status Error:", error);
 
     return res.status(500).json({
       success: false,

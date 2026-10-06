@@ -1,47 +1,26 @@
 const mongoose = require("mongoose");
 
-const kycDocumentSchema = new mongoose.Schema(
+const documentSchema = new mongoose.Schema(
   {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-
-    documentType: {
-      type: String,
-      enum: ["aadhaar", "pan"],
-      required: true,
-    },
-
-    // Aadhaar Front / PAN Document
-    documentUrl: {
-      type: String,
-      required: true,
-    },
-
-    documentPublicId: {
+    url: {
       type: String,
       default: null,
     },
 
-    // Only required for Aadhaar
-    backDocumentUrl: {
+    publicId: {
       type: String,
       default: null,
     },
+  },
+  { _id: false }
+);
 
-    backDocumentPublicId: {
-      type: String,
-      default: null,
-    },
-
+const reviewSchema = new mongoose.Schema(
+  {
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],
       default: "pending",
-      index: true,
     },
 
     rejectionReason: {
@@ -60,15 +39,81 @@ const kycDocumentSchema = new mongoose.Schema(
       default: null,
     },
   },
+  { _id: false }
+);
+
+const kycDocumentSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      unique: true,
+      index: true,
+    },
+
+    // ==========================================
+    // DATE OF BIRTH
+    // ==========================================
+
+    dob: {
+      type: Date,
+      default: null,
+    },
+
+    // ==========================================
+    // USER SELFIE
+    // ==========================================
+
+    selfie: {
+      type: documentSchema,
+      default: null,
+    },
+
+    // ==========================================
+    // AADHAAR
+    // ==========================================
+
+    aadhaar: {
+      front: {
+        type: documentSchema,
+        default: null,
+      },
+
+      back: {
+        type: documentSchema,
+        default: null,
+      },
+
+      review: {
+        type: reviewSchema,
+        default: () => ({
+          status: "pending",
+        }),
+      },
+    },
+
+    // ==========================================
+    // PAN
+    // ==========================================
+
+    pan: {
+      front: {
+        type: documentSchema,
+        default: null,
+      },
+
+      review: {
+        type: reviewSchema,
+        default: () => ({
+          status: "pending",
+        }),
+      },
+    },
+  },
   {
     timestamps: true,
   }
-);
-
-// One Aadhaar + one PAN per user
-kycDocumentSchema.index(
-  { userId: 1, documentType: 1 },
-  { unique: true }
 );
 
 module.exports = mongoose.model("KycDocument", kycDocumentSchema);
