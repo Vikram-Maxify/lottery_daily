@@ -24,6 +24,7 @@ import festivalReducer from './slice/festivalResultReducer'
 import topWinnerReducer from './slice/topWinnerSlice'
 import settingsReducer from './slice/settingsSlice'
 import dailyNumberReducer from './slice/dailyNumberSlice'
+import resultImageReducer from './slice/resultImageSlice'
 
 export const store = configureStore({
   reducer: {
@@ -47,5 +48,6 @@ export const store = configureStore({
     topWinner: topWinnerReducer,
     settings: settingsReducer,
     dailyNumbers: dailyNumberReducer,
+    resultImages: resultImageReducer,
   },
 });

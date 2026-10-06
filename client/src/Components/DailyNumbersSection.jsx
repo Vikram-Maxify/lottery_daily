@@ -184,7 +184,7 @@ const DailyNumbersSection = ({
     availableNumbers,
     searchQuery,
     showAllNumbers,
-    shuffleSeed, // 👈 force re-shuffle on button click
+    // 👈 force re-shuffle on button click
   ]);
 
   // =====================================================

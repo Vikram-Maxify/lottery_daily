@@ -9,6 +9,8 @@ const {
   updateResult,
   deleteResult,
   checkNumber,
+  getPublishedResults,
+  getPublishedResultByDate,
   getUnbetLotteryNumbers,
 } = require("../controllers/lotteryResultController");
 
@@ -16,6 +18,28 @@ const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
 
 const router = express.Router();
+
+// ==========================================
+// PUBLIC / USER RESULT ROUTES
+// ==========================================
+
+// Verify / Check ticket number
+router.post(
+  "/check-number",
+  checkNumber
+);
+
+// Get published results
+router.get(
+  "/published",
+  getPublishedResults
+);
+
+// Get published result by date
+router.get(
+  "/published/:date",
+  getPublishedResultByDate
+);
 
 // ==========================================
 // ADMIN RESULT ROUTES
@@ -35,14 +59,6 @@ router.get(
   authMiddleware,
   adminMiddleware,
   getAllResults
-);
-
-// Test number matching
-router.post(
-  "/check-number",
-  authMiddleware,
-  adminMiddleware,
-  checkNumber
 );
 
 // ==========================================

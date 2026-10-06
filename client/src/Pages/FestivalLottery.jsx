@@ -22,6 +22,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import DailyNumbersSection from "../Components/DailyNumbersSection";
+import QuickVerifyTicket from "../Components/QuickVerifyTicket";
+import LotteryVideoPlayer from "../Components/LotteryVideoPlayer";
 import NumberSoldNotification from "../Components/NumberSoldNotification";
 import { verifyNumberForBet } from "../reducer/slice/dailyNumberSlice";
 
@@ -1511,6 +1513,16 @@ const FestivalLottery = () => {
               </p>
             </div>
           </section> */}
+
+          {/* ================= QUICK TICKET VERIFICATION WIDGET ================= */}
+          <QuickVerifyTicket
+            defaultMode="festival"
+            title="Verify Festival Bumper Ticket"
+            subtitle="Check if your festival ticket is a jackpot winner"
+          />
+
+          {/* ================= HOW TO PLAY VIDEO TUTORIAL ================= */}
+          <LotteryVideoPlayer />
 
           {/* ================= WINNING RULES ================= */}
           <section className="overflow-hidden rounded-[18px] bg-gradient-to-br from-[#3a0b17] via-[#2b0a16] to-[#1a0710] p-2.5 shadow-lg">
