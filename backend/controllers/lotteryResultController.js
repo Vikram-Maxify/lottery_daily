@@ -1012,27 +1012,199 @@ const deleteResult = async (req, res) => {
 // =====================================================
 const checkNumber = async (req, res) => {
   try {
-    const { userNumber, winningNumber } = req.body;
-    if (
-      !validateLotteryNumber(userNumber) ||
-      !validateLotteryNumber(winningNumber)
-    ) {
+    const rawNumber = req.body.userNumber || req.body.ticketNumber;
+    const { winningNumber, date, lotteryConfigId, type } = req.body;
+
+    if (!rawNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Ticket number is required",
+      });
+    }
+
+    const cleanUserNumber = String(rawNumber).trim().toUpperCase();
+
+    if (!validateLotteryNumber(cleanUserNumber)) {
       return res.status(400).json({
         success: false,
         message:
-          "Both numbers must be 8 alphanumeric characters (e.g. 12A12345)",
+          "Ticket number must be 8 alphanumeric characters (e.g. 10F68057 or 12A12345)",
       });
     }
-    const result = getPrize(
-      String(userNumber).trim().toUpperCase(),
-      String(winningNumber).trim().toUpperCase()
-    );
+
+    // CASE 1: If winningNumber is explicitly provided (direct compare)
+    if (winningNumber) {
+      const cleanWinningNumber = String(winningNumber).trim().toUpperCase();
+      if (!validateLotteryNumber(cleanWinningNumber)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Winning number must be 8 alphanumeric characters (e.g. 12A12345)",
+        });
+      }
+
+      const match = getPrize(cleanUserNumber, cleanWinningNumber);
+      return res.status(200).json({
+        success: true,
+        userNumber: cleanUserNumber,
+        ticketNumber: cleanUserNumber,
+        winningNumber: cleanWinningNumber,
+        winner: match !== null,
+        status: match !== null ? "win" : "loss",
+        result: match,
+        prizeType: match?.prize || null,
+        prizeLabel: match
+          ? match.prize === "1st"
+            ? "1st Prize"
+            : match.prize === "2nd"
+            ? "2nd Prize"
+            : match.prize === "3rd"
+            ? "3rd Prize"
+            : `${match.prize} Prize`
+          : null,
+      });
+    }
+
+    // CASE 2: No winningNumber provided -> Look up published results from database
+    const isFestival = String(type || "").toLowerCase() === "festival";
+
+    const filter = { isPublished: true };
+    if (date) {
+      const parsedDate = normalizeDate(date);
+      if (parsedDate) filter.date = parsedDate;
+    }
+    if (lotteryConfigId && mongoose.Types.ObjectId.isValid(lotteryConfigId)) {
+      filter.lotteryConfigId = lotteryConfigId;
+    }
+
+    let results = [];
+    if (isFestival) {
+      const FestivalResult =
+        mongoose.models.festivalresult || require("../models/festivelresult");
+      results = await FestivalResult.find(filter)
+        .populate("lotteryConfigId")
+        .sort({ date: -1, createdAt: -1 });
+    } else {
+      results = await LotteryResult.find(filter)
+        .populate("lotteryConfigId")
+        .sort({ date: -1, createdAt: -1 });
+
+      // If no daily result found and type was not explicitly set to daily, check festival too
+      if (results.length === 0 && !type) {
+        try {
+          const FestivalResult =
+            mongoose.models.festivalresult || require("../models/festivelresult");
+          results = await FestivalResult.find(filter)
+            .populate("lotteryConfigId")
+            .sort({ date: -1, createdAt: -1 });
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+
+    // Check each published result for a match
+    for (const resDoc of results) {
+      const winNum = String(resDoc.winningNumber || "").trim().toUpperCase();
+      if (!winNum) continue;
+
+      const match = getPrize(cleanUserNumber, winNum);
+      if (match) {
+        const config = resDoc.lotteryConfigId || {};
+        const prizeAmounts = getPrizeAmounts(config);
+        const prizeAmount = getAmountByPrizeType(match.prize, prizeAmounts);
+
+        // Check if winner record exists in winners array
+        const winnerRecord = Array.isArray(resDoc.winners)
+          ? resDoc.winners.find(
+              (w) => String(w.userNumber).toUpperCase() === cleanUserNumber
+            )
+          : null;
+
+        const finalAmount = winnerRecord?.prizeAmount || prizeAmount;
+
+        const drawDateStr = resDoc.date
+          ? new Date(resDoc.date).toLocaleDateString("en-IN", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })
+          : "—";
+
+        const drawDayStr = resDoc.date
+          ? `(${new Date(resDoc.date).toLocaleDateString("en-IN", {
+              weekday: "long",
+            })})`
+          : "";
+
+        return res.status(200).json({
+          success: true,
+          winner: true,
+          status: "win",
+          userNumber: cleanUserNumber,
+          ticketNumber: cleanUserNumber,
+          winningNumber: winNum,
+          prizeType: match.prize,
+          prizeLabel:
+            match.prize === "1st"
+              ? "1st Prize"
+              : match.prize === "2nd"
+              ? "2nd Prize"
+              : match.prize === "3rd"
+              ? "3rd Prize"
+              : `${match.prize} Prize`,
+          prizeAmount: finalAmount
+            ? `₹${Number(finalAmount).toLocaleString("en-IN")}`
+            : "₹1,00,00,000",
+          prizeSub:
+            match.prize === "1st"
+              ? "(1 Crore)"
+              : match.prize === "2nd"
+              ? "(9,000)"
+              : "(450)",
+          matchedDigits: match.matchedDigits,
+          drawDate: drawDateStr,
+          drawDay: drawDayStr,
+          drawTime: config.drawTime || "8:00 PM",
+          lotteryName:
+            config.marketName ||
+            (isFestival ? "Dear Festival Lottery" : "Dear Daily Lottery"),
+          result: match,
+        });
+      }
+    }
+
+    // No winning match found
+    const latest = results[0] || null;
+    const latestConfig = latest?.lotteryConfigId || {};
+    const latestDateStr = latest?.date
+      ? new Date(latest.date).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : "—";
+    const latestDayStr = latest?.date
+      ? `(${new Date(latest.date).toLocaleDateString("en-IN", {
+          weekday: "long",
+        })})`
+      : "";
+
     return res.status(200).json({
       success: true,
-      userNumber: String(userNumber).trim().toUpperCase(),
-      winningNumber: String(winningNumber).trim().toUpperCase(),
-      winner: result !== null,
-      result,
+      winner: false,
+      status: "loss",
+      userNumber: cleanUserNumber,
+      ticketNumber: cleanUserNumber,
+      winningNumber: latest?.winningNumber || null,
+      drawDate: latestDateStr,
+      drawDay: latestDayStr,
+      drawTime: latestConfig?.drawTime || "8:00 PM",
+      lotteryName:
+        latestConfig?.marketName ||
+        (isFestival ? "Dear Festival Lottery" : "Dear Daily Lottery"),
+      message:
+        "Better luck next time! This ticket number is not among the winning numbers for published draws.",
     });
   } catch (error) {
     console.error("Check Number Error:", error);

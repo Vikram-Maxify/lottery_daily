@@ -48,6 +48,10 @@ import {
   selectActiveTopWinners,
 } from "../reducer/slice/topWinnerSlice";
 
+import QuickVerifyTicket from "./QuickVerifyTicket";
+import TopWinnersToast from "./TopWinnersToast";
+import LotteryVideoPlayer from "./LotteryVideoPlayer";
+
 // =====================================================
 // HELPERS
 // =====================================================
@@ -388,38 +392,6 @@ const HomeLotterySection = () => {
 
   return (
     <div className="min-h-screen w-full bg-[#EEF3FA] flex justify-center">
-      {/* Winners infinite scroll animation */}
-
-      <style>{`
-        @keyframes winners-marquee {
-          from {
-            transform: translateX(0);
-          }
-
-          to {
-            transform: translateX(-50%);
-          }
-        }
-
-        .winners-track {
-          display: flex;
-          width: max-content;
-          animation: winners-marquee 24s linear infinite;
-          will-change: transform;
-        }
-
-        .winners-wrap:hover .winners-track,
-        .winners-wrap:active .winners-track {
-          animation-play-state: paused;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .winners-track {
-            animation: none;
-          }
-        }
-      `}</style>
-
       <main className="relative w-full max-w-[500px] min-h-screen bg-[#EEF3FA] shadow-xl">
         {/* =====================================================
             HOMEPAGE BANNERS
@@ -482,52 +454,10 @@ const HomeLotterySection = () => {
         )}
 
         {/* =====================================================
-            TOP WINNERS
+            TOP WINNERS (LIVE TOAST NOTIFICATION SLIDER)
         ====================================================== */}
-
         <section className="px-2.5 pt-2">
-          <div className="overflow-hidden rounded-2xl border border-[#ff3155]/40 bg-gradient-to-br from-[#5d1028] via-[#461025] to-[#27102a] py-3 shadow-[0_10px_28px_rgba(0,0,0,0.25)]">
-            <div className="flex items-center gap-2 px-3">
-              <Trophy size={21} className="text-[#ffd24c]" />
-
-              <div className="leading-tight">
-                <h2 className="text-[16px] font-extrabold text-white">
-                  Top Winners
-                </h2>
-
-                <p className="text-[10px] text-white/65">
-                  Real People. Real Winnings.
-                </p>
-              </div>
-            </div>
-
-            <div
-              className="winners-wrap mt-3 overflow-hidden"
-              style={{
-                WebkitMaskImage:
-                  "linear-gradient(to right, transparent 0, #000 7%, #000 93%, transparent 100%)",
-                maskImage:
-                  "linear-gradient(to right, transparent 0, #000 7%, #000 93%, transparent 100%)",
-              }}
-            >
-              <div className="winners-track">
-                {[0, 1].map((set) => (
-                  <div
-                    key={set}
-                    className="flex shrink-0"
-                    aria-hidden={set === 1}
-                  >
-                    {displayWinners.map((winner, idx) => (
-                      <WinnerCard
-                        key={`${set}-${winner.name}-${idx}`}
-                        {...winner}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <TopWinnersToast winners={displayWinners} />
         </section>
 
         {/* =====================================================
@@ -573,6 +503,13 @@ const HomeLotterySection = () => {
               />
             </div>
           </div>
+        </section>
+
+        {/* =====================================================
+            QUICK TICKET VERIFICATION WIDGET
+        ====================================================== */}
+        <section className="px-2.5 pt-3">
+          <QuickVerifyTicket />
         </section>
 
         {/* =====================================================
@@ -642,6 +579,11 @@ const HomeLotterySection = () => {
         {/* <section className="px-2.5 pt-1">
           <DailyNumbersSection mode="home" />
         </section> */}
+
+        {/* =====================================================
+            VIDEO TUTORIAL PLAYER
+        ====================================================== */}
+        <LotteryVideoPlayer containerClassName="px-2.5 pt-3" />
 
         {/* =====================================================
             WINNING RULES
@@ -796,28 +738,6 @@ const HomeLotterySection = () => {
 };
 
 // =====================================================
-// WINNER CARD
-// =====================================================
-
-const WinnerCard = ({ name, amount, ticket, time, image }) => (
-  <div className="flex min-w-[170px] shrink-0 items-center gap-2.5 pl-4 pr-2">
-    <img
-      src={image}
-      alt={name}
-      className="h-11 w-11 shrink-0 rounded-full border-2 border-[#ffd34e] object-cover"
-    />
-
-    <div className="min-w-0 leading-tight">
-      <p className="truncate text-[11px] font-medium text-white">{name}</p>
-
-      <p className="truncate text-[14px] font-black text-[#ffd34e]">{amount}</p>
-
-      <p className="truncate text-[9px] text-white/70">Tkt: {ticket}</p>
-
-      <p className="truncate text-[9px] text-white/55">{time}</p>
-    </div>
-  </div>
-);
 
 // =====================================================
 // TRUST FEATURE
@@ -864,7 +784,7 @@ const LotteryTypeCard = ({
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-[#d7d0c6] bg-[#fffaf4] p-1.5 shadow-[0_8px_22px_rgba(0,0,0,0.15)]">
       <div
-        className={`relative flex h-[84px] items-center justify-center overflow-hidden rounded-xl ${
+        className={`relative flex h-[120px] items-center justify-center overflow-hidden rounded-xl ${
           daily
             ? "bg-gradient-to-br from-[#ffb3a8] via-[#ffd9c2] to-[#ffefe0]"
             : "bg-gradient-to-br from-[#123c75] via-[#2a5ea8] to-[#f2c95a]"

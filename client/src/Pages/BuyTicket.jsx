@@ -16,6 +16,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import DailyNumbersSection from "../Components/DailyNumbersSection";
+import QuickVerifyTicket from "../Components/QuickVerifyTicket";
+import LotteryVideoPlayer from "../Components/LotteryVideoPlayer";
 import NumberSoldNotification from "../Components/NumberSoldNotification";
 import { verifyNumberForBet } from "../reducer/slice/dailyNumberSlice";
 
@@ -1897,6 +1899,20 @@ const BuyTicket = () => {
           selectedNumber={ticketCode}
           onSelectNumber={(code) => setTicketCode(code)}
         />
+
+        {/* =================================================
+            QUICK TICKET VERIFICATION WIDGET
+        ================================================= */}
+        <QuickVerifyTicket
+          defaultMode="daily"
+          title="Verify Daily Ticket"
+          subtitle="Check if your ticket is among today's winning numbers"
+        />
+
+        {/* =================================================
+            HOW TO PLAY VIDEO TUTORIAL
+        ================================================= */}
+        <LotteryVideoPlayer />
 
         {/* =================================================
             WINNING RULES
