@@ -29,6 +29,8 @@ const adminRoutes = require("./routes/adminRoutes");
 const startLotteryDepositCron = require("./cron/lotteryDepositCron");
 const { startLotteryCron } = require("./cron/lotteryCron");
 const lotteryNumberRoutes = require("./routes/lotteryNumberRoutes");
+const resultImageRoutes = require("./routes/resultImageRoutes");
+
 
 // =======================
 // APP
@@ -113,6 +115,8 @@ app.use("/api/admin/settings", referralSettingRoutes);
 
 app.use("/api/top-winners", topWinnerRoutes);
 app.use("/api/festival-amount", require("./routes/festivalamountRoutes"));
+
+app.use("/api/result-images", resultImageRoutes);
 
 // =======================
 // HEALTH CHECK
