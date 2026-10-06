@@ -25,7 +25,7 @@ const generateToken = (user) =>
       role: user.role,
     },
     process.env.JWT_SECRET,
-    { expiresIn: "7d" },
+    { expiresIn: "7d" }
   );
 
 const setAuthCookie = (res, user) => {
@@ -66,6 +66,50 @@ const generateUniqueReferralCode = async (name = "USER") => {
   }
 
   return code;
+};
+
+// 🔥 Helper: extract client IP + device info from request
+const getClientInfo = (req) => {
+  // IP (handle proxy / x-forwarded-for)
+  const forwarded = req.headers["x-forwarded-for"];
+  const ip = forwarded
+    ? forwarded.split(",")[0].trim()
+    : req.ip ||
+      req.connection?.remoteAddress ||
+      req.socket?.remoteAddress ||
+      null;
+
+  const userAgent = req.headers["user-agent"] || "";
+
+  let browser = "Unknown";
+  let os = "Unknown";
+  let device = "Desktop";
+
+  // Browser detection
+  if (/edg/i.test(userAgent)) browser = "Edge";
+  else if (/opr|opera/i.test(userAgent)) browser = "Opera";
+  else if (/chrome|crios/i.test(userAgent)) browser = "Chrome";
+  else if (/firefox|fxios/i.test(userAgent)) browser = "Firefox";
+  else if (/safari/i.test(userAgent)) browser = "Safari";
+  else if (/msie|trident/i.test(userAgent)) browser = "Internet Explorer";
+
+  // OS detection
+  if (/windows nt/i.test(userAgent)) os = "Windows";
+  else if (/android/i.test(userAgent)) os = "Android";
+  else if (/iphone|ipad|ipod/i.test(userAgent)) os = "iOS";
+  else if (/mac os x/i.test(userAgent)) os = "macOS";
+  else if (/linux/i.test(userAgent)) os = "Linux";
+
+  // Device type
+  if (
+    /mobile|android|iphone|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
+  ) {
+    device = "Mobile";
+  } else if (/ipad|tablet|kindle|silk/i.test(userAgent)) {
+    device = "Tablet";
+  }
+
+  return { ip, browser, os, device, userAgent };
 };
 
 // =======================
@@ -126,6 +170,9 @@ const register = async (req, res) => {
     // 🔥 Generate unique referral code for new user
     const referralCode = await generateUniqueReferralCode(name);
 
+    // 🔥 Capture client info on register (first login)
+    const clientInfo = getClientInfo(req);
+
     const user = await User.create({
       uuid: uuidv4(),
       name,
@@ -134,6 +181,16 @@ const register = async (req, res) => {
       profileImage,
       referralCode,
       referralBy: validReferralBy,
+      lastLogin: {
+        ...clientInfo,
+        time: new Date(),
+      },
+      loginHistory: [
+        {
+          ...clientInfo,
+          time: new Date(),
+        },
+      ],
     });
 
     setAuthCookie(res, user);
@@ -149,6 +206,7 @@ const register = async (req, res) => {
         profileImage: user.profileImage,
         referralCode: user.referralCode,
         referralBy: user.referralBy,
+        lastLogin: user.lastLogin,
       },
     });
   } catch (error) {
@@ -200,6 +258,26 @@ const login = async (req, res) => {
       });
     }
 
+    // 🔥 Save last login info (IP, browser, OS, device, time)
+    const clientInfo = getClientInfo(req);
+
+    user.lastLogin = {
+      ...clientInfo,
+      time: new Date(),
+    };
+
+    // Keep a rolling history (last 10 logins)
+    if (!Array.isArray(user.loginHistory)) user.loginHistory = [];
+    user.loginHistory.unshift({
+      ...clientInfo,
+      time: new Date(),
+    });
+    if (user.loginHistory.length > 10) {
+      user.loginHistory = user.loginHistory.slice(0, 10);
+    }
+
+    await user.save();
+
     setAuthCookie(res, user);
 
     return res.status(200).json({
@@ -213,6 +291,7 @@ const login = async (req, res) => {
         profileImage: user.profileImage,
         referralCode: user.referralCode,
         referralBy: user.referralBy,
+        lastLogin: user.lastLogin,
       },
     });
   } catch (error) {
@@ -254,6 +333,8 @@ const getProfile = async (req, res) => {
         profileImage: user.profileImage,
         referralCode: user.referralCode,
         referralBy: user.referralBy,
+        lastLogin: user.lastLogin,
+        loginHistory: user.loginHistory,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
@@ -378,7 +459,9 @@ const updateProfile = async (req, res) => {
 // =======================
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select("-password").sort({ createdAt: -1 });
+    const users = await User.find()
+      .select("-password")
+      .sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
@@ -492,6 +575,8 @@ const adminUpdateUserProfile = async (req, res) => {
         isKycVerified: user.isKycVerified,
         referralCode: user.referralCode,
         referralBy: user.referralBy,
+        lastLogin: user.lastLogin,
+        loginHistory: user.loginHistory,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
