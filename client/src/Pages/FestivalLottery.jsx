@@ -26,6 +26,8 @@ import {
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import DailyNumbersSection from "../Components/DailyNumbersSection";
+import NumberSoldNotification from "../Components/NumberSoldNotification";
+import { verifyNumberForBet } from "../reducer/slice/dailyNumberSlice";
 
 // =====================================================
 // REDUX IMPORTS
@@ -623,7 +625,7 @@ const FestivalLottery = () => {
     focusDraft(0);
   };
 
-  const handleManualAdd = () => {
+  const handleManualAdd = async () => {
     if (depositLoading) return;
     if (!TICKET_REGEX.test(draft)) {
       setManualError(`Enter full ticket number (e.g. ${TICKET_EXAMPLE})`);
@@ -637,6 +639,17 @@ const FestivalLottery = () => {
       setManualError(`Maximum ${MAX_TICKETS} tickets allowed`);
       return;
     }
+
+    const check = await verifyNumberForBet(draft);
+    if (!check.canBet) {
+      setManualError(
+        check.isSold
+          ? "This number has already been sold. Please choose another number."
+          : check.message || "This number has already been sold. Please choose another number."
+      );
+      return;
+    }
+
     setTickets((prev) => [
       ...prev,
       { id: `${Date.now()}-${Math.random()}`, code: draft },
@@ -736,6 +749,26 @@ const FestivalLottery = () => {
 
       const totalPayable = calcFestivalAmount(setPriceAmount, tickets.length);
 
+      // ---------- CHECK NUMBER AVAILABILITY (checkNumberForBet) ----------
+      setLocalSuccess("Checking ticket availability...");
+      const checks = await Promise.all(
+        lotteryNumbers.map((num) =>
+          verifyNumberForBet(num).then((res) => ({ num, ...res }))
+        )
+      );
+
+      const unavailable = checks.find((c) => !c.canBet);
+      if (unavailable) {
+        setLocalSuccess("");
+        setManualError(
+          unavailable.isSold
+            ? `Ticket ${unavailable.num} has already been sold. Please choose another number.`
+            : unavailable.message ||
+                `Ticket ${unavailable.num} has already been sold. Please choose another number.`
+        );
+        return;
+      }
+
       setLocalSuccess(
         `Creating payment order for ${tickets.length} ticket(s)...`
       );
@@ -821,6 +854,9 @@ const FestivalLottery = () => {
   // =====================================================
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#eef3fa] text-[#173e70]">
+      {/* Real-time Number Sold Notification */}
+      <NumberSoldNotification />
+
       <div
         className="relative mx-auto w-[calc(100%-0px)] max-w-[500px] overflow-x-hidden"
         style={{
