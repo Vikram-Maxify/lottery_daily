@@ -164,7 +164,6 @@ function App() {
             <Route path="/recharge" element={<Recharge />} />
 
             <Route path="/live-tickets" element={<LiveTickets />} />
-            <Route path="/dashboard" element={<TicketDashboard />} />
 
             {/* <Route
               path="/deposit"
