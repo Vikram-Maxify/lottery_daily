@@ -1,7 +1,3 @@
-import { useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { Navigate, useNavigate } from "react-router-dom";
-import { adminLogin, clearAdminError } from "../../reducer/slice/adminAuthReducer";
 import {
   AlertTriangle,
   ArrowRight,
@@ -16,6 +12,13 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
+import { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Navigate, useNavigate } from "react-router-dom";
+import {
+  adminLogin,
+  clearAdminError,
+} from "../../reducer/slice/adminAuthReducer";
 
 const DEV_CREDENTIALS = {
   mobile: "1234567890",
@@ -27,7 +30,7 @@ const AdminLogin = () => {
   const navigate = useNavigate();
 
   const { admin, isAuthenticated, loading, error } = useSelector(
-    (state) => state.adminAuth
+    (state) => state.adminAuth,
   );
 
   const [formData, setFormData] = useState({
@@ -138,7 +141,10 @@ const AdminLogin = () => {
           ================================================== */}
           {error && (
             <div className="mb-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-3.5 flex items-start gap-3 text-xs text-red-200 animate-in fade-in slide-in-from-top-2">
-              <AlertTriangle size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
+              <AlertTriangle
+                size={18}
+                className="text-red-400 flex-shrink-0 mt-0.5"
+              />
               <div className="flex-1 font-semibold">{error}</div>
             </div>
           )}

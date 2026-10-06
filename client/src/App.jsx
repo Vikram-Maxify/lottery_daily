@@ -1,5 +1,4 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { useRef, useState, useEffect } from "react";
 import "./App.css";
 
 // ================= CLIENT =================
@@ -9,11 +8,10 @@ import PhoneLayout from "./Layout/PhoneLayout";
 import BuyTicket from "./Pages/BuyTicket";
 import HomePage from "./Pages/HomePage";
 import Login from "./Pages/Login";
-import MyTickets from "./Pages/MyTickets";
+import PaymentSuccess from "./Pages/PaymentSuccess";
 import ProfilePage from "./Pages/ProfilePage";
 import Register from "./Pages/Register";
 import ResultPage from "./Pages/ResultPage";
-import PaymentSuccess from "./Pages/PaymentSuccess";
 import WithdrawalRequest from "./Pages/WithdrawalRequest";
 
 // ================= ADMIN =================
@@ -21,29 +19,27 @@ import AdminLayout from "./admin/adminComponents/AdminLayout";
 import AdminPrivateRoute from "./admin/adminComponents/PrivateRoute";
 
 import AdminLogin from "./admin/adminPages/AdminLogin";
+import AdminLottery from "./admin/adminPages/AdminLottery";
 import Amount from "./admin/adminPages/Amount";
 import Dashboard from "./admin/adminPages/Dashboard";
+import LotteryConfig from "./admin/adminPages/LotteryConfig";
 import AdminResults from "./admin/adminPages/Results";
 import Users from "./admin/adminPages/Users";
-import LotteryConfig from "./admin/adminPages/LotteryConfig";
-import AdminLottery from "./admin/adminPages/AdminLottery";
-import AdminDeposits from "./admin/adminPages/AdminDeposits";
 import WithdrawalManagement from "./admin/adminPages/WithdrawalManagement";
 import Recharge from "./Pages/Rechagre";
 // import Deposit from "./Pages/Deposit";
-import WithdrawHistory from "./Pages/WithdrawHistory";
-import FestivalLottery from "./Pages/FestivalLottery";
-import KycVarificationPage from "./Pages/KycVarificationPage";
-import VarifyTicket from "./Pages/VarifyTicket";
-import LeaderboardPage from "./Pages/LeaderboardPage";
-import AdminKycVerification from "./admin/adminPages/AdminKycVerification";
 import AdminFestivalLottery from "./admin/adminPages/AdminFestivalLottery";
 import AdminHomeBanner from "./admin/adminPages/AdminHomeBanner";
-import FestivalResult from "./admin/adminPages/FestivalResult";
-import AdminTopWinners from "./admin/adminPages/AdminTopWinners";
+import AdminKycVerification from "./admin/adminPages/AdminKycVerification";
 import AdminSettings from "./admin/adminPages/AdminSettings";
+import AdminTopWinners from "./admin/adminPages/AdminTopWinners";
+import FestivalResult from "./admin/adminPages/FestivalResult";
+import FestivalLottery from "./Pages/FestivalLottery";
+import KycVarificationPage from "./Pages/KycVarificationPage";
+import LeaderboardPage from "./Pages/LeaderboardPage";
 import LiveTickets from "./pages/LiveTickets";
-import TicketDashboard from "./pages/TicketDashboard";
+import VarifyTicket from "./Pages/VarifyTicket";
+import WithdrawHistory from "./Pages/WithdrawHistory";
 
 // ==========================================================
 // WHATSAPP SUPPORT NUMBER
@@ -63,11 +59,7 @@ const ADMIN_ROUTES = ["/admin"];
 const HomeRoute = () => {
   const location = useLocation();
 
-  return (
-    <HomePage
-      key={location.key}
-    />
-  );
+  return <HomePage key={location.key} />;
 };
 
 // ==========================================================
@@ -77,74 +69,39 @@ function App() {
   return (
     <>
       <Routes>
-
         {/* =====================================================
             CLIENT ROUTES
         ===================================================== */}
 
         <Route element={<PhoneLayout />}>
-
           {/* ================= CLIENT PUBLIC ================= */}
 
           {/* Home */}
-          <Route
-            path="/"
-            element={<HomeRoute />}
-          />
+          <Route path="/" element={<HomeRoute />} />
 
           {/* Login */}
-          <Route
-            path="/login"
-            element={<Login />}
-          />
+          <Route path="/login" element={<Login />} />
 
           {/* Register */}
-          <Route
-            path="/register"
-            element={<Register />}
-          />
+          <Route path="/register" element={<Register />} />
 
           {/* Results */}
-          <Route
-            path="/results"
-            element={<ResultPage />}
-          />
-
+          <Route path="/results" element={<ResultPage />} />
 
           {/* ================= CLIENT PRIVATE ================= */}
 
           <Route element={<PrivateRoute />}>
-
             {/* Profile */}
-            <Route
-              path="/profile"
-              element={<ProfilePage />}
-            />
+            <Route path="/profile" element={<ProfilePage />} />
 
             {/* Buy Ticket */}
-            <Route
-              path="/buy-ticket"
-              element={<BuyTicket />}
-            />
-            <Route
-              path="/festival"
-              element={<FestivalLottery />}
-            />
-            <Route
-              path="/kyc"
-              element={<KycVarificationPage />}
-            />
+            <Route path="/buy-ticket" element={<BuyTicket />} />
+            <Route path="/festival" element={<FestivalLottery />} />
+            <Route path="/kyc" element={<KycVarificationPage />} />
 
-            <Route
-              path="/verify"
-              element={<VarifyTicket />}
-            />
+            <Route path="/verify" element={<VarifyTicket />} />
 
-            <Route
-              path="/leaderboard"
-              element={<LeaderboardPage />}
-            />
-
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
 
             {/* <Route
               path="/my-tickets"
@@ -152,15 +109,9 @@ function App() {
             /> */}
 
             {/* Withdraw */}
-            <Route
-              path="/user/withdraw"
-              element={<WithdrawalRequest />}
-            />
+            <Route path="/user/withdraw" element={<WithdrawalRequest />} />
 
-            <Route
-              path="/withdraw-history"
-              element={<WithdrawHistory />}
-            />
+            <Route path="/withdraw-history" element={<WithdrawHistory />} />
             <Route path="/recharge" element={<Recharge />} />
 
             <Route path="/live-tickets" element={<LiveTickets />} />
@@ -171,25 +122,15 @@ function App() {
             /> */}
 
             {/* Payment Success */}
-            <Route
-              path="/payment-success"
-              element={<PaymentSuccess />}
-            />
-
-
+            <Route path="/payment-success" element={<PaymentSuccess />} />
           </Route>
-
         </Route>
-
 
         {/* =====================================================
             ADMIN PUBLIC ROUTES
         ===================================================== */}
 
-        <Route
-          path="/admin/login"
-          element={<AdminLogin />}
-        />
+        <Route path="/admin/login" element={<AdminLogin />} />
 
         {/* =====================================================
             ADMIN PRIVATE ROUTES
@@ -197,52 +138,26 @@ function App() {
         ===================================================== */}
 
         <Route element={<AdminPrivateRoute />}>
-
           <Route element={<AdminLayout />}>
-
             {/* Dashboard */}
-            <Route
-              path="/dashboard"
-              element={<Dashboard />}
-            />
+            <Route path="/dashboard" element={<Dashboard />} />
 
             {/* Users */}
-            <Route
-              path="/users"
-              element={<Users />}
-            />
+            <Route path="/users" element={<Users />} />
 
             {/* Amount */}
-            <Route
-              path="/amount"
-              element={<Amount />}
-            />
+            <Route path="/amount" element={<Amount />} />
 
-            <Route
-              path="/home_banner"
-              element={<AdminHomeBanner />}
-            />
+            <Route path="/home_banner" element={<AdminHomeBanner />} />
 
-            <Route
-              path="/adminkyc"
-              element={<AdminKycVerification />}
-            />
+            <Route path="/adminkyc" element={<AdminKycVerification />} />
 
             {/* ADMIN RESULTS */}
-            <Route
-              path="/admin/results"
-              element={<AdminResults />}
-            />
-            <Route
-              path="/admin/festival_result"
-              element={<FestivalResult />}
-            />
+            <Route path="/admin/results" element={<AdminResults />} />
+            <Route path="/admin/festival_result" element={<FestivalResult />} />
 
             {/* Lottery Config */}
-            <Route
-              path="/lottery-config"
-              element={<LotteryConfig />}
-            />
+            <Route path="/lottery-config" element={<LotteryConfig />} />
             {/* lottery config */}
             <Route
               path="admin/festival_lottery"
@@ -250,10 +165,7 @@ function App() {
             />
 
             {/* Admin Lottery */}
-            <Route
-              path="/admin/lottery"
-              element={<AdminLottery />}
-            />
+            <Route path="/admin/lottery" element={<AdminLottery />} />
 
             {/* Admin Deposits */}
             {/* <Route
@@ -268,47 +180,24 @@ function App() {
             />
 
             {/* Admin Top Winners */}
-            <Route
-              path="/admin/top-winners"
-              element={<AdminTopWinners />}
-            />
+            <Route path="/admin/top-winners" element={<AdminTopWinners />} />
 
             {/* Admin Settings (Daily amount, Festival amount, Referral %) */}
-            <Route
-              path="/settings"
-              element={<AdminSettings />}
-            />
-            <Route
-              path="/admin/settings"
-              element={<AdminSettings />}
-            />
-
+            <Route path="/settings" element={<AdminSettings />} />
+            <Route path="/admin/settings" element={<AdminSettings />} />
           </Route>
-
         </Route>
-
 
         {/* =====================================================
             DEFAULT
         ===================================================== */}
 
-        <Route
-          path="*"
-          element={
-            <Navigate
-              to="/"
-              replace
-            />
-          }
-        />
-
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-
 
       {/* =====================================================
           WHATSAPP - USER SIDE ONLY (ADMIN SIDE HIDDEN)
       ===================================================== */}
-
     </>
   );
 }
