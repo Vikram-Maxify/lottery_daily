@@ -13,8 +13,11 @@ import {
   User,
   XCircle,
 } from "lucide-react";
+
 import { useEffect, useRef, useState } from "react";
+
 import { useDispatch, useSelector } from "react-redux";
+
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -30,10 +33,13 @@ import {
 } from "../reducer/slice/kycReducer";
 
 // =====================================================
+
 // CONSTANTS
+
 // =====================================================
 
 const BOTTOM_NAV_HEIGHT = 64;
+
 const MAX_FILE_MB = 5;
 
 const BANNER_IMAGE =
@@ -47,11 +53,14 @@ const inputBase =
 
 const emptyFile = {
   file: null,
+
   preview: "",
 };
 
 // =====================================================
+
 // HELPERS
+
 // =====================================================
 
 const todayString = () => new Date().toISOString().split("T")[0];
@@ -67,10 +76,7 @@ const getAge = (dob) => {
 
   const month = now.getMonth() - birth.getMonth();
 
-  if (
-    month < 0 ||
-    (month === 0 && now.getDate() < birth.getDate())
-  ) {
+  if (month < 0 || (month === 0 && now.getDate() < birth.getDate())) {
     age -= 1;
   }
 
@@ -78,56 +84,64 @@ const getAge = (dob) => {
 };
 
 // =====================================================
+
 // KYC PAGE
+
 // =====================================================
 
 const KycVarificationPage = () => {
   const navigate = useNavigate();
+
   const dispatch = useDispatch();
 
   // =====================================================
+
   // REDUX KYC STATE
+
   // =====================================================
 
   const documents = useSelector(selectKycDocuments);
 
   const kycLoading = useSelector(selectKycLoading);
 
-  const uploadLoading = useSelector(
-    selectKycUploadLoading
-  );
+  const uploadLoading = useSelector(selectKycUploadLoading);
 
-  const uploadError = useSelector(
-    selectKycUploadError
-  );
+  const uploadError = useSelector(selectKycUploadError);
 
-  const uploadSuccess = useSelector(
-    selectKycUploadSuccess
-  );
+  const uploadSuccess = useSelector(selectKycUploadSuccess);
 
   // =====================================================
+
   // LOCAL FORM STATE
+
   // =====================================================
 
   const [form, setForm] = useState({
     name: "",
+
     dob: "",
   });
 
   const [files, setFiles] = useState({
     aadhaarFront: emptyFile,
+
     aadhaarBack: emptyFile,
+
     pan: emptyFile,
+
     selfie: emptyFile,
   });
 
   const [error, setError] = useState("");
+
   const [success, setSuccess] = useState("");
 
   const loading = uploadLoading;
 
   // =====================================================
+
   // FETCH EXISTING KYC
+
   // =====================================================
 
   useEffect(() => {
@@ -135,58 +149,48 @@ const KycVarificationPage = () => {
 
     return () => {
       dispatch(clearKycError());
+
       dispatch(clearKycSuccess());
     };
   }, [dispatch]);
 
   // =====================================================
-  // FIND EXISTING DOCUMENTS
+  // FIND EXISTING KYC
   // =====================================================
 
-  const aadhaarDocument = documents.find(
-    (document) =>
-      document.documentType === "aadhaar"
-  );
+  const kycDocument = documents[0] || null;
 
-  const panDocument = documents.find(
-    (document) =>
-      document.documentType === "pan"
+  const aadhaarStatus = kycDocument?.aadhaar?.review?.status || null;
+  const panStatus = kycDocument?.pan?.review?.status || null;
+
+  const hasAadhaar = Boolean(
+    kycDocument?.aadhaar?.front?.url && kycDocument?.aadhaar?.back?.url,
   );
+  const hasPan = Boolean(kycDocument?.pan?.front?.url);
+  const hasSelfie = Boolean(kycDocument?.selfie?.url);
 
   // =====================================================
   // CALCULATE OVERALL KYC STATUS
   // =====================================================
 
-  let kycStatus = "none";
+  const submittedStatuses = [];
+  if (hasAadhaar) {
+    submittedStatuses.push(aadhaarStatus || "pending");
+  }
+  if (hasPan) {
+    submittedStatuses.push(panStatus || "pending");
+  }
 
-  const hasAadhaar = Boolean(aadhaarDocument);
-  const hasPan = Boolean(panDocument);
-
-  const aadhaarStatus =
-    aadhaarDocument?.status || null;
-
-  const panStatus =
-    panDocument?.status || null;
-
-  const hasRejected =
-    aadhaarStatus === "rejected" ||
-    panStatus === "rejected";
-
-  const hasPending =
-    aadhaarStatus === "pending" ||
-    panStatus === "pending";
-
-  const bothApproved =
-    aadhaarStatus === "approved" &&
-    panStatus === "approved";
-
-  if (hasRejected) {
-    kycStatus = "rejected";
-  } else if (hasPending) {
-    kycStatus = "pending";
-  } else if (bothApproved) {
-    kycStatus = "approved";
-  } else if (hasAadhaar || hasPan) {
+  let kycStatus = kycDocument?.status || "none";
+  if (submittedStatuses.length > 0) {
+    if (submittedStatuses.includes("rejected")) {
+      kycStatus = "rejected";
+    } else if (submittedStatuses.includes("pending")) {
+      kycStatus = "pending";
+    } else if (submittedStatuses.every((s) => s === "approved")) {
+      kycStatus = "approved";
+    }
+  } else if (hasSelfie || kycDocument?.dob) {
     kycStatus = "incomplete";
   }
 
@@ -195,40 +199,45 @@ const KycVarificationPage = () => {
   // =====================================================
 
   const rejectionReasons = [
-    aadhaarDocument?.rejectionReason,
-    panDocument?.rejectionReason,
+    kycDocument?.rejectionReason,
+    kycDocument?.aadhaar?.review?.rejectionReason,
+    kycDocument?.pan?.review?.rejectionReason,
   ].filter(Boolean);
 
-  const rejectionReason =
-    [...new Set(rejectionReasons)].join(" • ");
+  const rejectionReason = [...new Set(rejectionReasons)].join(" • ");
 
   // =====================================================
+
   // HANDLE REDUX ERROR
+
   // =====================================================
 
   useEffect(() => {
     if (uploadError) {
       setError(uploadError);
+
       setSuccess("");
     }
   }, [uploadError]);
 
   // =====================================================
+
   // HANDLE REDUX SUCCESS
+
   // =====================================================
 
   useEffect(() => {
     if (uploadSuccess) {
-      setSuccess(
-        "KYC submitted. Verification usually takes some time."
-      );
+      setSuccess("KYC submitted. Verification usually takes some time.");
 
       setError("");
     }
   }, [uploadSuccess]);
 
   // =====================================================
+
   // FORM CHANGE
+
   // =====================================================
 
   const handleChange = (e) => {
@@ -236,6 +245,7 @@ const KycVarificationPage = () => {
 
     setForm((prev) => ({
       ...prev,
+
       [name]: value,
     }));
 
@@ -249,43 +259,44 @@ const KycVarificationPage = () => {
   };
 
   // =====================================================
+
   // FILE HANDLER
+
   // =====================================================
 
   const handleFile = (key, file) => {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setError(
-        "Please upload an image file (JPG or PNG)"
-      );
+      setError("Please upload an image file (JPG or PNG)");
+
       return;
     }
 
     if (file.size > MAX_FILE_MB * 1024 * 1024) {
-      setError(
-        `Image must be smaller than ${MAX_FILE_MB} MB`
-      );
+      setError(`Image must be smaller than ${MAX_FILE_MB} MB`);
+
       return;
     }
 
     setFiles((prev) => {
       if (prev[key].preview) {
-        URL.revokeObjectURL(
-          prev[key].preview
-        );
+        URL.revokeObjectURL(prev[key].preview);
       }
 
       return {
         ...prev,
+
         [key]: {
           file,
+
           preview: URL.createObjectURL(file),
         },
       };
     });
 
     setError("");
+
     setSuccess("");
 
     if (uploadError) {
@@ -298,43 +309,50 @@ const KycVarificationPage = () => {
   };
 
   // =====================================================
+
   // REMOVE FILE
+
   // =====================================================
 
   const removeFile = (key) => {
     setFiles((prev) => {
       if (prev[key].preview) {
-        URL.revokeObjectURL(
-          prev[key].preview
-        );
+        URL.revokeObjectURL(prev[key].preview);
       }
 
       return {
         ...prev,
+
         [key]: emptyFile,
       };
     });
 
     setError("");
+
     setSuccess("");
   };
 
   // =====================================================
+
   // UPLOADED PHOTO COUNT
+
   // =====================================================
 
   const uploadedCount = Object.values(files).filter(
-    (fileData) => fileData.file
+    (fileData) => fileData.file,
   ).length;
 
   // =====================================================
+
   // SUBMIT KYC
+
   // =====================================================
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     setError("");
+
     setSuccess("");
 
     if (uploadError) {
@@ -346,139 +364,135 @@ const KycVarificationPage = () => {
     }
 
     // -------------------------------------------------
+
     // SAFETY CHECK
+
     // -------------------------------------------------
 
     if (kycStatus === "approved") {
-      setError(
-        "Your KYC is already approved."
-      );
+      setError("Your KYC is already approved.");
+
       return;
     }
 
     if (kycStatus === "pending") {
-      setError(
-        "Your KYC is already under review."
-      );
+      setError("Your KYC is already under review.");
+
       return;
     }
 
     // -------------------------------------------------
+
     // NAME
+
     // -------------------------------------------------
 
     if (form.name.trim().length < 3) {
-      setError(
-        "Please enter your full name"
-      );
+      setError("Please enter your full name");
+
       return;
     }
 
     // -------------------------------------------------
+
     // DOB
+
     // -------------------------------------------------
 
     if (!form.dob) {
-      setError(
-        "Please select your date of birth"
-      );
+      setError("Please select your date of birth");
+
       return;
     }
 
     if (getAge(form.dob) < 18) {
-      setError(
-        "You must be at least 18 years old"
-      );
+      setError("You must be at least 18 years old");
+
       return;
     }
 
     // -------------------------------------------------
+
     // AADHAAR FRONT
+
     // -------------------------------------------------
 
     if (!files.aadhaarFront.file) {
-      setError(
-        "Please upload Aadhaar card front photo"
-      );
+      setError("Please upload Aadhaar card front photo");
+
       return;
     }
 
     // -------------------------------------------------
+
     // AADHAAR BACK
+
     // -------------------------------------------------
 
     if (!files.aadhaarBack.file) {
-      setError(
-        "Please upload Aadhaar card back photo"
-      );
+      setError("Please upload Aadhaar card back photo");
+
       return;
     }
 
     // -------------------------------------------------
+
     // PAN
+
     // -------------------------------------------------
 
     if (!files.pan.file) {
-      setError(
-        "Please upload PAN card photo"
-      );
+      setError("Please upload PAN card photo");
+
       return;
     }
 
     // -------------------------------------------------
+
     // SELFIE
+
     // -------------------------------------------------
 
     if (!files.selfie.file) {
-      setError(
-        "Please take your selfie"
-      );
+      setError("Please take your selfie");
+
       return;
     }
 
     try {
       // =================================================
-      // 1. UPLOAD AADHAAR
+      // =================================================
+      // UPLOAD ALL 4 IMAGES + DOB IN ONE REQUEST
+      // Backend expects: aadhaarFront, aadhaarBack, panFront, selfie, dob
       // =================================================
 
       await dispatch(
         uploadKycDocument({
-          documentType: "aadhaar",
-          front: files.aadhaarFront.file,
-          back: files.aadhaarBack.file,
-        })
+          aadhaarFront: files.aadhaarFront.file,
+          aadhaarBack: files.aadhaarBack.file,
+          panFront: files.pan.file,
+          selfie: files.selfie.file,
+          dob: form.dob,
+        }),
       ).unwrap();
 
       // =================================================
-      // 2. UPLOAD PAN
-      // =================================================
-
-      await dispatch(
-        uploadKycDocument({
-          documentType: "pan",
-          front: files.pan.file,
-        })
-      ).unwrap();
-
+      // REFRESH KYC
       // =================================================
       // 3. REFRESH KYC
+
       // =================================================
 
-      await dispatch(
-        getMyKyc()
-      ).unwrap();
+      await dispatch(getMyKyc()).unwrap();
 
-      setSuccess(
-        "KYC submitted. Verification usually takes some time."
-      );
+      setSuccess("KYC submitted. Verification usually takes some time.");
 
       setError("");
     } catch (err) {
       setError(
         typeof err === "string"
           ? err
-          : err?.message ||
-              "Could not submit KYC. Please try again."
+          : err?.message || "Could not submit KYC. Please try again.",
       );
 
       setSuccess("");
@@ -486,7 +500,9 @@ const KycVarificationPage = () => {
   };
 
   // =====================================================
+
   // LOADING SCREEN
+
   // =====================================================
 
   if (kycLoading) {
@@ -495,16 +511,12 @@ const KycVarificationPage = () => {
         <div
           className="mx-auto flex min-h-screen w-full max-w-[490px] items-center justify-center px-5"
           style={{
-            paddingBottom:
-              BOTTOM_NAV_HEIGHT + 16,
+            paddingBottom: BOTTOM_NAV_HEIGHT + 16,
           }}
         >
           <div className="w-full rounded-[20px] border border-[#e6c97c]/70 bg-[#fffaf4] p-8 text-center shadow-[0_12px_35px_rgba(0,0,0,0.18)]">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#eaf1ff]">
-              <Loader2
-                size={30}
-                className="animate-spin text-[#d7193f]"
-              />
+              <Loader2 size={30} className="animate-spin text-[#d7193f]" />
             </div>
 
             <h2 className="mt-4 text-[20px] font-extrabold text-[#173e70]">
@@ -521,7 +533,9 @@ const KycVarificationPage = () => {
   }
 
   // =====================================================
+
   // APPROVED SCREEN
+
   // =====================================================
 
   if (kycStatus === "approved") {
@@ -536,7 +550,9 @@ const KycVarificationPage = () => {
   }
 
   // =====================================================
+
   // PENDING SCREEN
+
   // =====================================================
 
   if (kycStatus === "pending") {
@@ -551,7 +567,9 @@ const KycVarificationPage = () => {
   }
 
   // =====================================================
+
   // MAIN FORM
+
   // =====================================================
 
   return (
@@ -559,8 +577,7 @@ const KycVarificationPage = () => {
       <div
         className="mx-auto w-full max-w-[490px]"
         style={{
-          paddingBottom:
-            BOTTOM_NAV_HEIGHT + 16,
+          paddingBottom: BOTTOM_NAV_HEIGHT + 16,
         }}
       >
         {/* ================= BANNER ================= */}
@@ -568,8 +585,7 @@ const KycVarificationPage = () => {
         <section
           className="relative isolate overflow-hidden bg-[#1a0a1c] bg-cover bg-center"
           style={{
-            backgroundImage:
-              `url(${BANNER_IMAGE})`,
+            backgroundImage: `url(${BANNER_IMAGE})`,
           }}
         >
           <div className="absolute inset-0 bg-gradient-to-br from-[#06132d]/95 via-[#3b0d1c]/88 to-[#7a0f1e]/80" />
@@ -606,8 +622,7 @@ const KycVarificationPage = () => {
 
               <p className="mt-1.5 text-[13px] font-medium leading-tight text-white">
                 Quick, Safe
-                <br />
-                &amp; Easy
+                <br />& Easy
               </p>
             </div>
 
@@ -630,10 +645,7 @@ const KycVarificationPage = () => {
         <div className="relative z-10 mx-3 -mt-8 rounded-[20px] border border-[#e6c97c]/70 bg-[#fffaf4] p-5 shadow-[0_12px_35px_rgba(0,0,0,0.18)]">
           <div className="mb-4 text-center">
             <h1 className="text-[23px] font-extrabold leading-[1.25] text-[#173e70]">
-              Verify Your{" "}
-              <span className="text-[#d7193f]">
-                Identity
-              </span>
+              Verify Your <span className="text-[#d7193f]">Identity</span>
             </h1>
 
             <p className="mt-1 text-[12px] text-[#4b5563]">
@@ -661,10 +673,7 @@ const KycVarificationPage = () => {
           {kycStatus === "rejected" && (
             <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3">
               <div className="flex items-start gap-2">
-                <XCircle
-                  size={18}
-                  className="mt-0.5 shrink-0 text-[#d7193f]"
-                />
+                <XCircle size={18} className="mt-0.5 shrink-0 text-[#d7193f]" />
 
                 <div>
                   <p className="text-[13px] font-extrabold text-[#b91c1c]">
@@ -672,7 +681,8 @@ const KycVarificationPage = () => {
                   </p>
 
                   <p className="mt-0.5 text-[11px] leading-relaxed text-[#7f1d1d]">
-                    Please correct the rejected document(s) and upload them again.
+                    Please correct the rejected document(s) and upload them
+                    again.
                   </p>
 
                   {rejectionReason && (
@@ -696,10 +706,7 @@ const KycVarificationPage = () => {
           {kycStatus === "incomplete" && (
             <div className="mb-3 rounded-xl border border-[#f0d38b] bg-[#fff8df] p-3">
               <div className="flex items-start gap-2">
-                <Clock3
-                  size={18}
-                  className="mt-0.5 shrink-0 text-[#c27b00]"
-                />
+                <Clock3 size={18} className="mt-0.5 shrink-0 text-[#c27b00]" />
 
                 <div>
                   <p className="text-[13px] font-extrabold text-[#8a5a00]">
@@ -714,19 +721,12 @@ const KycVarificationPage = () => {
             </div>
           )}
 
-          <form
-            onSubmit={handleSubmit}
-            className="flex flex-col gap-2.5"
-          >
+          <form onSubmit={handleSubmit} className="flex flex-col gap-2.5">
             {/* NAME */}
 
             <div className={inputWrap}>
               <div className="flex w-[45px] shrink-0 justify-center">
-                <User
-                  size={20}
-                  strokeWidth={2.3}
-                  className="text-[#d7193f]"
-                />
+                <User size={20} strokeWidth={2.3} className="text-[#d7193f]" />
               </div>
 
               <div className="h-[28px] w-px shrink-0 bg-[#d6dfec]" />
@@ -769,10 +769,7 @@ const KycVarificationPage = () => {
 
             {/* AADHAAR */}
 
-            <SectionTitle
-              title="Aadhaar Card"
-              note="Front & back both"
-            />
+            <SectionTitle title="Aadhaar Card" note="Front & back both" />
 
             <div className="grid grid-cols-2 gap-2.5">
               <UploadBox
@@ -784,12 +781,11 @@ const KycVarificationPage = () => {
                 onPick={(file) =>
                   handleFile(
                     "aadhaarFront",
-                    file
+
+                    file,
                   )
                 }
-                onRemove={() =>
-                  removeFile("aadhaarFront")
-                }
+                onRemove={() => removeFile("aadhaarFront")}
               />
 
               <UploadBox
@@ -801,21 +797,17 @@ const KycVarificationPage = () => {
                 onPick={(file) =>
                   handleFile(
                     "aadhaarBack",
-                    file
+
+                    file,
                   )
                 }
-                onRemove={() =>
-                  removeFile("aadhaarBack")
-                }
+                onRemove={() => removeFile("aadhaarBack")}
               />
             </div>
 
             {/* PAN */}
 
-            <SectionTitle
-              title="PAN Card"
-              note="Front side only"
-            />
+            <SectionTitle title="PAN Card" note="Front side only" />
 
             <UploadBox
               label="Front side"
@@ -823,20 +815,13 @@ const KycVarificationPage = () => {
               data={files.pan}
               disabled={loading}
               icon="file"
-              onPick={(file) =>
-                handleFile("pan", file)
-              }
-              onRemove={() =>
-                removeFile("pan")
-              }
+              onPick={(file) => handleFile("pan", file)}
+              onRemove={() => removeFile("pan")}
             />
 
             {/* SELFIE */}
 
-            <SectionTitle
-              title="Your Selfie"
-              note="Clear face, good light"
-            />
+            <SectionTitle title="Your Selfie" note="Clear face, good light" />
 
             <UploadBox
               label="Take selfie"
@@ -845,12 +830,8 @@ const KycVarificationPage = () => {
               selfie
               data={files.selfie}
               disabled={loading}
-              onPick={(file) =>
-                handleFile("selfie", file)
-              }
-              onRemove={() =>
-                removeFile("selfie")
-              }
+              onPick={(file) => handleFile("selfie", file)}
+              onRemove={() => removeFile("selfie")}
             />
 
             {/* ERROR */}
@@ -866,6 +847,7 @@ const KycVarificationPage = () => {
             {success && (
               <p className="flex items-center justify-center gap-1.5 rounded-lg border border-[#bfe8d3] bg-[#e7f8ef] px-3 py-1.5 text-center text-[11px] font-medium text-[#14805a]">
                 <CheckCircle2 size={14} />
+
                 {success}
               </p>
             )}
@@ -879,23 +861,14 @@ const KycVarificationPage = () => {
             >
               {loading ? (
                 <>
-                  <Loader2
-                    size={19}
-                    strokeWidth={3}
-                    className="animate-spin"
-                  />
+                  <Loader2 size={19} strokeWidth={3} className="animate-spin" />
                   Submitting...
                 </>
               ) : (
                 <>
-                  {kycStatus === "rejected"
-                    ? "Resubmit KYC"
-                    : "Submit KYC"}
+                  {kycStatus === "rejected" ? "Resubmit KYC" : "Submit KYC"}
 
-                  <ArrowRight
-                    size={21}
-                    strokeWidth={2.8}
-                  />
+                  <ArrowRight size={21} strokeWidth={2.8} />
                 </>
               )}
             </button>
@@ -913,8 +886,8 @@ const KycVarificationPage = () => {
           </form>
 
           <p className="mt-4 border-t border-[#d8c8ad] pt-3 text-center text-[10px] leading-snug text-[#6b7280]">
-            Upload clear, uncropped photos. Your documents are used
-            only for identity verification.
+            Upload clear, uncropped photos. Your documents are used only for
+            identity verification.
           </p>
         </div>
       </div>
@@ -923,13 +896,18 @@ const KycVarificationPage = () => {
 };
 
 // =====================================================
+
 // KYC STATUS SCREEN
+
 // =====================================================
 
 const KycStatusScreen = ({
   type,
+
   navigate,
+
   title,
+
   description,
 }) => {
   const approved = type === "approved";
@@ -939,8 +917,7 @@ const KycStatusScreen = ({
       <div
         className="mx-auto flex min-h-screen w-full max-w-[490px] items-center justify-center px-3"
         style={{
-          paddingBottom:
-            BOTTOM_NAV_HEIGHT + 16,
+          paddingBottom: BOTTOM_NAV_HEIGHT + 16,
         }}
       >
         <div className="w-full overflow-hidden rounded-[24px] border border-[#e6c97c]/70 bg-[#fffaf4] shadow-[0_15px_45px_rgba(0,0,0,0.18)]">
@@ -965,11 +942,7 @@ const KycStatusScreen = ({
                   strokeWidth={2}
                 />
               ) : (
-                <Clock3
-                  size={48}
-                  className="text-[#173e70]"
-                  strokeWidth={2}
-                />
+                <Clock3 size={48} className="text-[#173e70]" strokeWidth={2} />
               )}
             </div>
 
@@ -988,47 +961,35 @@ const KycStatusScreen = ({
             {approved ? (
               <>
                 <div className="rounded-xl border border-[#bfe8d3] bg-[#e7f8ef] p-4 text-center">
-                  <CheckCircle2
-                    size={24}
-                    className="mx-auto text-[#14805a]"
-                  />
+                  <CheckCircle2 size={24} className="mx-auto text-[#14805a]" />
 
                   <p className="mt-2 text-[14px] font-extrabold text-[#116b4c]">
                     Identity Verified Successfully
                   </p>
 
                   <p className="mt-1 text-[11px] leading-relaxed text-[#39735e]">
-                    Your Aadhaar and PAN documents have both been approved.
-                    You can now continue using your account.
+                    Your Aadhaar and PAN documents have both been approved. You
+                    can now continue using your account.
                   </p>
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  <StatusDocument
-                    title="Aadhaar"
-                    approved
-                  />
+                  <StatusDocument title="Aadhaar" approved />
 
-                  <StatusDocument
-                    title="PAN"
-                    approved
-                  />
+                  <StatusDocument title="PAN" approved />
                 </div>
               </>
             ) : (
               <div className="rounded-xl border border-[#d7e1ee] bg-[#f4f7fb] p-4 text-center">
-                <Clock3
-                  size={24}
-                  className="mx-auto text-[#28558e]"
-                />
+                <Clock3 size={24} className="mx-auto text-[#28558e]" />
 
                 <p className="mt-2 text-[14px] font-extrabold text-[#173e70]">
                   Verification in Progress
                 </p>
 
                 <p className="mt-1 text-[11px] leading-relaxed text-[#64748b]">
-                  Our team is checking your submitted documents.
-                  Please wait for the verification to complete.
+                  Our team is checking your submitted documents. Please wait for
+                  the verification to complete.
                 </p>
               </div>
             )}
@@ -1049,74 +1010,74 @@ const KycStatusScreen = ({
 };
 
 // =====================================================
+
 // STATUS DOCUMENT
+
 // =====================================================
 
 const StatusDocument = ({
   title,
+
   approved,
 }) => {
   return (
     <div className="flex items-center justify-center gap-1.5 rounded-lg border border-[#bfe8d3] bg-[#f2fcf6] px-2 py-2">
       <CheckCircle2
         size={14}
-        className={
-          approved
-            ? "text-[#14805a]"
-            : "text-[#9ca3af]"
-        }
+        className={approved ? "text-[#14805a]" : "text-[#9ca3af]"}
       />
 
-      <span className="text-[11px] font-bold text-[#173e70]">
-        {title}
-      </span>
+      <span className="text-[11px] font-bold text-[#173e70]">{title}</span>
 
-      <span className="text-[9px] font-semibold text-[#14805a]">
-        Approved
-      </span>
+      <span className="text-[9px] font-semibold text-[#14805a]">Approved</span>
     </div>
   );
 };
 
 // =====================================================
+
 // SECTION TITLE
+
 // =====================================================
 
 const SectionTitle = ({
   title,
+
   note,
 }) => (
   <div className="mt-2 flex items-end justify-between">
-    <h3 className="text-[14px] font-extrabold text-[#173e70]">
-      {title}
-    </h3>
+    <h3 className="text-[14px] font-extrabold text-[#173e70]">{title}</h3>
 
-    <span className="text-[10px] text-[#6b7280]">
-      {note}
-    </span>
+    <span className="text-[10px] text-[#6b7280]">{note}</span>
   </div>
 );
 
 // =====================================================
+
 // UPLOAD BOX
+
 // =====================================================
 
 const UploadBox = ({
   label,
+
   hint,
+
   data,
+
   onPick,
+
   onRemove,
+
   disabled,
+
   icon = "file",
+
   selfie = false,
 }) => {
   const inputRef = useRef(null);
 
-  const Icon =
-    icon === "camera"
-      ? Camera
-      : Upload;
+  const Icon = icon === "camera" ? Camera : Upload;
 
   const handleInput = (e) => {
     onPick(e.target.files?.[0]);
@@ -1130,11 +1091,7 @@ const UploadBox = ({
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture={
-          selfie
-            ? "user"
-            : undefined
-        }
+        capture={selfie ? "user" : undefined}
         onChange={handleInput}
         disabled={disabled}
         className="hidden"
@@ -1146,9 +1103,7 @@ const UploadBox = ({
             src={data.preview}
             alt={label}
             className={`block w-full object-cover ${
-              selfie
-                ? "aspect-[4/3]"
-                : "aspect-[16/10]"
+              selfie ? "aspect-[4/3]" : "aspect-[16/10]"
             }`}
           />
 
@@ -1169,44 +1124,29 @@ const UploadBox = ({
 
           <button
             type="button"
-            onClick={() =>
-              inputRef.current?.click()
-            }
+            onClick={() => inputRef.current?.click()}
             disabled={disabled}
             className="w-full bg-[#173e70] py-1.5 text-[10px] font-semibold text-white disabled:opacity-60"
           >
-            {selfie
-              ? "Retake"
-              : "Change photo"}
+            {selfie ? "Retake" : "Change photo"}
           </button>
         </div>
       ) : (
         <button
           type="button"
-          onClick={() =>
-            inputRef.current?.click()
-          }
+          onClick={() => inputRef.current?.click()}
           disabled={disabled}
           className={`flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-[#c9d3e3] bg-[#eaf1ff] px-2 text-center transition active:scale-[0.98] disabled:opacity-60 ${
-            selfie
-              ? "aspect-[4/3]"
-              : "aspect-[16/10]"
+            selfie ? "aspect-[4/3]" : "aspect-[16/10]"
           }`}
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#d7193f] shadow-sm">
-            <Icon
-              size={20}
-              strokeWidth={2.3}
-            />
+            <Icon size={20} strokeWidth={2.3} />
           </span>
 
-          <span className="text-[12px] font-bold text-[#173e70]">
-            {label}
-          </span>
+          <span className="text-[12px] font-bold text-[#173e70]">{label}</span>
 
-          <span className="text-[9px] text-[#6b7280]">
-            {hint}
-          </span>
+          <span className="text-[9px] text-[#6b7280]">{hint}</span>
         </button>
       )}
     </div>

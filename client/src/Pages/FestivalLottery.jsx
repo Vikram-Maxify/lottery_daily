@@ -1,30 +1,26 @@
-import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   BookOpen,
   CalendarDays,
   Check,
   ChevronDown,
-  FileText,
   Flame,
   Flower2,
   Gift,
-  Info,
   PartyPopper,
   Plus,
-  Shuffle,
   ShieldCheck,
+  Shuffle,
   Sparkles,
   Target,
   Ticket,
-  Trash2,
   TreePine,
   Trophy,
   Users,
-  X,
 } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import DailyNumbersSection from "../Components/DailyNumbersSection";
 import NumberSoldNotification from "../Components/NumberSoldNotification";
 import { verifyNumberForBet } from "../reducer/slice/dailyNumberSlice";
@@ -33,9 +29,9 @@ import { verifyNumberForBet } from "../reducer/slice/dailyNumberSlice";
 // REDUX IMPORTS
 // =====================================================
 import {
-  getActiveLotteryConfig,
   clearLotteryConfigError,
   clearLotteryConfigSuccess,
+  getActiveLotteryConfig,
 } from "../reducer/slice/lotteryConfigSlice";
 
 // 🔥 FESTIVAL SLICE - all created lotteries (tab images + prizes)
@@ -46,8 +42,8 @@ import {
 } from "../reducer/slice/festivalLotteryReducer";
 
 import {
-  createDeposit,
   clearDepositState,
+  createDeposit,
   selectDepositError,
   selectDepositLoading,
   selectDepositOrderId,
@@ -73,8 +69,18 @@ const HERO_IMAGE =
   "https://images.unsplash.com/photo-1605196560547-b2f7281b7355?auto=format&fit=crop&w=1400&q=80";
 
 const EN_MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 const EN_DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const QUICK_OPTIONS = [10, 20, 30, 50, 100];
@@ -115,12 +121,66 @@ const CHIP_COLORS = [
 
 // Festival meta — `name` must match `marketName` on backend config
 const FESTIVALS = [
-  { key: "navratra", tab: "Navratra", icon: Flame, name: "Navratra", special: "Navratra Special", desc: "Play & celebrate this Navratra with bigger prizes and more happiness!", price: 50, drawTime: "9:00 PM" },
-  { key: "diwali", tab: "Diwali", icon: Sparkles, name: "Diwali", special: "Diwali Special", desc: "Light up your Diwali with mega prizes and endless happiness!", price: 50, drawTime: "9:00 PM" },
-  { key: "dussehra", tab: "Dussehra", icon: Target, name: "Dussehra", special: "Dussehra Special", desc: "Victory of good over evil, celebrate with a chance to win big!", price: 50, drawTime: "9:00 PM" },
-  { key: "newyear", tab: "New Year", icon: PartyPopper, name: "New Year", special: "New Year Special", desc: "Start the new year with a lucky ticket and bigger dreams!", price: 50, drawTime: "9:00 PM" },
-  { key: "christmas", tab: "Christmas", icon: TreePine, name: "Christmas", special: "Christmas Special", desc: "Unwrap the joy of Christmas with exciting festive prizes!", price: 50, drawTime: "9:00 PM" },
-  { key: "holi", tab: "Holi", icon: Flower2, name: "Holi", special: "Holi Special", desc: "Add colors to your luck this Holi with rainbow-sized prizes!", price: 50, drawTime: "9:00 PM" },
+  {
+    key: "navratra",
+    tab: "Navratra",
+    icon: Flame,
+    name: "Navratra",
+    special: "Navratra Special",
+    desc: "Play & celebrate this Navratra with bigger prizes and more happiness!",
+    price: 50,
+    drawTime: "9:00 PM",
+  },
+  {
+    key: "diwali",
+    tab: "Diwali",
+    icon: Sparkles,
+    name: "Diwali",
+    special: "Diwali Special",
+    desc: "Light up your Diwali with mega prizes and endless happiness!",
+    price: 50,
+    drawTime: "9:00 PM",
+  },
+  {
+    key: "dussehra",
+    tab: "Dussehra",
+    icon: Target,
+    name: "Dussehra",
+    special: "Dussehra Special",
+    desc: "Victory of good over evil, celebrate with a chance to win big!",
+    price: 50,
+    drawTime: "9:00 PM",
+  },
+  {
+    key: "newyear",
+    tab: "New Year",
+    icon: PartyPopper,
+    name: "New Year",
+    special: "New Year Special",
+    desc: "Start the new year with a lucky ticket and bigger dreams!",
+    price: 50,
+    drawTime: "9:00 PM",
+  },
+  {
+    key: "christmas",
+    tab: "Christmas",
+    icon: TreePine,
+    name: "Christmas",
+    special: "Christmas Special",
+    desc: "Unwrap the joy of Christmas with exciting festive prizes!",
+    price: 50,
+    drawTime: "9:00 PM",
+  },
+  {
+    key: "holi",
+    tab: "Holi",
+    icon: Flower2,
+    name: "Holi",
+    special: "Holi Special",
+    desc: "Add colors to your luck this Holi with rainbow-sized prizes!",
+    price: 50,
+    drawTime: "9:00 PM",
+  },
 ];
 
 // =====================================================
@@ -153,9 +213,27 @@ const formatPrize = (amount) => {
 };
 
 const RULE_META = [
-  { number: "1", condition: "All digits/characters match", example: "12A12345", badge: "bg-[#ed1d43]", row: "bg-[#ffe4e8]" },
-  { number: "2", condition: "Alphabet does not match but all remaining digits match", example: "12X12345", badge: "bg-[#2e7dd7]", row: "bg-[#e3f0ff]" },
-  { number: "3", condition: "Last 5 digits after the alphabet match", example: "99A12345", badge: "bg-[#f08a25]", row: "bg-[#ffefdc]" },
+  {
+    number: "1",
+    condition: "All digits/characters match",
+    example: "12A12345",
+    badge: "bg-[#ed1d43]",
+    row: "bg-[#ffe4e8]",
+  },
+  {
+    number: "2",
+    condition: "Alphabet does not match but all remaining digits match",
+    example: "12X12345",
+    badge: "bg-[#2e7dd7]",
+    row: "bg-[#e3f0ff]",
+  },
+  {
+    number: "3",
+    condition: "Last 5 digits after the alphabet match",
+    example: "99A12345",
+    badge: "bg-[#f08a25]",
+    row: "bg-[#ffefdc]",
+  },
 ];
 
 // =====================================================
@@ -205,7 +283,9 @@ const slotAccepts = (index, ch) =>
 const slotPlaceholder = (index) => (SLOT_PATTERN[index] === "D" ? "0" : "A");
 
 const sanitizeCode = (raw) => {
-  const cleaned = String(raw || "").toUpperCase().replace(/[^0-9A-Z]/g, "");
+  const cleaned = String(raw || "")
+    .toUpperCase()
+    .replace(/[^0-9A-Z]/g, "");
   let result = "";
   for (const ch of cleaned) {
     if (result.length >= TICKET_LENGTH) break;
@@ -226,9 +306,7 @@ const deriveKycStatus = (documents) => {
   if (!Array.isArray(documents) || documents.length === 0) {
     return "not_submitted";
   }
-  const statuses = documents.map((d) =>
-    String(d?.status || "").toLowerCase()
-  );
+  const statuses = documents.map((d) => String(d?.status || "").toLowerCase());
   if (statuses.includes("approved") || statuses.includes("verified")) {
     return "approved";
   }
@@ -262,7 +340,7 @@ const FestivalLottery = () => {
         activeConfig: null,
         activeLoading: false,
         error: null,
-      }
+      },
   );
 
   // ---------- ALL FESTIVAL LOTTERIES (tab images + prizes) ----------
@@ -270,7 +348,7 @@ const FestivalLottery = () => {
 
   // ---------- FESTIVAL SET PRICE (10 tickets) FROM SETTINGS SLICE ----------
   const festivalPriceFromSettings = useSelector(
-    (state) => state.settings?.festivalLotteryAmount
+    (state) => state.settings?.festivalLotteryAmount,
   );
 
   const apiPrice = readPrice(festivalPriceFromSettings);
@@ -292,7 +370,7 @@ const FestivalLottery = () => {
   const [searchParams] = useSearchParams();
   const [showQuick, setShowQuick] = useState(true);
   const [tickets, setTickets] = useState(() =>
-    generateUniqueTickets(MIN_TICKETS, [])
+    generateUniqueTickets(MIN_TICKETS, []),
   );
   const [showAllTickets, setShowAllTickets] = useState(false);
   const [draft, setDraft] = useState(() => {
@@ -317,7 +395,7 @@ const FestivalLottery = () => {
     // same marketName ki multiple configs ho to active wali preferred
     const pickConfig = (normalizedName) => {
       const matches = list.filter(
-        (c) => normalizeKey(c?.marketName) === normalizedName
+        (c) => normalizeKey(c?.marketName) === normalizedName,
       );
       return matches.find((c) => c?.isActive) || matches[0] || null;
     };
@@ -358,7 +436,7 @@ const FestivalLottery = () => {
 
   const festival = useMemo(
     () => festivalTabs.find((f) => f.key === festivalKey) || festivalTabs[0],
-    [festivalTabs, festivalKey]
+    [festivalTabs, festivalKey],
   );
 
   // =====================================================
@@ -378,12 +456,15 @@ const FestivalLottery = () => {
   const visibleTickets = showAllTickets
     ? tickets
     : tickets.slice(0, INITIAL_VISIBLE_TICKETS);
-  const hiddenTicketsCount = Math.max(tickets.length - INITIAL_VISIBLE_TICKETS, 0);
+  const hiddenTicketsCount = Math.max(
+    tickets.length - INITIAL_VISIBLE_TICKETS,
+    0,
+  );
 
   // 🔥 KYC STATUS
   const kycStatus = useMemo(
     () => deriveKycStatus(kycDocuments),
-    [kycDocuments]
+    [kycDocuments],
   );
   const isKycApproved = kycStatus === "approved";
 
@@ -507,7 +588,7 @@ const FestivalLottery = () => {
 
   const firstPrizeText = useMemo(
     () => formatPrize(prizeAmounts[0].total),
-    [prizeAmounts]
+    [prizeAmounts],
   );
 
   const winningRules = useMemo(
@@ -517,7 +598,7 @@ const FestivalLottery = () => {
         prize: formatPrize(prizeAmounts[i].perTicket),
         total: formatPrize(prizeAmounts[i].total),
       })),
-    [prizeAmounts]
+    [prizeAmounts],
   );
 
   // =====================================================
@@ -572,7 +653,10 @@ const FestivalLottery = () => {
       updateDraft(draft.slice(0, index));
       return;
     }
-    const ch = raw.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(-1);
+    const ch = raw
+      .toUpperCase()
+      .replace(/[^0-9A-Z]/g, "")
+      .slice(-1);
     if (!ch) return;
     const pos = Math.min(index, draft.length);
     if (!slotAccepts(pos, ch)) return;
@@ -645,7 +729,8 @@ const FestivalLottery = () => {
       setManualError(
         check.isSold
           ? "This number has already been sold. Please choose another number."
-          : check.message || "This number has already been sold. Please choose another number."
+          : check.message ||
+              "This number has already been sold. Please choose another number.",
       );
       return;
     }
@@ -689,7 +774,7 @@ const FestivalLottery = () => {
       if (!isKycApproved) {
         if (kycStatus === "pending") {
           setManualError(
-            "Your KYC is pending approval. Please wait for admin verification."
+            "Your KYC is pending approval. Please wait for admin verification.",
           );
           return;
         }
@@ -700,7 +785,7 @@ const FestivalLottery = () => {
         }
         // not_submitted
         setManualError(
-          "Please complete your KYC first. Redirecting to KYC page..."
+          "Please complete your KYC first. Redirecting to KYC page...",
         );
         setTimeout(() => navigate("/kyc"), 1500);
         return;
@@ -708,7 +793,7 @@ const FestivalLottery = () => {
 
       if (!purchaseConfig?._id) {
         setManualError(
-          "No active lottery configuration found. Please try again later."
+          "No active lottery configuration found. Please try again later.",
         );
         return;
       }
@@ -717,7 +802,9 @@ const FestivalLottery = () => {
         return;
       }
       if (tickets.length < MIN_TICKETS) {
-        setManualError(`Minimum ${MIN_TICKETS} tickets are required to purchase.`);
+        setManualError(
+          `Minimum ${MIN_TICKETS} tickets are required to purchase.`,
+        );
         return;
       }
 
@@ -733,14 +820,14 @@ const FestivalLottery = () => {
       const invalidIndex = tickets.findIndex((t) => !TICKET_REGEX.test(t.code));
       if (invalidIndex !== -1) {
         setManualError(
-          `Ticket ${invalidIndex + 1} is not valid (e.g. ${TICKET_EXAMPLE})`
+          `Ticket ${invalidIndex + 1} is not valid (e.g. ${TICKET_EXAMPLE})`,
         );
         return;
       }
 
       const lotteryNumbers = tickets.map((t) => t.code);
       const duplicates = lotteryNumbers.filter(
-        (n, i) => lotteryNumbers.indexOf(n) !== i
+        (n, i) => lotteryNumbers.indexOf(n) !== i,
       );
       if (duplicates.length > 0) {
         setManualError("Two tickets cannot have the same number.");
@@ -753,8 +840,8 @@ const FestivalLottery = () => {
       setLocalSuccess("Checking ticket availability...");
       const checks = await Promise.all(
         lotteryNumbers.map((num) =>
-          verifyNumberForBet(num).then((res) => ({ num, ...res }))
-        )
+          verifyNumberForBet(num).then((res) => ({ num, ...res })),
+        ),
       );
 
       const unavailable = checks.find((c) => !c.canBet);
@@ -764,13 +851,13 @@ const FestivalLottery = () => {
           unavailable.isSold
             ? `Ticket ${unavailable.num} has already been sold. Please choose another number.`
             : unavailable.message ||
-                `Ticket ${unavailable.num} has already been sold. Please choose another number.`
+                `Ticket ${unavailable.num} has already been sold. Please choose another number.`,
         );
         return;
       }
 
       setLocalSuccess(
-        `Creating payment order for ${tickets.length} ticket(s)...`
+        `Creating payment order for ${tickets.length} ticket(s)...`,
       );
 
       // ---------- CREATE PAYMENT ORDER (same as BuyTicket) ----------
@@ -781,7 +868,7 @@ const FestivalLottery = () => {
           amount: totalPayable,
           configId: purchaseConfig._id,
           lotteryNumbers,
-        })
+        }),
       ).unwrap();
 
       const paymentUrl = result?.paymentUrl || depositPaymentUrl || "";
@@ -790,14 +877,14 @@ const FestivalLottery = () => {
       if (!paymentUrl) {
         setLocalSuccess("");
         setManualError(
-          result?.message || "Payment URL not received. Please try again."
+          result?.message || "Payment URL not received. Please try again.",
         );
         return;
       }
 
       setManualError("");
       setLocalSuccess(
-        `Order ${orderId} created. Redirecting to payment page...`
+        `Order ${orderId} created. Redirecting to payment page...`,
       );
 
       // Reset local selection to 10 tickets
@@ -816,9 +903,9 @@ const FestivalLottery = () => {
         typeof purchaseError === "string"
           ? purchaseError
           : purchaseError?.message ||
-          purchaseError?.payload?.message ||
-          purchaseError?.payload ||
-          "Could not buy tickets"
+              purchaseError?.payload?.message ||
+              purchaseError?.payload ||
+              "Could not buy tickets",
       );
     }
   };
@@ -874,8 +961,14 @@ const FestivalLottery = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-[#2a0610]/95 via-[#4a0b18]/75 to-[#2a0610]/55" />
           <div className="pointer-events-none absolute -right-10 top-0 h-52 w-52 rounded-full bg-[#ff8a00]/25 blur-3xl" />
           <div className="pointer-events-none absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-[#ff1744]/20 blur-3xl" />
-          <Sparkles size={16} className="pointer-events-none absolute left-[46%] top-4 text-[#ffcf4a]/80" />
-          <Sparkles size={12} className="pointer-events-none absolute bottom-[30%] left-[4%] text-[#ffb82e]/70" />
+          <Sparkles
+            size={16}
+            className="pointer-events-none absolute left-[46%] top-4 text-[#ffcf4a]/80"
+          />
+          <Sparkles
+            size={12}
+            className="pointer-events-none absolute bottom-[30%] left-[4%] text-[#ffb82e]/70"
+          />
           <div className="relative grid grid-cols-[1.05fr_1fr] items-center gap-2 px-2 pb-14 pt-5">
             <div className="relative z-10 min-w-0">
               <h1 className="font-serif font-black leading-[0.9] tracking-tight">
@@ -891,8 +984,14 @@ const FestivalLottery = () => {
               </p>
               <div className="mt-3 grid grid-cols-4 gap-1">
                 <HeroFeature icon={<Gift size={20} />} text="Mega Prizes" />
-                <HeroFeature icon={<ShieldCheck size={20} />} text="Special Draws" />
-                <HeroFeature icon={<Trophy size={20} />} text="Limited Period" />
+                <HeroFeature
+                  icon={<ShieldCheck size={20} />}
+                  text="Special Draws"
+                />
+                <HeroFeature
+                  icon={<Trophy size={20} />}
+                  text="Limited Period"
+                />
                 <HeroFeature icon={<Users size={20} />} text="More Chances" />
               </div>
             </div>
@@ -957,12 +1056,13 @@ const FestivalLottery = () => {
           {/* 🔥 KYC STATUS BANNER */}
           {!kycLoading && kycStatus !== "approved" && (
             <div
-              className={`rounded-xl border px-4 py-3 text-sm font-medium ${kycStatus === "pending"
-                ? "border-amber-200 bg-amber-50 text-amber-800"
-                : kycStatus === "rejected"
-                  ? "border-red-200 bg-red-50 text-red-700"
-                  : "border-blue-200 bg-blue-50 text-blue-700"
-                }`}
+              className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+                kycStatus === "pending"
+                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                  : kycStatus === "rejected"
+                    ? "border-red-200 bg-red-50 text-red-700"
+                    : "border-blue-200 bg-blue-50 text-blue-700"
+              }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -970,7 +1070,8 @@ const FestivalLottery = () => {
                     <>
                       <p className="font-bold">KYC Verification Pending</p>
                       <p className="mt-0.5 text-xs">
-                        Your KYC is under review. You cannot purchase tickets until approved.
+                        Your KYC is under review. You cannot purchase tickets
+                        until approved.
                       </p>
                     </>
                   )}
@@ -1098,7 +1199,11 @@ const FestivalLottery = () => {
           <section className="rounded-[16px] bg-white p-3 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Ticket size={26} className="-rotate-[30deg] text-[#173e70]" fill="#173e70" />
+                <Ticket
+                  size={26}
+                  className="-rotate-[30deg] text-[#173e70]"
+                  fill="#173e70"
+                />
                 <h2 className="text-[16px] font-extrabold text-[#173e70]">
                   How Many Tickets?
                 </h2>
@@ -1150,13 +1255,19 @@ const FestivalLottery = () => {
 
               <div className="grid min-w-0 grid-cols-[1fr_auto_1fr_auto_1.2fr] items-center gap-1 rounded-xl bg-[#f3f6fb] px-2 py-2 text-center">
                 <div className="min-w-0">
-                  <p className="text-[9px] text-[#4b5563]">Price / {PRICE_SET_SIZE} Tickets</p>
-                  <p className="text-[14px] font-black text-[#d7193f]">₹{price}/-</p>
+                  <p className="text-[9px] text-[#4b5563]">
+                    Price / {PRICE_SET_SIZE} Tickets
+                  </p>
+                  <p className="text-[14px] font-black text-[#d7193f]">
+                    ₹{price}/-
+                  </p>
                 </div>
                 <span className="text-[15px] text-[#9aa5b8]">•</span>
                 <div className="min-w-0">
                   <p className="text-[9px] text-[#4b5563]">Total Tickets</p>
-                  <p className="text-[14px] font-black text-[#d7193f]">{totalTickets}</p>
+                  <p className="text-[14px] font-black text-[#d7193f]">
+                    {totalTickets}
+                  </p>
                 </div>
                 <span className="text-[15px] text-[#9aa5b8]">→</span>
                 <div className="min-w-0">
@@ -1170,12 +1281,13 @@ const FestivalLottery = () => {
 
             {/* ================= TICKET BOX INPUT ================= */}
             <div
-              className={`mt-3 rounded-2xl border p-3 ${displayError
-                ? "border-red-300 bg-red-50/50"
-                : TICKET_REGEX.test(draft)
-                  ? "border-emerald-300 bg-emerald-50/40"
-                  : "border-[#dfe5f0] bg-[#f9fbff]"
-                }`}
+              className={`mt-3 rounded-2xl border p-3 ${
+                displayError
+                  ? "border-red-300 bg-red-50/50"
+                  : TICKET_REGEX.test(draft)
+                    ? "border-emerald-300 bg-emerald-50/40"
+                    : "border-[#dfe5f0] bg-[#f9fbff]"
+              }`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0 leading-tight">
@@ -1232,10 +1344,11 @@ const FestivalLottery = () => {
                       spellCheck={false}
                       placeholder={slotPlaceholder(i)}
                       aria-label={`Ticket character ${i + 1}`}
-                      className={`h-12 w-full min-w-0 rounded-xl border-2 text-center text-[18px] font-extrabold outline-none transition placeholder:font-bold placeholder:text-[#c3c8de] focus:border-[#ed1d43] focus:shadow-[0_0_0_3px_rgba(237,29,67,0.15)] disabled:opacity-50 ${filled
-                        ? "border-[#173e70] bg-white text-[#173e70]"
-                        : "border-[#c9d3e3] bg-[#f1f3fa] text-[#173e70]"
-                        }`}
+                      className={`h-12 w-full min-w-0 rounded-xl border-2 text-center text-[18px] font-extrabold outline-none transition placeholder:font-bold placeholder:text-[#c3c8de] focus:border-[#ed1d43] focus:shadow-[0_0_0_3px_rgba(237,29,67,0.15)] disabled:opacity-50 ${
+                        filled
+                          ? "border-[#173e70] bg-white text-[#173e70]"
+                          : "border-[#c9d3e3] bg-[#f1f3fa] text-[#173e70]"
+                      }`}
                     />
                   );
                 })}
@@ -1271,22 +1384,28 @@ const FestivalLottery = () => {
                       type="button"
                       onClick={() => setQuantity(count)}
                       disabled={depositLoading}
-                      className={`relative min-w-0 rounded-lg border px-0.5 py-2 text-center transition active:scale-95 disabled:opacity-60 ${active
-                        ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
-                        : "border-[#dfe5f0] bg-white"
-                        }`}
+                      className={`relative min-w-0 rounded-lg border px-0.5 py-2 text-center transition active:scale-95 disabled:opacity-60 ${
+                        active
+                          ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
+                          : "border-[#dfe5f0] bg-white"
+                      }`}
                     >
                       <p
-                        className={`whitespace-nowrap text-[9.5px] font-semibold ${active ? "text-[#ed1d43]" : "text-[#26354b]"
-                          }`}
+                        className={`whitespace-nowrap text-[9.5px] font-semibold ${
+                          active ? "text-[#ed1d43]" : "text-[#26354b]"
+                        }`}
                       >
                         {count} Tickets
                       </p>
                       <p
-                        className={`whitespace-nowrap text-[12px] font-black ${active ? "text-[#ed1d43]" : "text-[#173e70]"
-                          }`}
+                        className={`whitespace-nowrap text-[12px] font-black ${
+                          active ? "text-[#ed1d43]" : "text-[#173e70]"
+                        }`}
                       >
-                        ₹ {calcFestivalAmount(price, count).toLocaleString("en-IN")}
+                        ₹{" "}
+                        {calcFestivalAmount(price, count).toLocaleString(
+                          "en-IN",
+                        )}
                       </p>
                       {active && (
                         <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-[#ed1d43]" />
@@ -1306,7 +1425,7 @@ const FestivalLottery = () => {
           />
 
           {/* ================= SELECTED TICKETS ================= */}
-          <section className="rounded-[16px] bg-white p-3 shadow-sm">
+          {/* <section className="rounded-[16px] bg-white p-3 shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 <FileText size={22} className="shrink-0 text-[#173e70]" />
@@ -1391,7 +1510,7 @@ const FestivalLottery = () => {
                 {PRICE_SET_SIZE} tickets cost ₹{price} (minimum {MIN_TICKETS} tickets).
               </p>
             </div>
-          </section>
+          </section> */}
 
           {/* ================= WINNING RULES ================= */}
           <section className="overflow-hidden rounded-[18px] bg-gradient-to-br from-[#3a0b17] via-[#2b0a16] to-[#1a0710] p-2.5 shadow-lg">
@@ -1420,7 +1539,11 @@ const FestivalLottery = () => {
                 </span>
               </div>
               <div className="flex min-w-0 items-center gap-1.5 rounded-xl border border-[#ffd34e]/30 bg-white/5 px-2.5 py-2">
-                <Trophy size={30} className="shrink-0 text-[#ffd34e]" fill="#ffd34e" />
+                <Trophy
+                  size={30}
+                  className="shrink-0 text-[#ffd34e]"
+                  fill="#ffd34e"
+                />
                 <div className="min-w-0">
                   <p className="text-[10px] text-white/80">Total First Prize</p>
                   <p className="whitespace-nowrap text-[20px] font-black leading-none text-[#ffd34e]">
@@ -1516,7 +1639,10 @@ const FestivalLottery = () => {
             >
               <span>{depositLoading ? "Processing..." : "Purchase Now"}</span>
               {!depositLoading && (
-                <ArrowRight size={17} className="shrink-0 sm:h-[18px] sm:w-[18px]" />
+                <ArrowRight
+                  size={17}
+                  className="shrink-0 sm:h-[18px] sm:w-[18px]"
+                />
               )}
             </button>
           </div>
@@ -1548,10 +1674,11 @@ const FestivalTab = ({ festival, active, disabled, onClick, innerRef }) => {
       onClick={onClick}
       disabled={disabled}
       aria-pressed={active}
-      className={`relative flex w-[78px] shrink-0 snap-center flex-col items-center gap-1.5 rounded-2xl border-2 px-1.5 pb-2 pt-2 text-center transition active:scale-95 disabled:opacity-60 ${active
-        ? "border-[#ed1d43] bg-gradient-to-b from-[#ff1744] to-[#c9102f] text-white shadow-[0_3px_8px_rgba(237,29,67,0.30)]"
-        : "border-[#d5dcec] bg-white text-[#173e70] shadow-sm hover:border-[#ed1d43]/60"
-        }`}
+      className={`relative flex w-[78px] shrink-0 snap-center flex-col items-center gap-1.5 rounded-2xl border-2 px-1.5 pb-2 pt-2 text-center transition active:scale-95 disabled:opacity-60 ${
+        active
+          ? "border-[#ed1d43] bg-gradient-to-b from-[#ff1744] to-[#c9102f] text-white shadow-[0_3px_8px_rgba(237,29,67,0.30)]"
+          : "border-[#d5dcec] bg-white text-[#173e70] shadow-sm hover:border-[#ed1d43]/60"
+      }`}
     >
       {active && (
         <span className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-[#14a06a] text-white shadow-sm">
@@ -1560,10 +1687,9 @@ const FestivalTab = ({ festival, active, disabled, onClick, innerRef }) => {
       )}
 
       <span
-        className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border-2 ${active
-          ? "border-white bg-white/20"
-          : "border-[#e3d3ae] bg-[#fff6e0]"
-          }`}
+        className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border-2 ${
+          active ? "border-white bg-white/20" : "border-[#e3d3ae] bg-[#fff6e0]"
+        }`}
       >
         {showImage ? (
           <img
@@ -1593,27 +1719,33 @@ const DateChip = ({ date, today, active, onClick, fluid = false }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`relative flex h-[66px] ${fluid ? "w-full" : "w-[64px] shrink-0"
-      } flex-col items-center justify-center rounded-xl border text-center transition active:scale-95 ${active
+    className={`relative flex h-[66px] ${
+      fluid ? "w-full" : "w-[64px] shrink-0"
+    } flex-col items-center justify-center rounded-xl border text-center transition active:scale-95 ${
+      active
         ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
         : "border-transparent bg-[#e3e9f3]"
-      }`}
+    }`}
   >
     {today && (
       <span className="text-[10px] font-semibold text-[#ed1d43]">Today</span>
     )}
     <span
-      className={`whitespace-nowrap text-[13px] font-extrabold ${active ? "text-[#ed1d43]" : "text-[#26354b]"
-        }`}
+      className={`whitespace-nowrap text-[13px] font-extrabold ${
+        active ? "text-[#ed1d43]" : "text-[#26354b]"
+      }`}
     >
       {date.day} {date.month}
     </span>
-    <span className={`text-[10px] ${active ? "text-[#ed1d43]" : "text-[#6b7280]"}`}>
+    <span
+      className={`text-[10px] ${active ? "text-[#ed1d43]" : "text-[#6b7280]"}`}
+    >
       {date.weekday}
     </span>
     <span
-      className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${active ? "bg-[#ed1d43]" : "bg-[#20a66a]"
-        }`}
+      className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
+        active ? "bg-[#ed1d43]" : "bg-[#20a66a]"
+      }`}
     />
   </button>
 );
@@ -1621,7 +1753,9 @@ const DateChip = ({ date, today, active, onClick, fluid = false }) => (
 const HeroFeature = ({ icon, text }) => (
   <div className="flex min-w-0 flex-col items-center gap-1 text-center">
     <span className="text-[#ffd34e]">{icon}</span>
-    <span className="text-[8px] font-medium leading-tight text-white/90">{text}</span>
+    <span className="text-[8px] font-medium leading-tight text-white/90">
+      {text}
+    </span>
   </div>
 );
 
@@ -1634,8 +1768,12 @@ const FestivalHeroTicket = ({ special, price, number }) => (
     >
       <div className="flex items-start justify-between gap-[0.4em]">
         <div className="min-w-0">
-          <p className="text-[1.8em] font-black leading-none text-[#d7193f]">DEAR</p>
-          <p className="text-[0.7em] font-bold text-[#153c78]">FESTIVAL LOTTERY</p>
+          <p className="text-[1.8em] font-black leading-none text-[#d7193f]">
+            DEAR
+          </p>
+          <p className="text-[0.7em] font-bold text-[#153c78]">
+            FESTIVAL LOTTERY
+          </p>
           <p className="mt-[0.2em] font-serif text-[1.15em] font-black leading-tight text-[#d7193f]">
             {special}
           </p>
@@ -1644,7 +1782,9 @@ const FestivalHeroTicket = ({ special, price, number }) => (
           Price <span className="text-[1.4em]">₹{price}/-</span>
         </div>
       </div>
-      <p className="mt-[0.4em] text-[0.8em] font-bold text-[#26354b]">First Prize</p>
+      <p className="mt-[0.4em] text-[0.8em] font-bold text-[#26354b]">
+        First Prize
+      </p>
       <p className="whitespace-nowrap text-[2.7em] font-black leading-none text-[#153c78]">
         ₹5 CRORE
       </p>
@@ -1666,7 +1806,9 @@ const MiniTicket = ({ className = "", title, price }) => (
       style={{ fontSize: "10px" }}
     >
       <div className="flex items-start justify-between">
-        <p className="text-[1.9em] font-black leading-none text-[#d7193f]">DEAR</p>
+        <p className="text-[1.9em] font-black leading-none text-[#d7193f]">
+          DEAR
+        </p>
         <div className="flex h-[2.6em] w-[2.6em] flex-col items-center justify-center rounded-full bg-[#d7198c] text-center text-[0.5em] font-black leading-tight text-white">
           Price <span className="text-[1.3em]">₹{price}/-</span>
         </div>

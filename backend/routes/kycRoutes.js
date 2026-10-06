@@ -22,40 +22,57 @@ const upload = multer({
     cb(null, true);
   },
 });
-const { uploadKycDocument, getMyKyc } = require("../controllers/kycController");
+const {
+  uploadKycDocument,
+  getMyKyc,
+  getKycStatus,
+} = require("../controllers/kycController");
 
 const authMiddleware = require("../middleware/authMiddleware");
 
 // =====================================================
 // UPLOAD KYC
-// Aadhaar:
-//   front = Aadhaar Front
-//   back  = Aadhaar Back
-//
-// PAN:
-//   front = PAN Card
+// Fields:
+//   aadhaarFront (or front)
+//   aadhaarBack  (or back)
+//   panFront     (or pan)
+//   selfie
 // =====================================================
 
-router.post(
-  "/upload",
-  authMiddleware,
-  upload.fields([
-    {
-      name: "front",
-      maxCount: 1,
-    },
-    {
-      name: "back",
-      maxCount: 1,
-    },
-  ]),
-  uploadKycDocument,
-);
+const uploadFields = upload.fields([
+  { name: "aadhaarFront", maxCount: 1 },
+  { name: "aadhaarBack", maxCount: 1 },
+  { name: "panFront", maxCount: 1 },
+  { name: "pan", maxCount: 1 },
+  { name: "selfie", maxCount: 1 },
+  { name: "front", maxCount: 1 },
+  { name: "back", maxCount: 1 },
+]);
+
+const handleUpload = (req, res, next) => {
+  uploadFields(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({
+        success: false,
+        message: err.message || "File upload error",
+      });
+    } else if (err) {
+      return res.status(400).json({
+        success: false,
+        message: err.message || "Invalid file",
+      });
+    }
+    next();
+  });
+};
+
+router.post("/upload", authMiddleware, handleUpload, uploadKycDocument);
 
 // =====================================================
 // USER'S KYC
 // =====================================================
 
 router.get("/my", authMiddleware, getMyKyc);
+router.get("/status", authMiddleware, getKycStatus);
 
 module.exports = router;

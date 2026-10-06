@@ -241,8 +241,16 @@ const adminKycSlice = createSlice({
                 state.success = true;
                 state.error = null;
 
-                state.documents =
-                    action.payload?.data || [];
+                const res = action.payload;
+                if (Array.isArray(res)) {
+                    state.documents = res;
+                } else if (Array.isArray(res?.data)) {
+                    state.documents = res.data;
+                } else if (Array.isArray(res?.documents)) {
+                    state.documents = res.documents;
+                } else {
+                    state.documents = [];
+                }
             })
 
             .addCase(getAllKyc.rejected, (state, action) => {

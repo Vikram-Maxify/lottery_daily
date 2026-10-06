@@ -1,4 +1,5 @@
 const KycDocument = require("../models/KycDocument");
+const User = require("../models/userModel");
 const uploadToImgBB = require("../utils/imgbbUpload");
 
 // =====================================================
@@ -27,9 +28,12 @@ exports.uploadKycDocument = async (req, res) => {
     // GET FILES
     // =================================================
 
-    const aadhaarFront = req.files?.aadhaarFront?.[0] || null;
-    const aadhaarBack = req.files?.aadhaarBack?.[0] || null;
-    const panFront = req.files?.panFront?.[0] || null;
+    const aadhaarFront =
+      req.files?.aadhaarFront?.[0] || req.files?.front?.[0] || null;
+    const aadhaarBack =
+      req.files?.aadhaarBack?.[0] || req.files?.back?.[0] || null;
+    const panFront =
+      req.files?.panFront?.[0] || req.files?.pan?.[0] || null;
     const selfie = req.files?.selfie?.[0] || null;
 
     // =================================================
@@ -96,23 +100,24 @@ exports.uploadKycDocument = async (req, res) => {
     // =================================================
 
     if (kyc) {
-      if (
-        aadhaarFront &&
-        kyc.aadhaar?.review?.status === "approved"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Aadhaar is already approved",
-        });
-      }
+      const hasAadhaar = Boolean(
+        kyc.aadhaar?.front?.url && kyc.aadhaar?.back?.url,
+      );
+      const hasPan = Boolean(kyc.pan?.front?.url);
 
+      const isAadhaarApproved =
+        hasAadhaar && kyc.aadhaar?.review?.status === "approved";
+      const isPanApproved = hasPan && kyc.pan?.review?.status === "approved";
+
+      // If already fully verified/approved, reject re-upload
       if (
-        panFront &&
-        kyc.pan?.review?.status === "approved"
+        (isAadhaarApproved && isPanApproved) ||
+        (isAadhaarApproved && !hasPan) ||
+        (isPanApproved && !hasAadhaar)
       ) {
         return res.status(400).json({
           success: false,
-          message: "PAN is already approved",
+          message: "Your KYC is already approved and verified",
         });
       }
     }
@@ -125,14 +130,9 @@ exports.uploadKycDocument = async (req, res) => {
 
     if (aadhaarFront) {
       try {
-        aadhaarFrontUpload = await uploadToImgBB(
-          aadhaarFront
-        );
+        aadhaarFrontUpload = await uploadToImgBB(aadhaarFront);
       } catch (error) {
-        console.error(
-          "Aadhaar front ImgBB error:",
-          error.message
-        );
+        console.error("Aadhaar front ImgBB error:", error.message);
 
         return res.status(500).json({
           success: false,
@@ -149,14 +149,9 @@ exports.uploadKycDocument = async (req, res) => {
 
     if (aadhaarBack) {
       try {
-        aadhaarBackUpload = await uploadToImgBB(
-          aadhaarBack
-        );
+        aadhaarBackUpload = await uploadToImgBB(aadhaarBack);
       } catch (error) {
-        console.error(
-          "Aadhaar back ImgBB error:",
-          error.message
-        );
+        console.error("Aadhaar back ImgBB error:", error.message);
 
         return res.status(500).json({
           success: false,
@@ -173,14 +168,9 @@ exports.uploadKycDocument = async (req, res) => {
 
     if (panFront) {
       try {
-        panUpload = await uploadToImgBB(
-          panFront
-        );
+        panUpload = await uploadToImgBB(panFront);
       } catch (error) {
-        console.error(
-          "PAN ImgBB error:",
-          error.message
-        );
+        console.error("PAN ImgBB error:", error.message);
 
         return res.status(500).json({
           success: false,
@@ -197,14 +187,9 @@ exports.uploadKycDocument = async (req, res) => {
 
     if (selfie) {
       try {
-        selfieUpload = await uploadToImgBB(
-          selfie
-        );
+        selfieUpload = await uploadToImgBB(selfie);
       } catch (error) {
-        console.error(
-          "Selfie ImgBB error:",
-          error.message
-        );
+        console.error("Selfie ImgBB error:", error.message);
 
         return res.status(500).json({
           success: false,
@@ -296,6 +281,11 @@ exports.uploadKycDocument = async (req, res) => {
 
     await kyc.save();
 
+    // Reset user KYC verification status until reviewed
+    await User.findByIdAndUpdate(userId, {
+      isKycVerified: false,
+    });
+
     // =================================================
     // RESPONSE
     // =================================================
@@ -315,6 +305,44 @@ exports.uploadKycDocument = async (req, res) => {
   }
 };
 
+// =====================================================
+// HELPER: CALCULATE USER OVERALL KYC STATUS
+// =====================================================
+
+const getDocOverallStatus = (kyc) => {
+  if (!kyc) return "none";
+
+  const hasAadhaar = Boolean(
+    kyc.aadhaar?.front?.url && kyc.aadhaar?.back?.url,
+  );
+  const hasPan = Boolean(kyc.pan?.front?.url);
+  const hasSelfie = Boolean(kyc.selfie?.url);
+
+  const submittedStatuses = [];
+  if (hasAadhaar) {
+    submittedStatuses.push(kyc.aadhaar?.review?.status || "pending");
+  }
+  if (hasPan) {
+    submittedStatuses.push(kyc.pan?.review?.status || "pending");
+  }
+
+  if (submittedStatuses.length === 0) {
+    if (hasSelfie || kyc.dob) return "incomplete";
+    return "none";
+  }
+
+  if (submittedStatuses.includes("rejected")) {
+    return "rejected";
+  }
+  if (submittedStatuses.includes("pending")) {
+    return "pending";
+  }
+  if (submittedStatuses.every((s) => s === "approved")) {
+    return "approved";
+  }
+
+  return "pending";
+};
 
 // =====================================================
 // GET MY KYC
@@ -328,15 +356,9 @@ exports.getMyKyc = async (req, res) => {
     const kyc = await KycDocument.findOne({
       userId,
     })
-      .populate("userId", "name email mobile")
-      .populate(
-        "aadhaar.review.reviewedBy",
-        "name email"
-      )
-      .populate(
-        "pan.review.reviewedBy",
-        "name email"
-      );
+      .populate("userId", "name email mobile isKycVerified")
+      .populate("aadhaar.review.reviewedBy", "name email")
+      .populate("pan.review.reviewedBy", "name email");
 
     if (!kyc) {
       return res.status(404).json({
@@ -345,9 +367,20 @@ exports.getMyKyc = async (req, res) => {
       });
     }
 
+    const overallStatus = getDocOverallStatus(kyc);
+    const rejectionReasons = [
+      kyc.aadhaar?.review?.rejectionReason,
+      kyc.pan?.review?.rejectionReason,
+    ].filter(Boolean);
+
     return res.status(200).json({
       success: true,
-      data: kyc,
+      data: {
+        ...kyc.toObject(),
+        status: overallStatus,
+        rejectionReason:
+          [...new Set(rejectionReasons)].join(" • ") || null,
+      },
     });
   } catch (error) {
     console.error("Get My KYC Error:", error);
@@ -358,7 +391,6 @@ exports.getMyKyc = async (req, res) => {
     });
   }
 };
-
 
 // =====================================================
 // GET KYC STATUS
@@ -371,15 +403,14 @@ exports.getKycStatus = async (req, res) => {
 
     const kyc = await KycDocument.findOne({
       userId,
-    }).select(
-      "dob selfie aadhaar pan createdAt updatedAt"
-    );
+    }).select("dob selfie aadhaar pan createdAt updatedAt");
 
     if (!kyc) {
       return res.status(200).json({
         success: true,
         data: {
           exists: false,
+          status: "none",
           dob: null,
           selfie: null,
           aadhaar: null,
@@ -388,10 +419,19 @@ exports.getKycStatus = async (req, res) => {
       });
     }
 
+    const overallStatus = getDocOverallStatus(kyc);
+    const rejectionReasons = [
+      kyc.aadhaar?.review?.rejectionReason,
+      kyc.pan?.review?.rejectionReason,
+    ].filter(Boolean);
+
     return res.status(200).json({
       success: true,
       data: {
         exists: true,
+        status: overallStatus,
+        rejectionReason:
+          [...new Set(rejectionReasons)].join(" • ") || null,
 
         dob: kyc.dob,
 
@@ -415,13 +455,9 @@ exports.getKycStatus = async (req, res) => {
                   }
                 : null,
 
-              status:
-                kyc.aadhaar.review?.status ||
-                "pending",
+              status: kyc.aadhaar.review?.status || "pending",
 
-              rejectionReason:
-                kyc.aadhaar.review
-                  ?.rejectionReason || null,
+              rejectionReason: kyc.aadhaar.review?.rejectionReason || null,
             }
           : null,
 
@@ -433,13 +469,9 @@ exports.getKycStatus = async (req, res) => {
                   }
                 : null,
 
-              status:
-                kyc.pan.review?.status ||
-                "pending",
+              status: kyc.pan.review?.status || "pending",
 
-              rejectionReason:
-                kyc.pan.review
-                  ?.rejectionReason || null,
+              rejectionReason: kyc.pan.review?.rejectionReason || null,
             }
           : null,
 
