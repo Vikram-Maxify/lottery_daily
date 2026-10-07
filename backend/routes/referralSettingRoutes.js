@@ -1,12 +1,14 @@
 const express = require("express");
 
 const router = express.Router();
+const authMiddleware = require("../middleware/authMiddleware");
 
 const {
   getAllSettings,
   updateAllSettings,
   getReferralPercentage,
   setReferralPercentage,
+  getMyReferralDetails,
 } = require("../controllers/referralSettingController");
 
 // =====================================================
@@ -20,5 +22,10 @@ router.put("/", updateAllSettings);
 // =====================================================
 router.get("/referral-percentage", getReferralPercentage);
 router.put("/referral-percentage", setReferralPercentage);
+
+// =====================================================
+// USER REFERRAL DETAILS & EARNINGS
+// =====================================================
+router.get("/my-referral", authMiddleware, getMyReferralDetails);
 
 module.exports = router;

@@ -112,6 +112,7 @@ app.use("/api/banners", bannerRoutes);
 
 app.use("/api/lottery-numbers", lotteryNumberRoutes);
 app.use("/api/admin/settings", referralSettingRoutes);
+app.use("/api/referral", referralSettingRoutes);
 
 app.use("/api/top-winners", topWinnerRoutes);
 app.use("/api/festival-amount", require("./routes/festivalamountRoutes"));
