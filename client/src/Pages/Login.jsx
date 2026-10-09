@@ -4,7 +4,6 @@ import {
   Crown,
   Eye,
   EyeOff,
-  Gift,
   Loader2,
   Lock,
   ShieldCheck,
@@ -119,13 +118,13 @@ const Login = () => {
 
   const handleForgot = () => {
     const message = encodeURIComponent(
-      "Hello, mujhe apna password reset karna hai."
+      "Hello, mujhe apna password reset karna hai.",
     );
 
     window.open(
       `https://wa.me/917234806209?text=${message}`,
       "_blank",
-      "noopener,noreferrer"
+      "noopener,noreferrer",
     );
   };
 
@@ -280,11 +279,7 @@ const Login = () => {
             {/* PASSWORD */}
             <div className={inputWrap}>
               <div className="flex w-[45px] shrink-0 justify-center">
-                <Lock
-                  size={20}
-                  strokeWidth={2.3}
-                  className="text-[#d7193f]"
-                />
+                <Lock size={20} strokeWidth={2.3} className="text-[#d7193f]" />
               </div>
 
               <div className="h-[28px] w-px shrink-0 bg-[#d6dfec]" />
@@ -314,43 +309,9 @@ const Login = () => {
                     className="text-[#173e70]"
                   />
                 ) : (
-                  <Eye
-                    size={19}
-                    strokeWidth={2.3}
-                    className="text-[#173e70]"
-                  />
+                  <Eye size={19} strokeWidth={2.3} className="text-[#173e70]" />
                 )}
               </button>
-            </div>
-
-            {/* REFERRAL CODE (OPTIONAL) */}
-            <div className={inputWrap}>
-              <div className="flex w-[45px] shrink-0 justify-center">
-                <Gift
-                  size={20}
-                  strokeWidth={2.3}
-                  className="text-[#d7193f]"
-                />
-              </div>
-
-              <div className="h-[28px] w-px shrink-0 bg-[#d6dfec]" />
-
-              <input
-                type="text"
-                name="referralBy"
-                value={form.referralBy}
-                onChange={handleChange}
-                placeholder="Referral Code (Optional)"
-                autoCapitalize="characters"
-                disabled={loginLoading}
-                className={`${inputBase} px-3 font-semibold uppercase tracking-wider`}
-              />
-
-              {form.referralBy && (
-                <span className="mr-3 shrink-0 rounded-md bg-[#d7193f]/10 px-2 py-0.5 text-[10px] font-bold text-[#d7193f]">
-                  APPLIED
-                </span>
-              )}
             </div>
 
             {(error || loginError) && (
@@ -398,11 +359,7 @@ const Login = () => {
             >
               {loginLoading ? (
                 <>
-                  <Loader2
-                    size={19}
-                    strokeWidth={3}
-                    className="animate-spin"
-                  />
+                  <Loader2 size={19} strokeWidth={3} className="animate-spin" />
                   Logging in...
                 </>
               ) : (
