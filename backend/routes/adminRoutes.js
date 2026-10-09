@@ -14,6 +14,7 @@ const {
   getAllUsers,
   getSingleUser,
   updateUserWallet,
+  deleteUser,
 } = require("../controllers/adminUserController");
 
 const {
@@ -88,6 +89,13 @@ router.put(
   authMiddleware,
   adminMiddleware,
   updateUserWallet
+);
+
+router.delete(
+  "/users/:id",
+  authMiddleware,
+  adminMiddleware,
+  deleteUser
 );
 
 // =====================================================

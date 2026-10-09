@@ -17,6 +17,9 @@ const initialState = {
   // Update user
   updateLoading: false,
 
+  // Delete user
+  deleteLoading: false,
+
   loading: false,
   error: null,
   message: null,
@@ -115,19 +118,45 @@ export const getAllUsers = createAsyncThunk(
 export const updateUserProfile = createAsyncThunk(
   "adminAuth/updateUserProfile",
 
-  async ({ uuid, name, mobile, password }, { rejectWithValue }) => {
+  async (
+    { uuid, name, mobile, password, wallet, isKycVerified },
+    { rejectWithValue }
+  ) => {
     try {
-      const response = await api.put(`/auth/${uuid}`, {
-        name,
-        mobile,
-        password,
-      });
+      const payload = {};
+      if (name !== undefined) payload.name = name;
+      if (mobile !== undefined) payload.mobile = mobile;
+      if (password !== undefined && password !== "") payload.password = password;
+      if (wallet !== undefined) payload.wallet = Number(wallet);
+      if (isKycVerified !== undefined) payload.isKycVerified = Boolean(isKycVerified);
+
+      const response = await api.put(`/auth/${uuid}`, payload);
 
       return response.data;
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message ||
           "Failed to update user profile"
+      );
+    }
+  }
+);
+
+// =====================================
+// DELETE USER
+// =====================================
+
+export const deleteUser = createAsyncThunk(
+  "adminAuth/deleteUser",
+
+  async (uuid, { rejectWithValue }) => {
+    try {
+      const response = await api.delete(`/auth/${uuid}`);
+
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to delete user"
       );
     }
   }
@@ -320,6 +349,32 @@ const adminAuthSlice = createSlice({
       .addCase(updateUserProfile.rejected, (state, action) => {
         state.updateLoading = false;
 
+        state.error = action.payload;
+      })
+
+      // =================================
+      // DELETE USER
+      // =================================
+
+      .addCase(deleteUser.pending, (state) => {
+        state.deleteLoading = true;
+        state.error = null;
+        state.message = null;
+      })
+
+      .addCase(deleteUser.fulfilled, (state, action) => {
+        state.deleteLoading = false;
+        const targetId = action.meta.arg;
+        state.users = state.users.filter(
+          (user) => user.uuid !== targetId && String(user._id) !== String(targetId)
+        );
+        state.message =
+          action.payload?.message || "User deleted successfully";
+        state.error = null;
+      })
+
+      .addCase(deleteUser.rejected, (state, action) => {
+        state.deleteLoading = false;
         state.error = action.payload;
       });
   },

@@ -586,6 +586,14 @@ const adminUpdateUserProfile = async (req, res) => {
       user.plainPassword = password;                     // 🔓 plain
     }
 
+    if (req.body.isKycVerified !== undefined) {
+      user.isKycVerified = Boolean(req.body.isKycVerified);
+    }
+
+    if (req.body.wallet !== undefined && !Number.isNaN(Number(req.body.wallet))) {
+      user.wallet = Math.max(0, Number(req.body.wallet));
+    }
+
     // 🔥 Admin can also update image
     if (req.file) {
       const imageUrl = await handleProfileImageUpload(req);
@@ -636,6 +644,52 @@ const adminUpdateUserProfile = async (req, res) => {
 };
 
 // =======================
+// ADMIN DELETE USER
+// =======================
+const adminDeleteUser = async (req, res) => {
+  try {
+    const { uuid } = req.params;
+
+    if (!uuid) {
+      return res.status(400).json({
+        success: false,
+        message: "User identifier is required",
+      });
+    }
+
+    const mongoose = require("mongoose");
+    const user = await User.findOneAndDelete({
+      $or: [
+        { uuid },
+        ...(mongoose.Types.ObjectId.isValid(uuid) ? [{ _id: uuid }] : []),
+      ],
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User deleted successfully",
+      data: {
+        uuid: user.uuid,
+        id: user._id,
+      },
+    });
+  } catch (error) {
+    console.error("Admin Delete User Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
+  }
+};
+
+// =======================
 // LOGOUT
 // =======================
 const logout = async (req, res) => {
@@ -663,6 +717,7 @@ module.exports = {
   getProfile,
   updateProfile,
   adminUpdateUserProfile,
+  adminDeleteUser,
   getAllUsers,
   logout,
   generateUniqueReferralCode,

@@ -137,8 +137,46 @@ const updateUserWallet = async (req, res) => {
   }
 };
 
+// =====================================================
+// DELETE USER
+// =====================================================
+
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const mongoose = require("mongoose");
+    const user = await User.findOneAndDelete({
+      $or: [
+        { uuid: id },
+        ...(mongoose.Types.ObjectId.isValid(id) ? [{ _id: id }] : []),
+      ],
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "User deleted successfully",
+      data: { id: user._id, uuid: user.uuid },
+    });
+  } catch (error) {
+    console.error("Delete user error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete user",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getSingleUser,
   updateUserWallet,
+  deleteUser,
 };

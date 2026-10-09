@@ -61,7 +61,7 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
     }).lean();
 
     console.log(
-      `📋 ${formatDateString(refStart)} ki total lotteries mili: ${refLotteries.length}`
+      `📋 ${formatDateString(refStart)} ki total lotteries mili: ${refLotteries.length}`,
     );
 
     // If no lotteries found for exact referenceDate, fallback to latest config per market
@@ -77,7 +77,9 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
           refLotteries.push(latest);
         }
       }
-      console.log(`📋 Found ${refLotteries.length} latest lotteries by distinct markets`);
+      console.log(
+        `📋 Found ${refLotteries.length} latest lotteries by distinct markets`,
+      );
     }
 
     if (refLotteries.length === 0) {
@@ -111,7 +113,9 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
 
           if (prevWithImg?.imageUrl) {
             imageUrl = prevWithImg.imageUrl;
-            console.log(`🖼️ Auto-resolved banner for ${marketName}: ${imageUrl}`);
+            console.log(
+              `🖼️ Auto-resolved banner for ${marketName}: ${imageUrl}`,
+            );
           }
         }
 
@@ -126,7 +130,7 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
                 { imageUrl: "" },
               ],
             },
-            { $set: { imageUrl } }
+            { $set: { imageUrl } },
           );
         }
 
@@ -158,12 +162,12 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
               imageUrl,
             });
             console.log(
-              `🖼️ REPAIRED existing next lottery: ${marketName} - ${nextDateString} with banner image`
+              `🖼️ REPAIRED existing next lottery: ${marketName} - ${nextDateString} with banner image`,
             );
           }
 
           console.log(
-            `⏭️ SKIP: ${marketName} - ${nextDateString} (already exists)`
+            `⏭️ SKIP: ${marketName} - ${nextDateString} (already exists)`,
           );
           skippedCount++;
           continue;
@@ -196,25 +200,23 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
 
           users: [],
 
-          isActive: false,
+          isActive: true, // 🔥 next day lottery is always active by default
         });
 
         console.log(
-          `✅ CREATED: ${marketName} - ${nextDateString} (id: ${nextLottery._id}, image: ${imageUrl ? "yes" : "no"})`
+          `✅ CREATED: ${marketName} - ${nextDateString} (id: ${nextLottery._id}, image: ${imageUrl ? "yes" : "no"})`,
         );
 
         createdCount++;
       } catch (marketError) {
         // Duplicate key error (race condition) — skip
         if (marketError.code === 11000) {
-          console.log(
-            `⏭️ SKIP (duplicate): ${refLottery.marketName}`
-          );
+          console.log(`⏭️ SKIP (duplicate): ${refLottery.marketName}`);
           skippedCount++;
         } else {
           console.error(
             `❌ ERROR for market ${refLottery.marketName}:`,
-            marketError.message
+            marketError.message,
           );
           errorCount++;
         }
@@ -278,7 +280,7 @@ const startLotteryCron = () => {
     {
       scheduled: true,
       timezone: "Asia/Kolkata",
-    }
+    },
   );
 
   console.log("✅ Lottery cron job scheduled (daily 12:00 AM IST)");
