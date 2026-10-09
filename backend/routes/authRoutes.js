@@ -9,6 +9,7 @@ const {
   updateProfile,
   getAllUsers,
   adminUpdateUserProfile,
+  adminDeleteUser,
 } = require("../controllers/authController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -66,6 +67,13 @@ router.put(
   adminMiddleware,
   upload.single("profileImage"),
   adminUpdateUserProfile
+);
+
+router.delete(
+  "/:uuid",
+  authMiddleware,
+  adminMiddleware,
+  adminDeleteUser
 );
 
 module.exports = router;

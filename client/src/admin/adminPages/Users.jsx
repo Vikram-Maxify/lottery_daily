@@ -1,21 +1,34 @@
 import {
+  AlertTriangle,
   Ban,
   CalendarDays,
+  Check,
   ChevronLeft,
   ChevronRight,
   Clock,
+  Copy,
   Download,
+  Eye,
+  EyeOff,
+  Gift,
+  Globe,
+  History,
+  Key,
+  Laptop,
   Mail,
-  MoreVertical,
   Pencil,
   Phone,
   RefreshCw,
   Search,
+  Shield,
   ShieldCheck,
+  Smartphone,
   Ticket,
+  Trash2,
   UserCheck,
   UserRound,
   Users as UsersIcon,
+  Wallet,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -24,6 +37,7 @@ import { useDispatch, useSelector } from "react-redux";
 import {
   clearAdminError,
   clearAdminMessage,
+  deleteUser,
   getAllUsers,
   updateUserProfile,
 } from "../../reducer/slice/adminAuthReducer";
@@ -67,26 +81,95 @@ const TONES = {
   green: "bg-[#E6F6EF] text-[#12A36B] ring-[#12A36B]/20",
   amber: "bg-[#FFF1CC] text-[#B26A00] ring-[#F2B705]/30",
   red: "bg-[#FDE8E6] text-[#D93025] ring-[#D93025]/20",
+  blue: "bg-[#E8F1FD] text-[#2E7DD7] ring-[#2E7DD7]/20",
   gray: "bg-[#F1F2F4] text-[#6B7280] ring-[#D5D8DD]",
 };
 
-const KYC_META = {
-  approved: { label: "Verified", tone: "green" },
-  pending: { label: "Pending", tone: "amber" },
-  rejected: { label: "Rejected", tone: "red" },
-  not_submitted: { label: "Not Submitted", tone: "gray" },
-};
+const FOUR_DAYS_MS = 4 * 24 * 60 * 60 * 1000;
 
 /* =========================================================
-   HELPERS
+   DYNAMIC ACTIVITY & STATUS HELPERS
 ========================================================= */
+
+/**
+ * Dynamic calculation of activity status from lastLogin.time:
+ * - Active: login within the last 4 days (including current time).
+ * - Inactive: > 4 days elapsed, or never logged in, or null/invalid.
+ */
+const calculateUserActivity = (user) => {
+  const loginTime = user?.lastLogin?.time;
+  if (!loginTime) {
+    return {
+      isActive: false,
+      label: "Inactive",
+      tone: "gray",
+      detail: "Never logged in",
+    };
+  }
+
+  const d = new Date(loginTime);
+  const timeMs = d.getTime();
+  if (Number.isNaN(timeMs)) {
+    return {
+      isActive: false,
+      label: "Inactive",
+      tone: "gray",
+      detail: "Never logged in",
+    };
+  }
+
+  const now = Date.now();
+  const diffMs = now - timeMs;
+
+  // Active: within 4 days (with 1-min clock-skew allowance)
+  if (diffMs <= FOUR_DAYS_MS && diffMs >= -60000) {
+    const hours = Math.floor(Math.max(0, diffMs) / (60 * 60 * 1000));
+    const days = Math.floor(Math.max(0, diffMs) / (24 * 60 * 60 * 1000));
+
+    let timeAgo = "Just now";
+    if (hours < 1) timeAgo = "Just now";
+    else if (hours < 24) timeAgo = `${hours}h ago`;
+    else timeAgo = `${days}d ago`;
+
+    return {
+      isActive: true,
+      label: "Active",
+      tone: "green",
+      detail: `Logged in ${timeAgo}`,
+    };
+  }
+
+  const daysAgo = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  return {
+    isActive: false,
+    label: "Inactive",
+    tone: "gray",
+    detail: daysAgo > 0 ? `Last seen ${daysAgo}d ago` : "Last login > 4d",
+  };
+};
+
+/**
+ * KYC Status based on isKycVerified and documents
+ */
+const calculateUserKyc = (user) => {
+  if (user?.isKycVerified) {
+    return { label: "Verified", tone: "green", isVerified: true };
+  }
+  if (user?._kycDocStatus === "pending") {
+    return { label: "Pending", tone: "amber", isVerified: false };
+  }
+  if (user?._kycDocStatus === "rejected") {
+    return { label: "Rejected", tone: "red", isVerified: false };
+  }
+  return { label: "Pending", tone: "amber", isVerified: false };
+};
 
 const idOf = (v) =>
   String(v && typeof v === "object" ? (v._id ?? "") : (v ?? ""));
 
 const docUserId = (doc) => idOf(doc?.user ?? doc?.userId ?? doc?.userID);
 
-const deriveKycStatus = (docs) => {
+const deriveKycDocsStatus = (docs) => {
   if (!Array.isArray(docs) || docs.length === 0) return "not_submitted";
   const s = docs.map((d) => String(d?.status || "").toLowerCase());
   if (s.includes("approved") || s.includes("verified")) return "approved";
@@ -98,18 +181,10 @@ const deriveKycStatus = (docs) => {
 const isMobileVerified = (u) =>
   Boolean(
     u?.isMobileVerified ??
-    u?.mobileVerified ??
-    u?.phoneVerified ??
-    u?.isVerified ??
-    false,
-  );
-
-const isSuspended = (u) =>
-  Boolean(
-    u?.isBlocked ||
-    u?.isSuspended ||
-    u?.isActive === false ||
-    String(u?.status || "").toLowerCase() === "suspended",
+      u?.mobileVerified ??
+      u?.phoneVerified ??
+      u?.isVerified ??
+      false
   );
 
 // "Rahul Sharma" -> "RS", "Rahul" -> "RA"
@@ -131,8 +206,9 @@ const toYMD = (date) => {
 };
 
 const fmtDate = (date) => {
+  if (!date) return "-";
   const d = new Date(date);
-  if (!date || Number.isNaN(d.getTime())) return "-";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -141,8 +217,9 @@ const fmtDate = (date) => {
 };
 
 const fmtDateTime = (date) => {
+  if (!date) return "-";
   const d = new Date(date);
-  if (!date || Number.isNaN(d.getTime())) return "-";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -171,24 +248,23 @@ const csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 const EMPTY_FILTERS = {
   search: "",
   mobile: "all",
-  account: "all",
+  account: "all", // all | active | inactive
   kyc: "all",
   date: "",
 };
 
 /* =========================================================
-   SMALL COMPONENTS
+   COMPONENTS
 ========================================================= */
 
-const Pill = ({ tone = "gray", children }) => (
+const Pill = ({ tone = "gray", children, className = "" }) => (
   <span
-    className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-bold ring-1 ${TONES[tone]}`}
+    className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-bold ring-1 ${TONES[tone] || TONES.gray} ${className}`}
   >
     {children}
   </span>
 );
 
-// Image ho to image, nahi to first + second letter
 const Avatar = ({ user, size = "h-9 w-9", text = "text-sm" }) => {
   const img = user?.profileImage || user?.avatar || user?.photo;
   return img ? (
@@ -233,15 +309,8 @@ const Field = ({ label, children }) => (
   </div>
 );
 
-const StatusBox = ({ label, tone, value }) => (
-  <div className="min-w-0 rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-2 text-center">
-    <p className="mb-1 text-[10px] font-semibold text-[#6B7280]">{label}</p>
-    <Pill tone={tone}>{value}</Pill>
-  </div>
-);
-
 /* =========================================================
-   PAGE
+   MAIN USERS PAGE
 ========================================================= */
 
 const Users = () => {
@@ -253,12 +322,13 @@ const Users = () => {
     usersLoading,
     usersError,
     updateLoading,
+    deleteLoading,
     error,
     message,
   } = useSelector((state) => state.adminAuth);
 
   const { configs = [], loading: lotteryLoading } = useSelector(
-    (state) => state.lotteryConfig || {},
+    (state) => state.lotteryConfig || {}
   );
 
   const kycDocs = useSelector(selectAdminKycDocuments);
@@ -272,11 +342,24 @@ const Users = () => {
   const [perPage, setPerPage] = useState(10);
   const [page, setPage] = useState(1);
   const [checked, setChecked] = useState(new Set());
-  const [activeId, setActiveId] = useState(null);
-  const [tab, setTab] = useState("activity");
-  const [menuId, setMenuId] = useState(null);
+
+  // Action Modals State
+  const [viewUser, setViewUser] = useState(null);
+  const [showPlainPassword, setShowPlainPassword] = useState(false);
+  const [viewTab, setViewTab] = useState("overview"); // overview | history | kyc
+
   const [editUser, setEditUser] = useState(null);
-  const [form, setForm] = useState({ name: "", mobile: "", password: "" });
+  const [form, setForm] = useState({
+    name: "",
+    mobile: "",
+    password: "",
+    wallet: 0,
+    isKycVerified: false,
+  });
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [copiedKey, setCopiedKey] = useState("");
+
   const [rejectDocId, setRejectDocId] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
 
@@ -310,28 +393,44 @@ const Users = () => {
 
     return users.map((u) => {
       const uid = String(u._id);
+      const docs = kycByUser[uid] || [];
+      const docStatus = deriveKycDocsStatus(docs);
+      const activity = calculateUserActivity(u);
+      const kyc = calculateUserKyc({ ...u, _kycDocStatus: docStatus });
+
       return {
         ...u,
-        _kycDocs: kycByUser[uid] || [],
-        _kyc: deriveKycStatus(kycByUser[uid]),
+        _kycDocs: docs,
+        _kycDocStatus: docStatus,
+        _kyc: kyc,
+        _activity: activity,
         _mobileVerified: isMobileVerified(u),
-        _suspended: isSuspended(u),
         _tickets: ticketsByUser[uid] || [],
       };
     });
   }, [users, kycDocs, configs]);
 
+  // Keep viewUser synchronized when users array updates
+  useEffect(() => {
+    if (viewUser) {
+      const updated = rows.find(
+        (r) => r.uuid === viewUser.uuid || String(r._id) === String(viewUser._id)
+      );
+      if (updated) setViewUser(updated);
+    }
+  }, [rows]);
+
   // ---------- STATS ----------
   const stats = useMemo(
     () => ({
       total: rows.length,
-      mobile: rows.filter((r) => r._mobileVerified).length,
-      kyc: rows.filter((r) => r._kyc === "approved").length,
-      active: rows.filter((r) => !r._suspended).length,
-      suspended: rows.filter((r) => r._suspended).length,
-      pendingKyc: rows.filter((r) => r._kyc === "pending").length,
+      active: rows.filter((r) => r._activity.isActive).length,
+      inactive: rows.filter((r) => !r._activity.isActive).length,
+      kycVerified: rows.filter((r) => r._kyc.isVerified).length,
+      pendingKyc: rows.filter((r) => !r._kyc.isVerified).length,
+      mobileVerified: rows.filter((r) => r._mobileVerified).length,
     }),
-    [rows],
+    [rows]
   );
 
   // ---------- FILTERING ----------
@@ -339,17 +438,27 @@ const Users = () => {
     const term = filters.search.trim().toLowerCase();
     return rows.filter((r) => {
       if (term) {
-        const hay = [r.name, r.mobile, r.uuid, r.email, r.userId]
+        const hay = [r.name, r.mobile, r.uuid, r._id, r.referralCode]
           .map((v) => String(v || "").toLowerCase())
           .join(" ");
         if (!hay.includes(term)) return false;
       }
+
       if (filters.mobile === "verified" && !r._mobileVerified) return false;
       if (filters.mobile === "unverified" && r._mobileVerified) return false;
-      if (filters.account === "active" && r._suspended) return false;
-      if (filters.account === "suspended" && !r._suspended) return false;
-      if (filters.kyc !== "all" && r._kyc !== filters.kyc) return false;
+
+      // Dynamic activity filter
+      if (filters.account === "active" && !r._activity.isActive) return false;
+      if (filters.account === "inactive" && r._activity.isActive) return false;
+
+      // KYC filter
+      if (filters.kyc === "approved" && !r._kyc.isVerified) return false;
+      if (filters.kyc === "pending" && r._kyc.label !== "Pending") return false;
+      if (filters.kyc === "rejected" && r._kyc.label !== "Rejected") return false;
+      if (filters.kyc === "not_submitted" && r._kycDocs.length > 0) return false;
+
       if (filters.date && toYMD(r.createdAt) !== filters.date) return false;
+
       return true;
     });
   }, [rows, filters]);
@@ -358,11 +467,6 @@ const Users = () => {
   const currentPage = Math.min(page, totalPages);
   const start = (currentPage - 1) * perPage;
   const pageRows = filtered.slice(start, start + perPage);
-
-  const activeUser = useMemo(
-    () => rows.find((r) => String(r._id) === activeId) || null,
-    [rows, activeId],
-  );
 
   // ---------- HANDLERS ----------
   const applyFilters = () => {
@@ -397,101 +501,163 @@ const Users = () => {
     setChecked((prev) => {
       const next = new Set(prev);
       pageRows.forEach((r) =>
-        allOnPageChecked ? next.delete(String(r._id)) : next.add(String(r._id)),
+        allOnPageChecked
+          ? next.delete(String(r._id))
+          : next.add(String(r._id))
       );
       return next;
     });
 
+  const copyToClipboard = (text, key) => {
+    if (!text) return;
+    navigator.clipboard.writeText(String(text));
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(""), 2000);
+  };
+
+  // 1. VIEW ACTION
+  const openView = (u) => {
+    setViewUser(u);
+    setShowPlainPassword(false);
+    setViewTab("overview");
+  };
+
+  const closeView = () => {
+    setViewUser(null);
+    setShowPlainPassword(false);
+  };
+
+  // 2. EDIT ACTION
   const openEdit = (u) => {
     setEditUser(u);
-    setForm({ name: u.name || "", mobile: u.mobile || "", password: "" });
-    setMenuId(null);
+    setForm({
+      name: u.name || "",
+      mobile: u.mobile || "",
+      password: "",
+      wallet: Number(u.wallet || 0),
+      isKycVerified: Boolean(u.isKycVerified),
+    });
     dispatch(clearAdminError());
     dispatch(clearAdminMessage());
   };
 
   const closeEdit = () => {
     setEditUser(null);
-    setForm({ name: "", mobile: "", password: "" });
+    setForm({ name: "", mobile: "", password: "", wallet: 0, isKycVerified: false });
   };
 
   const submitEdit = async (e) => {
     e.preventDefault();
     if (!editUser) return;
+
     const payload = {
       uuid: editUser.uuid,
       name: form.name.trim(),
       mobile: form.mobile.trim(),
+      wallet: Number(form.wallet) || 0,
+      isKycVerified: Boolean(form.isKycVerified),
     };
-    if (form.password.trim()) payload.password = form.password;
+
+    if (form.password.trim()) {
+      payload.password = form.password.trim();
+    }
+
     const res = await dispatch(updateUserProfile(payload));
-    if (updateUserProfile.fulfilled.match(res)) closeEdit();
+    if (updateUserProfile.fulfilled.match(res)) {
+      closeEdit();
+    }
   };
 
-  // NOTE: backend ko `isBlocked` field support karna chahiye
-  const toggleSuspend = (u) => {
-    setMenuId(null);
-    dispatch(
-      updateUserProfile({
-        uuid: u.uuid,
-        name: u.name,
-        mobile: u.mobile,
-        isBlocked: !u._suspended,
-      }),
-    );
+  // 3. DELETE ACTION
+  const openDelete = (u) => {
+    setDeleteTarget(u);
+    dispatch(clearAdminError());
+    dispatch(clearAdminMessage());
   };
 
-  const selectUser = (u, nextTab) => {
-    setActiveId(String(u._id));
-    if (nextTab) setTab(nextTab);
-    setMenuId(null);
+  const closeDelete = () => {
+    setDeleteTarget(null);
   };
 
-  const handleApprove = async (id) => {
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    const res = await dispatch(deleteUser(deleteTarget.uuid || deleteTarget._id));
+    if (deleteUser.fulfilled.match(res)) {
+      if (viewUser && (viewUser.uuid === deleteTarget.uuid || viewUser._id === deleteTarget._id)) {
+        closeView();
+      }
+      closeDelete();
+    }
+  };
+
+  // KYC Actions inside View Modal
+  const handleApproveKyc = async (id) => {
     dispatch(clearAdminKycError());
     dispatch(clearAdminKycSuccess());
     await dispatch(approveKyc(id));
+    dispatch(getAllUsers());
   };
 
-  const handleReject = async (id) => {
+  const handleRejectKyc = async (id) => {
     dispatch(clearAdminKycError());
     dispatch(clearAdminKycSuccess());
     const res = await dispatch(
-      rejectKyc({ id, rejectionReason: rejectReason }),
+      rejectKyc({ id, rejectionReason: rejectReason })
     );
     if (rejectKyc.fulfilled.match(res)) {
       setRejectDocId(null);
       setRejectReason("");
+      dispatch(getAllUsers());
     }
   };
 
+  // EXPORT CSV
   const exportCsv = () => {
     const list = checked.size
       ? filtered.filter((r) => checked.has(String(r._id)))
       : filtered;
+
     const head = [
       "User ID",
+      "UUID",
       "Name",
       "Mobile",
-      "Mobile Verified",
+      "Dynamic Activity Status",
+      "Activity Detail",
       "KYC Status",
-      "Account Status",
+      "Wallet Balance",
+      "Referral Code",
+      "Referred By",
+      "Last Login Time",
+      "Last Login IP",
+      "Last Login Device",
       "Join Date",
     ];
+
     const body = list.map((r) => [
+      r._id,
       r.uuid,
       r.name,
       r.mobile,
-      r._mobileVerified ? "Verified" : "Not Verified",
-      KYC_META[r._kyc].label,
-      r._suspended ? "Suspended" : "Active",
+      r._activity.label,
+      r._activity.detail,
+      r._kyc.label,
+      r.wallet || 0,
+      r.referralCode || "-",
+      r.referralBy || "-",
+      r.lastLogin?.time ? fmtDateTime(r.lastLogin.time) : "Never",
+      r.lastLogin?.ip || "-",
+      r.lastLogin?.device || "-",
       fmtDate(r.createdAt),
     ]);
+
     const csv = [head, ...body]
       .map((row) => row.map(csvCell).join(","))
       .join("\n");
+
     const url = URL.createObjectURL(
-      new Blob([csv], { type: "text/csv;charset=utf-8;" }),
+      new Blob([csv], { type: "text/csv;charset=utf-8;" })
     );
     const a = document.createElement("a");
     a.href = url;
@@ -500,43 +666,19 @@ const Users = () => {
     URL.revokeObjectURL(url);
   };
 
-  // ---------- ACTIVITY (derived from real data) ----------
-  const activity = useMemo(() => {
-    if (!activeUser) return [];
-    const items = activeUser._tickets.map((t) => ({
-      key: `t-${t._id || t.number}`,
-      title: "Played Lottery",
-      sub: `${t.marketName} • ${t.number || "-"} • ₹${Number(t.amount || 0).toFixed(2)}`,
-      at: t.createdAt || t.entryDate,
-      icon: <Ticket size={16} />,
-    }));
-    items.push({
-      key: "joined",
-      title: "Joined Winzox",
-      sub: "Account created",
-      at: activeUser.createdAt,
-      icon: <UserCheck size={16} />,
-    });
-    return items.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
-  }, [activeUser]);
-
   const banner = message || kycMessage;
   const bannerError = usersError || error || kycActionError;
 
-  /* =======================================================
-     UI
-  ======================================================= */
   return (
     <div className="min-h-screen space-y-4 bg-[#FFFDF7] p-4 md:p-6">
       {/* HEADER */}
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-[#1A1A1A]">
-            Users
+            User Management
           </h1>
           <p className="mt-1 text-sm text-[#6B7280]">
-            Manage users, verification status, KYC, activity history and support
-            details.
+            Manage users, view complete account details, edit profiles, and perform actions.
           </p>
         </div>
         <button
@@ -563,40 +705,43 @@ const Users = () => {
         />
         <StatCard
           bg="bg-[#E6F6EF]"
-          label="Verified Mobile"
-          value={stats.mobile}
-          icon={<Phone size={22} className="text-[#12A36B]" />}
+          label="Active (≤ 4 Days)"
+          value={stats.active}
+          icon={<UsersIcon size={24} className="text-[#12A36B]" />}
+        />
+        <StatCard
+          bg="bg-[#F1F2F4]"
+          label="Inactive Users"
+          value={stats.inactive}
+          icon={<Clock size={22} className="text-[#6B7280]" />}
         />
         <StatCard
           bg="bg-[#E6F6EF]"
           label="KYC Verified"
-          value={stats.kyc}
+          value={stats.kycVerified}
           icon={<ShieldCheck size={24} className="text-[#12A36B]" />}
-        />
-        <StatCard
-          bg="bg-[#E8F1FD]"
-          label="Active Users"
-          value={stats.active}
-          icon={<UsersIcon size={24} className="text-[#2E7DD7]" />}
-        />
-        <StatCard
-          bg="bg-[#FDE8E6]"
-          label="Suspended"
-          value={stats.suspended}
-          icon={<Ban size={22} className="text-[#D93025]" />}
         />
         <StatCard
           bg="bg-[#FFF1CC]"
           label="Pending KYC"
           value={stats.pendingKyc}
-          icon={<Clock size={22} className="text-[#B26A00]" />}
+          icon={<Shield size={22} className="text-[#B26A00]" />}
+        />
+        <StatCard
+          bg="bg-[#E8F1FD]"
+          label="Verified Mobile"
+          value={stats.mobileVerified}
+          icon={<Phone size={22} className="text-[#2E7DD7]" />}
         />
       </div>
 
-      {/* MESSAGES */}
+      {/* NOTIFICATIONS */}
       {banner && (
         <div className="flex items-center justify-between rounded-xl border border-[#12A36B]/30 bg-[#E6F6EF] px-4 py-3 text-sm font-medium text-[#0E7A52]">
-          <span>{banner}</span>
+          <span className="flex items-center gap-2">
+            <Check size={18} className="text-[#12A36B]" />
+            {banner}
+          </span>
           <button
             type="button"
             onClick={() => {
@@ -609,9 +754,13 @@ const Users = () => {
           </button>
         </div>
       )}
+
       {bannerError && (
         <div className="flex items-center justify-between rounded-xl border border-[#D93025]/30 bg-[#FDE8E6] px-4 py-3 text-sm font-medium text-[#B3261E]">
-          <span>{String(bannerError)}</span>
+          <span className="flex items-center gap-2">
+            <AlertTriangle size={18} className="text-[#D93025]" />
+            {String(bannerError)}
+          </span>
           <button
             type="button"
             onClick={() => {
@@ -639,33 +788,21 @@ const Users = () => {
                 value={draft.search}
                 onChange={(e) => setDraft({ ...draft, search: e.target.value })}
                 onKeyDown={(e) => e.key === "Enter" && applyFilters()}
-                placeholder="Name, Mobile or User ID..."
+                placeholder="Name, Mobile, UUID or User ID..."
                 className={`${INPUT_CLS} py-2.5 pl-9`}
               />
             </div>
           </Field>
 
-          <Field label="Mobile Verification">
-            <select
-              value={draft.mobile}
-              onChange={(e) => setDraft({ ...draft, mobile: e.target.value })}
-              className={`${INPUT_CLS} py-2.5`}
-            >
-              <option value="all">All Status</option>
-              <option value="verified">Verified</option>
-              <option value="unverified">Not Verified</option>
-            </select>
-          </Field>
-
-          <Field label="Account Status">
+          <Field label="Dynamic Activity Status">
             <select
               value={draft.account}
               onChange={(e) => setDraft({ ...draft, account: e.target.value })}
               className={`${INPUT_CLS} py-2.5`}
             >
               <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="suspended">Suspended</option>
+              <option value="active">Active (≤ 4 Days)</option>
+              <option value="inactive">Inactive (&gt; 4 Days / Never)</option>
             </select>
           </Field>
 
@@ -680,6 +817,18 @@ const Users = () => {
               <option value="pending">Pending</option>
               <option value="rejected">Rejected</option>
               <option value="not_submitted">Not Submitted</option>
+            </select>
+          </Field>
+
+          <Field label="Mobile Verification">
+            <select
+              value={draft.mobile}
+              onChange={(e) => setDraft({ ...draft, mobile: e.target.value })}
+              className={`${INPUT_CLS} py-2.5`}
+            >
+              <option value="all">All Status</option>
+              <option value="verified">Verified</option>
+              <option value="unverified">Not Verified</option>
             </select>
           </Field>
 
@@ -709,551 +858,800 @@ const Users = () => {
         </div>
       </div>
 
-      {/* LIST + DETAIL PANEL */}
-      <div
-        className={`grid items-start gap-4 ${activeUser ? "xl:grid-cols-[1fr_340px]" : ""}`}
-      >
-        {/* ---------- TABLE ---------- */}
-        <div className={`min-w-0 overflow-hidden ${CARD_CLS}`}>
-          <div className="flex items-center justify-between gap-2 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <UsersIcon size={20} className="text-[#9A5B00]" />
-              <h2 className="font-black text-[#1A1A1A]">
-                User List ({filtered.length.toLocaleString("en-IN")})
-              </h2>
-            </div>
-            <button
-              type="button"
-              onClick={exportCsv}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs ${OUTLINE_BTN}`}
-            >
-              <Download size={14} />
-              Export{checked.size ? ` (${checked.size})` : ""}
-            </button>
+      {/* TABLE */}
+      <div className={`min-w-0 overflow-hidden ${CARD_CLS}`}>
+        <div className="flex items-center justify-between gap-2 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <UsersIcon size={20} className="text-[#9A5B00]" />
+            <h2 className="font-black text-[#1A1A1A]">
+              User List ({filtered.length.toLocaleString("en-IN")})
+            </h2>
           </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px]">
-              <thead className="bg-[#FFF9E3]">
-                <tr>
-                  <th className={`${TH_CLS} w-10`}>#</th>
-                  <th className={`${TH_CLS} w-8`}>
-                    <input
-                      type="checkbox"
-                      checked={allOnPageChecked}
-                      onChange={toggleAllOnPage}
-                      className="h-4 w-4 accent-[#F7B500]"
-                    />
-                  </th>
-
-                  <th className={TH_CLS}>Name</th>
-                  <th className={TH_CLS}>Mobile Number</th>
-
-                  <th className={TH_CLS}>KYC Status</th>
-                  <th className={TH_CLS}>Account Status</th>
-                  <th className={TH_CLS}>Last Login</th>
-                  <th className={TH_CLS}>Join Date</th>
-                  <th className={`${TH_CLS} text-center`}>Action</th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-[#F3E7C4]">
-                {usersLoading ? (
-                  <tr>
-                    <td colSpan="10" className="px-6 py-16 text-center">
-                      <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-[#FFEFA8] border-t-[#F7B500]" />
-                      <p className="text-sm text-[#6B7280]">Loading users...</p>
-                    </td>
-                  </tr>
-                ) : pageRows.length === 0 ? (
-                  <tr>
-                    <td colSpan="10" className="px-6 py-16 text-center">
-                      <p className="font-bold text-[#1A1A1A]">No users found</p>
-                      <p className="mt-1 text-sm text-[#6B7280]">
-                        Try changing or resetting the filters.
-                      </p>
-                    </td>
-                  </tr>
-                ) : (
-                  pageRows.map((u, i) => {
-                    const id = String(u._id);
-                    const kyc = KYC_META[u._kyc];
-                    const selected = id === activeId;
-                    return (
-                      <tr
-                        key={id}
-                        onClick={() => selectUser(u)}
-                        className={`cursor-pointer transition hover:bg-[#FFFDF7] ${selected ? "bg-[#FFF9E3]" : ""}`}
-                      >
-                        <td className="px-3 py-2.5 text-sm text-[#6B7280]">
-                          {start + i + 1}
-                        </td>
-                        <td
-                          className="px-3 py-2.5"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked.has(id)}
-                            onChange={() => toggleOne(id)}
-                            className="h-4 w-4 accent-[#F7B500]"
-                          />
-                        </td>
-
-                        <td className="px-3 py-2.5">
-                          <div className="flex items-center gap-2.5">
-                            <Avatar user={u} />
-                            <span className="max-w-[130px] truncate text-sm font-semibold text-[#1A1A1A]">
-                              {u.name || "-"}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-sm text-[#1A1A1A]">
-                          {u.mobile || "-"}
-                        </td>
-
-                        <td className="px-3 py-2.5">
-                          <Pill tone={kyc.tone}>{kyc.label}</Pill>
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <Pill tone={u._suspended ? "red" : "green"}>
-                            {u._suspended ? "Suspended" : "Active"}
-                          </Pill>
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-xs text-[#6B7280]">
-                          {u.lastLogin?.time ? (
-                            <div>
-                              <span className="font-semibold text-[#1A1A1A]">
-                                {fmtDateTime(u.lastLogin.time)}
-                              </span>
-                              {u.lastLogin.device && (
-                                <span className="block text-[10px] text-[#8A8F98]">
-                                  {u.lastLogin.device} {u.lastLogin.os ? `• ${u.lastLogin.os}` : ""}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-[#9CA3AF]">Never</span>
-                          )}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-sm text-[#6B7280]">
-                          {fmtDate(u.createdAt)}
-                        </td>
-                        <td
-                          className="relative px-3 py-2.5 text-center"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => setMenuId(menuId === id ? null : id)}
-                            aria-label="Actions"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#F3E7C4] bg-white text-[#6B7280] hover:bg-[#FFEFA8]"
-                          >
-                            <MoreVertical size={16} />
-                          </button>
-                          {menuId === id && (
-                            <>
-                              <div
-                                className="fixed inset-0 z-10"
-                                onClick={() => setMenuId(null)}
-                              />
-                              <div className="absolute right-3 top-11 z-20 w-40 overflow-hidden rounded-xl border border-[#F3E7C4] bg-white py-1 text-left shadow-xl">
-                                <button
-                                  type="button"
-                                  onClick={() => selectUser(u, "kyc")}
-                                  className="block w-full px-4 py-2 text-left text-sm hover:bg-[#FFF9E3]"
-                                >
-                                  View KYC
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => selectUser(u, "activity")}
-                                  className="block w-full px-4 py-2 text-left text-sm hover:bg-[#FFF9E3]"
-                                >
-                                  View Activity
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => openEdit(u)}
-                                  className="block w-full px-4 py-2 text-left text-sm hover:bg-[#FFF9E3]"
-                                >
-                                  Edit User
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => toggleSuspend(u)}
-                                  className={`block w-full px-4 py-2 text-left text-sm hover:bg-[#FFF9E3] ${u._suspended ? "text-[#12A36B]" : "text-[#D93025]"}`}
-                                >
-                                  {u._suspended ? "Activate" : "Suspend"}
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* PAGINATION */}
-          <div className="flex flex-col items-center justify-between gap-3 border-t border-[#F3E7C4] px-4 py-3 sm:flex-row">
-            <div className="flex items-center gap-2 text-sm text-[#6B7280]">
-              Show
-              <select
-                value={perPage}
-                onChange={(e) => {
-                  setPerPage(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="rounded-lg border border-[#F3E7C4] bg-white px-2 py-1.5 text-sm text-[#1A1A1A]"
-              >
-                {PAGE_SIZES.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-              per page
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={currentPage === 1}
-                onClick={() => setPage(currentPage - 1)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#F3E7C4] disabled:opacity-40"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              {pageList(currentPage, totalPages).map((p, i) =>
-                p === "..." ? (
-                  <span key={`d${i}`} className="px-1 text-[#8A8F98]">
-                    ...
-                  </span>
-                ) : (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setPage(p)}
-                    className={`h-8 min-w-8 rounded-lg px-2 text-sm font-bold ${
-                      p === currentPage
-                        ? GOLD_BTN
-                        : "border border-[#F3E7C4] bg-white text-[#1A1A1A] hover:bg-[#FFEFA8]/60"
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ),
-              )}
-              <button
-                type="button"
-                disabled={currentPage === totalPages}
-                onClick={() => setPage(currentPage + 1)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#F3E7C4] disabled:opacity-40"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={exportCsv}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs ${OUTLINE_BTN}`}
+          >
+            <Download size={14} />
+            Export{checked.size ? ` (${checked.size})` : ""}
+          </button>
         </div>
 
-        {/* ---------- DETAIL PANEL ---------- */}
-        {activeUser && (
-          <aside className={`min-w-0 p-4 ${CARD_CLS} xl:sticky xl:top-4`}>
-            <div className="flex items-start gap-3">
-              <Avatar user={activeUser} size="h-16 w-16" text="text-xl" />
-              <div className="min-w-0 flex-1">
-                <h3 className="truncate text-base font-black text-[#1A1A1A]">
-                  {activeUser.name || "-"}
-                </h3>
-                <p className="truncate font-mono text-xs text-[#6B7280]">
-                  {activeUser.userId || activeUser.uuid}
-                </p>
-                <p className="mt-1 text-[11px] capitalize text-[#9A5B00]">
-                  {activeUser.role || "user"}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveId(null)}
-                aria-label="Close panel"
-                className="rounded-full p-1 text-[#8A8F98] hover:bg-[#FFEFA8]"
-              >
-                <X size={18} />
-              </button>
-            </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px]">
+            <thead className="bg-[#FFF9E3]">
+              <tr>
+                <th className={`${TH_CLS} w-10`}>#</th>
+                <th className={`${TH_CLS} w-8`}>
+                  <input
+                    type="checkbox"
+                    checked={allOnPageChecked}
+                    onChange={toggleAllOnPage}
+                    className="h-4 w-4 accent-[#F7B500]"
+                  />
+                </th>
+                <th className={TH_CLS}>User</th>
+                <th className={TH_CLS}>Mobile Number</th>
+                <th className={TH_CLS}>Activity Status</th>
+                <th className={TH_CLS}>KYC Status</th>
+                <th className={TH_CLS}>Last Login</th>
+                <th className={TH_CLS}>Join Date</th>
+                <th className={`${TH_CLS} text-center`}>Actions</th>
+              </tr>
+            </thead>
 
-            {/* STATUS */}
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <StatusBox
-                label="Account"
-                tone={activeUser._suspended ? "red" : "green"}
-                value={activeUser._suspended ? "Suspended" : "Active"}
-              />
-              <StatusBox
-                label="KYC"
-                tone={KYC_META[activeUser._kyc].tone}
-                value={KYC_META[activeUser._kyc].label}
-              />
-              <StatusBox
-                label="Mobile"
-                tone={activeUser._mobileVerified ? "green" : "red"}
-                value={activeUser._mobileVerified ? "Verified" : "Not Verified"}
-              />
-            </div>
+            <tbody className="divide-y divide-[#F3E7C4]">
+              {usersLoading ? (
+                <tr>
+                  <td colSpan="9" className="px-6 py-16 text-center">
+                    <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-[#FFEFA8] border-t-[#F7B500]" />
+                    <p className="text-sm text-[#6B7280]">Loading users...</p>
+                  </td>
+                </tr>
+              ) : pageRows.length === 0 ? (
+                <tr>
+                  <td colSpan="9" className="px-6 py-16 text-center">
+                    <p className="font-bold text-[#1A1A1A]">No users found</p>
+                    <p className="mt-1 text-sm text-[#6B7280]">
+                      Try changing or resetting your search filters.
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                pageRows.map((u, i) => {
+                  const id = String(u._id);
+                  const isChecked = checked.has(id);
 
-            {/* CONTACT */}
-            <div className="mt-4 space-y-2 text-sm text-[#1A1A1A]">
-              <div className="flex items-center gap-2">
-                <Phone size={15} className="shrink-0 text-[#6B7280]" />
-                {activeUser.mobile || "-"}
-              </div>
-              {activeUser.email && (
-                <div className="flex items-center gap-2">
-                  <Mail size={15} className="shrink-0 text-[#6B7280]" />
-                  <span className="truncate">{activeUser.email}</span>
-                </div>
+                  return (
+                    <tr
+                      key={id}
+                      className="transition hover:bg-[#FFFDF7]"
+                    >
+                      <td className="px-3 py-3 text-sm text-[#6B7280]">
+                        {start + i + 1}
+                      </td>
+                      <td className="px-3 py-3">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleOne(id)}
+                          className="h-4 w-4 accent-[#F7B500]"
+                        />
+                      </td>
+
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar user={u} />
+                          <div className="min-w-0">
+                            <span className="block max-w-[150px] truncate text-sm font-bold text-[#1A1A1A]">
+                              {u.name || "-"}
+                            </span>
+                            <span className="block font-mono text-[11px] text-[#8A8F98]">
+                              ID: {u._id ? String(u._id).slice(-6) : "-"}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="whitespace-nowrap px-3 py-3 text-sm font-semibold text-[#1A1A1A]">
+                        {u.mobile || "-"}
+                      </td>
+
+                      {/* Dynamic Account Activity Status */}
+                      <td className="px-3 py-3">
+                        <Pill tone={u._activity.tone}>
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              u._activity.isActive ? "bg-[#12A36B]" : "bg-[#9CA3AF]"
+                            }`}
+                          />
+                          {u._activity.label}
+                        </Pill>
+                        <span className="mt-0.5 block text-[10px] text-[#8A8F98]">
+                          {u._activity.detail}
+                        </span>
+                      </td>
+
+                      {/* KYC Status from isKycVerified */}
+                      <td className="px-3 py-3">
+                        <Pill tone={u._kyc.tone}>{u._kyc.label}</Pill>
+                      </td>
+
+                      {/* Last Login date & time */}
+                      <td className="whitespace-nowrap px-3 py-3 text-xs text-[#6B7280]">
+                        {u.lastLogin?.time ? (
+                          <div>
+                            <span className="font-semibold text-[#1A1A1A]">
+                              {fmtDateTime(u.lastLogin.time)}
+                            </span>
+                            {u.lastLogin.device && (
+                              <span className="block text-[10px] text-[#8A8F98]">
+                                {u.lastLogin.device}{" "}
+                                {u.lastLogin.os ? `• ${u.lastLogin.os}` : ""}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="font-medium text-[#9CA3AF]">
+                            Never logged in
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="whitespace-nowrap px-3 py-3 text-sm text-[#6B7280]">
+                        {fmtDate(u.createdAt)}
+                      </td>
+
+                      {/* EXACTLY THREE DISTINCT ACTIONS: VIEW, EDIT, DELETE */}
+                      <td className="whitespace-nowrap px-3 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {/* 1. VIEW BUTTON */}
+                          <button
+                            type="button"
+                            onClick={() => openView(u)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-[#2E7DD7]/30 bg-[#E8F1FD] px-2.5 py-1.5 text-xs font-bold text-[#2E7DD7] transition hover:bg-[#2E7DD7] hover:text-white"
+                            title="View Complete Details"
+                          >
+                            <Eye size={13} />
+                            <span>View</span>
+                          </button>
+
+                          {/* 2. EDIT BUTTON */}
+                          <button
+                            type="button"
+                            onClick={() => openEdit(u)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-[#F2B705]/40 bg-[#FFF9E3] px-2.5 py-1.5 text-xs font-bold text-[#9A5B00] transition hover:bg-[#F7B500] hover:text-[#1A1204]"
+                            title="Edit User Profile"
+                          >
+                            <Pencil size={13} />
+                            <span>Edit</span>
+                          </button>
+
+                          {/* 3. DELETE BUTTON */}
+                          <button
+                            type="button"
+                            onClick={() => openDelete(u)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-[#D93025]/30 bg-[#FDE8E6] px-2.5 py-1.5 text-xs font-bold text-[#D93025] transition hover:bg-[#D93025] hover:text-white"
+                            title="Delete User"
+                          >
+                            <Trash2 size={13} />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
-              <div className="flex items-center gap-2">
-                <CalendarDays size={15} className="shrink-0 text-[#6B7280]" />
-                Joined {fmtDateTime(activeUser.createdAt)}
+            </tbody>
+          </table>
+        </div>
+
+        {/* PAGINATION */}
+        <div className="flex flex-col items-center justify-between gap-3 border-t border-[#F3E7C4] px-4 py-3 sm:flex-row">
+          <div className="flex items-center gap-2 text-sm text-[#6B7280]">
+            Show
+            <select
+              value={perPage}
+              onChange={(e) => {
+                setPerPage(Number(e.target.value));
+                setPage(1);
+              }}
+              className="rounded-lg border border-[#F3E7C4] bg-white px-2 py-1.5 text-sm text-[#1A1A1A]"
+            >
+              {PAGE_SIZES.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+            per page
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setPage(currentPage - 1)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#F3E7C4] disabled:opacity-40"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            {pageList(currentPage, totalPages).map((p, i) =>
+              p === "..." ? (
+                <span key={`d${i}`} className="px-1 text-[#8A8F98]">
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPage(p)}
+                  className={`h-8 min-w-8 rounded-lg px-2 text-sm font-bold ${
+                    p === currentPage
+                      ? GOLD_BTN
+                      : "border border-[#F3E7C4] bg-white text-[#1A1A1A] hover:bg-[#FFEFA8]/60"
+                  }`}
+                >
+                  {p}
+                </button>
+              )
+            )}
+            <button
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() => setPage(currentPage + 1)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#F3E7C4] disabled:opacity-40"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* =========================================================
+         1. VIEW USER DETAILS MODAL
+      ========================================================= */}
+      {viewUser && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1204]/60 p-4 backdrop-blur-[2px]"
+          onClick={closeView}
+        >
+          <div
+            className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[#F3E7C4] bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-[#F3E7C4] bg-[#FFFDF7] px-6 py-4">
+              <div className="flex items-center gap-3">
+                <Avatar user={viewUser} size="h-12 w-12" text="text-lg" />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-black text-[#1A1A1A]">
+                      {viewUser.name || "User Details"}
+                    </h2>
+                    <Pill tone={viewUser._activity.tone}>
+                      {viewUser._activity.label}
+                    </Pill>
+                    <Pill tone={viewUser._kyc.tone}>
+                      {viewUser._kyc.label}
+                    </Pill>
+                  </div>
+                  <p className="text-xs text-[#6B7280]">
+                    {viewUser._activity.detail} • Registered on{" "}
+                    {fmtDate(viewUser.createdAt)}
+                  </p>
+                </div>
               </div>
+
               <div className="flex items-center gap-2">
-                <Clock size={15} className="shrink-0 text-[#6B7280]" />
-                <span>
-                  Last Login:{" "}
-                  <strong className="text-[#1A1A1A]">
-                    {activeUser.lastLogin?.time
-                      ? fmtDateTime(activeUser.lastLogin.time)
-                      : "Never"}
-                  </strong>
-                  {activeUser.lastLogin?.device && (
-                    <span className="ml-1 text-[11px] text-[#8A8F98]">
-                      ({activeUser.lastLogin.device} {activeUser.lastLogin.os ? `• ${activeUser.lastLogin.os}` : ""})
+                <button
+                  type="button"
+                  onClick={() => {
+                    openEdit(viewUser);
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ${OUTLINE_BTN}`}
+                >
+                  <Pencil size={13} /> Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    openDelete(viewUser);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#D93025]/30 bg-[#FDE8E6] px-3 py-1.5 text-xs font-bold text-[#D93025] hover:bg-[#D93025] hover:text-white"
+                >
+                  <Trash2 size={13} /> Delete
+                </button>
+                <button
+                  type="button"
+                  onClick={closeView}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-[#8A8F98] hover:bg-[#FFEFA8]"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Tabs */}
+            <div className="flex border-b border-[#F3E7C4] bg-[#FFF9E3]/50 px-6">
+              {[
+                { id: "overview", label: "Overview & Credentials", icon: <UserRound size={14} /> },
+                { id: "history", label: "Login History", icon: <History size={14} /> },
+                { id: "kyc", label: "KYC Documents", icon: <ShieldCheck size={14} /> },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setViewTab(t.id)}
+                  className={`inline-flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-bold transition ${
+                    viewTab === t.id
+                      ? "border-[#F7B500] text-[#9A5B00]"
+                      : "border-transparent text-[#6B7280] hover:text-[#1A1A1A]"
+                  }`}
+                >
+                  {t.icon}
+                  {t.label}
+                  {t.id === "history" && viewUser.loginHistory?.length > 0 && (
+                    <span className="rounded-full bg-[#FFEFA8] px-1.5 py-0.2 text-[10px] text-[#9A5B00]">
+                      {viewUser.loginHistory.length}
                     </span>
                   )}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => openEdit(activeUser)}
-                className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm ${OUTLINE_BTN}`}
-              >
-                <Pencil size={14} /> Edit User
-              </button>
-              <button
-                type="button"
-                onClick={() => toggleSuspend(activeUser)}
-                disabled={updateLoading}
-                className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-bold disabled:opacity-50 ${
-                  activeUser._suspended
-                    ? "border-[#12A36B]/40 text-[#12A36B] hover:bg-[#E6F6EF]"
-                    : "border-[#D93025]/40 text-[#D93025] hover:bg-[#FDE8E6]"
-                }`}
-              >
-                <Ban size={14} />{" "}
-                {activeUser._suspended ? "Activate" : "Suspend"}
-              </button>
-            </div>
-
-            {/* TABS */}
-            <div className="mt-4 grid grid-cols-4 gap-1 border-b border-[#F3E7C4] text-[11px] font-bold">
-              {[
-                ["kyc", "KYC Details"],
-                ["activity", "Activity"],
-                ["support", "Support"],
-                ["other", "Other Info"],
-              ].map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setTab(key)}
-                  className={`rounded-t-lg px-1 py-2 ${tab === key ? "bg-[#9A5B00] text-white" : "text-[#6B7280] hover:bg-[#FFF9E3]"}`}
-                >
-                  {label}
                 </button>
               ))}
             </div>
 
-            <div className="mt-3 max-h-[360px] space-y-2 overflow-y-auto pr-1">
-              {/* KYC TAB */}
-              {tab === "kyc" &&
-                (activeUser._kycDocs.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-[#6B7280]">
-                    KYC not submitted yet.
-                  </p>
-                ) : (
-                  activeUser._kycDocs.map((doc) => {
-                    const st = String(doc.status || "pending").toLowerCase();
-                    const meta =
-                      KYC_META[st === "verified" ? "approved" : st] ||
-                      KYC_META.pending;
-                    const link =
-                      doc.documentUrl ||
-                      doc.image ||
-                      doc.frontImage ||
-                      doc.file;
-                    return (
-                      <div
-                        key={doc._id}
-                        className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-sm font-bold text-[#1A1A1A]">
-                            {doc.documentType || doc.type || "KYC Document"}
-                          </p>
-                          <Pill tone={meta.tone}>{meta.label}</Pill>
-                        </div>
-                        {(doc.documentNumber || doc.number) && (
-                          <p className="mt-1 font-mono text-xs text-[#6B7280]">
-                            {doc.documentNumber || doc.number}
-                          </p>
-                        )}
-                        {link && (
-                          <a
-                            href={link}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-1 inline-block text-xs font-bold text-[#9A5B00] underline"
-                          >
-                            View document
-                          </a>
-                        )}
-                        {doc.rejectionReason && (
-                          <p className="mt-1 text-xs text-[#D93025]">
-                            Reason: {doc.rejectionReason}
-                          </p>
-                        )}
+            {/* Modal Body */}
+            <div className="flex-1 space-y-4 overflow-y-auto p-6">
+              {viewTab === "overview" && (
+                <>
+                  {/* Account Information Section */}
+                  <div>
+                    <h3 className="mb-2 text-xs font-black uppercase tracking-wider text-[#9A5B00]">
+                      Account Information
+                    </h3>
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                      <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
+                        <p className="text-[11px] font-semibold text-[#6B7280]">
+                          Full Name
+                        </p>
+                        <p className="mt-0.5 text-sm font-bold text-[#1A1A1A]">
+                          {viewUser.name || "Not available"}
+                        </p>
+                      </div>
 
-                        {st === "pending" && (
-                          <div className="mt-2">
-                            {rejectDocId === doc._id ? (
-                              <div className="space-y-2">
-                                <textarea
-                                  value={rejectReason}
-                                  onChange={(e) =>
-                                    setRejectReason(e.target.value)
-                                  }
-                                  rows={2}
-                                  placeholder="Rejection reason"
-                                  className={`${INPUT_CLS} py-2`}
-                                />
-                                <div className="flex gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setRejectDocId(null);
-                                      setRejectReason("");
-                                    }}
-                                    className={`flex-1 rounded-lg px-3 py-1.5 text-xs ${OUTLINE_BTN}`}
-                                  >
-                                    Cancel
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={
-                                      kycActionLoading || !rejectReason.trim()
-                                    }
-                                    onClick={() => handleReject(doc._id)}
-                                    className="flex-1 rounded-lg bg-[#D93025] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
-                                  >
-                                    Confirm Reject
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex gap-2">
-                                <button
-                                  type="button"
-                                  disabled={kycActionLoading}
-                                  onClick={() => handleApprove(doc._id)}
-                                  className={`flex-1 rounded-lg px-3 py-1.5 text-xs disabled:opacity-50 ${GOLD_BTN}`}
-                                >
-                                  Approve
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={kycActionLoading}
-                                  onClick={() => setRejectDocId(doc._id)}
-                                  className="flex-1 rounded-lg border border-[#D93025]/40 px-3 py-1.5 text-xs font-bold text-[#D93025] hover:bg-[#FDE8E6]"
-                                >
-                                  Reject
-                                </button>
-                              </div>
-                            )}
+                      <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
+                        <p className="text-[11px] font-semibold text-[#6B7280]">
+                          Mobile Number
+                        </p>
+                        <p className="mt-0.5 text-sm font-bold text-[#1A1A1A]">
+                          {viewUser.mobile || "Not available"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[11px] font-semibold text-[#6B7280]">
+                            User ID (_id)
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(viewUser._id, "id")}
+                            className="text-xs font-semibold text-[#9A5B00] hover:underline"
+                          >
+                            {copiedKey === "id" ? "Copied!" : "Copy"}
+                          </button>
+                        </div>
+                        <p className="mt-0.5 break-all font-mono text-xs font-bold text-[#1A1A1A]">
+                          {viewUser._id || "Not available"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[11px] font-semibold text-[#6B7280]">
+                            UUID
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(viewUser.uuid, "uuid")}
+                            className="text-xs font-semibold text-[#9A5B00] hover:underline"
+                          >
+                            {copiedKey === "uuid" ? "Copied!" : "Copy"}
+                          </button>
+                        </div>
+                        <p className="mt-0.5 break-all font-mono text-xs font-bold text-[#1A1A1A]">
+                          {viewUser.uuid || "Not available"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
+                        <p className="text-[11px] font-semibold text-[#6B7280]">
+                          Role
+                        </p>
+                        <p className="mt-0.5 text-sm font-bold capitalize text-[#1A1A1A]">
+                          {viewUser.role || "user"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
+                        <p className="text-[11px] font-semibold text-[#6B7280]">
+                          Registration Date
+                        </p>
+                        <p className="mt-0.5 text-sm font-bold text-[#1A1A1A]">
+                          {fmtDateTime(viewUser.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Password & Credentials Section */}
+                  <div>
+                    <h3 className="mb-2 text-xs font-black uppercase tracking-wider text-[#9A5B00]">
+                      Security & Credentials
+                    </h3>
+                    <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3.5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] font-semibold text-[#6B7280]">
+                            Password (Admin Authorized Access)
+                          </p>
+                          {viewUser.plainPassword ? (
+                            <p className="mt-1 font-mono text-base font-bold text-[#1A1A1A]">
+                              {showPlainPassword
+                                ? viewUser.plainPassword
+                                : "••••••••••••"}
+                            </p>
+                          ) : (
+                            <p className="mt-1 text-xs italic text-[#9CA3AF]">
+                              Not available (Encrypted / never stored in plain text)
+                            </p>
+                          )}
+                        </div>
+
+                        {viewUser.plainPassword && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowPlainPassword((prev) => !prev)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-[#F3E7C4] bg-white px-2.5 py-1.5 text-xs font-bold text-[#6B7280] hover:bg-[#FFEFA8]"
+                            >
+                              {showPlainPassword ? (
+                                <>
+                                  <EyeOff size={14} /> Hide
+                                </>
+                              ) : (
+                                <>
+                                  <Eye size={14} /> Reveal
+                                </>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                copyToClipboard(viewUser.plainPassword, "pass")
+                              }
+                              className="inline-flex items-center gap-1 rounded-lg border border-[#F3E7C4] bg-white px-2.5 py-1.5 text-xs font-bold text-[#6B7280] hover:bg-[#FFEFA8]"
+                            >
+                              {copiedKey === "pass" ? (
+                                <Check size={14} className="text-[#12A36B]" />
+                              ) : (
+                                <Copy size={14} />
+                              )}
+                              Copy
+                            </button>
                           </div>
                         )}
                       </div>
-                    );
-                  })
-                ))}
-
-              {/* ACTIVITY TAB */}
-              {tab === "activity" &&
-                activity.map((a) => (
-                  <div
-                    key={a.key}
-                    className="flex items-center gap-3 rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-2.5"
-                  >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#FFEFA8] text-[#9A5B00]">
-                      {a.icon}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-[#1A1A1A]">
-                        {a.title}
-                      </p>
-                      <p className="truncate text-xs text-[#6B7280]">{a.sub}</p>
-                      <p className="text-[11px] text-[#8A8F98]">
-                        {fmtDateTime(a.at)}
-                      </p>
                     </div>
                   </div>
-                ))}
 
-              {/* SUPPORT TAB */}
-              {tab === "support" && (
-                <p className="py-6 text-center text-sm text-[#6B7280]">
-                  No support history available.
-                </p>
+                  {/* Wallet & Referral Section */}
+                  <div>
+                    <h3 className="mb-2 text-xs font-black uppercase tracking-wider text-[#9A5B00]">
+                      Wallet & Referrals
+                    </h3>
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                      <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
+                        <p className="text-[11px] font-semibold text-[#6B7280]">
+                          Wallet Balance
+                        </p>
+                        <p className="mt-0.5 text-base font-black text-[#12A36B]">
+                          ₹{Number(viewUser.wallet || 0).toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[11px] font-semibold text-[#6B7280]">
+                            Referral Code
+                          </p>
+                          {viewUser.referralCode && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                copyToClipboard(viewUser.referralCode, "ref")
+                              }
+                              className="text-xs font-semibold text-[#9A5B00] hover:underline"
+                            >
+                              {copiedKey === "ref" ? "Copied!" : "Copy"}
+                            </button>
+                          )}
+                        </div>
+                        <p className="mt-0.5 font-mono text-sm font-bold text-[#1A1A1A]">
+                          {viewUser.referralCode || "Not generated"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
+                        <p className="text-[11px] font-semibold text-[#6B7280]">
+                          Referred By
+                        </p>
+                        <p className="mt-0.5 font-mono text-sm font-bold text-[#1A1A1A]">
+                          {viewUser.referralBy || viewUser.referral || "None"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Last Login & Device Details */}
+                  <div>
+                    <h3 className="mb-2 text-xs font-black uppercase tracking-wider text-[#9A5B00]">
+                      Last Login Details
+                    </h3>
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                      <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
+                        <p className="text-[11px] font-semibold text-[#6B7280]">
+                          Last Login Date & Time
+                        </p>
+                        <p className="mt-0.5 text-sm font-bold text-[#1A1A1A]">
+                          {viewUser.lastLogin?.time
+                            ? fmtDateTime(viewUser.lastLogin.time)
+                            : "Never logged in"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
+                        <p className="text-[11px] font-semibold text-[#6B7280]">
+                          IP Address
+                        </p>
+                        <p className="mt-0.5 font-mono text-sm font-bold text-[#1A1A1A]">
+                          {viewUser.lastLogin?.ip || "Not available"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
+                        <p className="text-[11px] font-semibold text-[#6B7280]">
+                          Device & OS
+                        </p>
+                        <p className="mt-0.5 text-sm font-bold text-[#1A1A1A]">
+                          {viewUser.lastLogin?.device || "Not available"}
+                          {viewUser.lastLogin?.os
+                            ? ` (${viewUser.lastLogin.os})`
+                            : ""}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
+                        <p className="text-[11px] font-semibold text-[#6B7280]">
+                          Browser
+                        </p>
+                        <p className="mt-0.5 text-sm font-bold text-[#1A1A1A]">
+                          {viewUser.lastLogin?.browser || "Not available"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
 
-              {/* OTHER TAB */}
-              {tab === "other" && (
-                <dl className="space-y-2 text-sm">
-                  {[
-                    ["Role", activeUser.role || "user"],
-                    ["UUID", activeUser.uuid || "-"],
-                    ["Total Tickets", activeUser._tickets.length],
-                    [
-                      "Total Spent",
-                      `₹${activeUser._tickets.reduce((s, t) => s + Number(t.amount || 0), 0).toFixed(2)}`,
-                    ],
-                    ["KYC Status", KYC_META[activeUser._kyc].label],
-                  ].map(([k, v]) => (
-                    <div
-                      key={k}
-                      className="flex justify-between gap-3 rounded-lg bg-[#FFF9E3] px-3 py-2"
-                    >
-                      <dt className="text-[#6B7280]">{k}</dt>
-                      <dd className="max-w-[170px] break-all text-right font-bold text-[#1A1A1A]">
-                        {v}
-                      </dd>
+              {/* Login History Tab */}
+              {viewTab === "history" && (
+                <div>
+                  <h3 className="mb-2 text-xs font-black uppercase tracking-wider text-[#9A5B00]">
+                    Recent Login History
+                  </h3>
+                  {Array.isArray(viewUser.loginHistory) &&
+                  viewUser.loginHistory.length > 0 ? (
+                    <div className="divide-y divide-[#F3E7C4] overflow-hidden rounded-xl border border-[#F3E7C4] bg-[#FFFDF7]">
+                      {viewUser.loginHistory.map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="flex flex-col justify-between gap-2 p-3 text-xs sm:flex-row sm:items-center"
+                        >
+                          <div>
+                            <span className="font-bold text-[#1A1A1A]">
+                              {fmtDateTime(item.time)}
+                            </span>
+                            <span className="ml-2 font-mono text-[11px] text-[#6B7280]">
+                              IP: {item.ip || "Not available"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[#8A8F98]">
+                            <span>{item.device || "Desktop"}</span>
+                            <span>•</span>
+                            <span>{item.os || "OS"}</span>
+                            <span>•</span>
+                            <span>{item.browser || "Browser"}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </dl>
+                  ) : (
+                    <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-8 text-center">
+                      <Clock size={28} className="mx-auto mb-2 text-[#8A8F98]" />
+                      <p className="text-sm font-bold text-[#1A1A1A]">
+                        No Login History Recorded
+                      </p>
+                      <p className="mt-1 text-xs text-[#6B7280]">
+                        The user has not logged in recently or session tracking was empty.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* KYC Documents Tab */}
+              {viewTab === "kyc" && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-[#9A5B00]">
+                      Submitted KYC Documents
+                    </h3>
+                    <Pill tone={viewUser._kyc.tone}>
+                      Current Status: {viewUser._kyc.label}
+                    </Pill>
+                  </div>
+
+                  {viewUser._kycDocs && viewUser._kycDocs.length > 0 ? (
+                    viewUser._kycDocs.map((doc) => {
+                      const st = String(doc.status || "pending").toLowerCase();
+                      const link =
+                        doc.documentUrl ||
+                        doc.image ||
+                        doc.frontImage ||
+                        doc.file;
+
+                      return (
+                        <div
+                          key={doc._id}
+                          className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3.5"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-bold text-[#1A1A1A]">
+                              {doc.documentType || doc.type || "Document"}
+                            </p>
+                            <Pill
+                              tone={
+                                st === "approved" || st === "verified"
+                                  ? "green"
+                                  : st === "rejected"
+                                  ? "red"
+                                  : "amber"
+                              }
+                            >
+                              {st}
+                            </Pill>
+                          </div>
+
+                          {(doc.documentNumber || doc.number) && (
+                            <p className="mt-1 font-mono text-xs text-[#6B7280]">
+                              Number: {doc.documentNumber || doc.number}
+                            </p>
+                          )}
+
+                          {link && (
+                            <a
+                              href={link}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-1 inline-block text-xs font-bold text-[#9A5B00] underline"
+                            >
+                              View uploaded file
+                            </a>
+                          )}
+
+                          {doc.rejectionReason && (
+                            <p className="mt-1 text-xs text-[#D93025]">
+                              Reason: {doc.rejectionReason}
+                            </p>
+                          )}
+
+                          {st === "pending" && (
+                            <div className="mt-3">
+                              {rejectDocId === doc._id ? (
+                                <div className="space-y-2">
+                                  <textarea
+                                    value={rejectReason}
+                                    onChange={(e) =>
+                                      setRejectReason(e.target.value)
+                                    }
+                                    rows={2}
+                                    placeholder="Enter rejection reason..."
+                                    className={`${INPUT_CLS} py-2`}
+                                  />
+                                  <div className="flex gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setRejectDocId(null);
+                                        setRejectReason("");
+                                      }}
+                                      className={`flex-1 rounded-lg px-3 py-1.5 text-xs ${OUTLINE_BTN}`}
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={
+                                        kycActionLoading || !rejectReason.trim()
+                                      }
+                                      onClick={() => handleRejectKyc(doc._id)}
+                                      className="flex-1 rounded-lg bg-[#D93025] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+                                    >
+                                      Confirm Reject
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={kycActionLoading}
+                                    onClick={() => handleApproveKyc(doc._id)}
+                                    className={`flex-1 rounded-lg px-3 py-1.5 text-xs disabled:opacity-50 ${GOLD_BTN}`}
+                                  >
+                                    Approve Document
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={kycActionLoading}
+                                    onClick={() => setRejectDocId(doc._id)}
+                                    className="flex-1 rounded-lg border border-[#D93025]/40 px-3 py-1.5 text-xs font-bold text-[#D93025] hover:bg-[#FDE8E6]"
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-8 text-center">
+                      <Shield size={28} className="mx-auto mb-2 text-[#8A8F98]" />
+                      <p className="text-sm font-bold text-[#1A1A1A]">
+                        No KYC Documents Submitted
+                      </p>
+                      <p className="mt-1 text-xs text-[#6B7280]">
+                        The user has not submitted any verification documents yet.
+                      </p>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-          </aside>
-        )}
-      </div>
 
-      {/* EDIT USER MODAL */}
+            {/* Modal Footer */}
+            <div className="flex justify-end border-t border-[#F3E7C4] bg-[#FFFDF7] px-6 py-3">
+              <button
+                type="button"
+                onClick={closeView}
+                className={`rounded-xl px-5 py-2 text-sm ${OUTLINE_BTN}`}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+         2. EDIT USER MODAL
+      ========================================================= */}
       {editUser && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1204]/60 p-4 backdrop-blur-[2px]"
@@ -1263,11 +1661,11 @@ const Users = () => {
             className="w-full max-w-md overflow-hidden rounded-2xl border border-[#F3E7C4] bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-[#F3E7C4] px-6 py-5">
+            <div className="flex items-center justify-between border-b border-[#F3E7C4] px-6 py-4">
               <div>
                 <h2 className="text-lg font-black text-[#1A1A1A]">Edit User</h2>
-                <p className="mt-1 text-xs text-[#6B7280]">
-                  Update user profile information
+                <p className="text-xs text-[#6B7280]">
+                  Update user profile, credentials and wallet
                 </p>
               </div>
               <button
@@ -1279,21 +1677,24 @@ const Users = () => {
               </button>
             </div>
 
-            <form onSubmit={submitEdit} className="space-y-5 p-6">
+            <form onSubmit={submitEdit} className="space-y-4 p-6">
               <div>
-                <label className="mb-2 block text-sm font-semibold">Name</label>
+                <label className="mb-1 block text-xs font-semibold text-[#1A1A1A]">
+                  Name *
+                </label>
                 <input
                   type="text"
                   required
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className={INPUT_CLS}
-                  placeholder="Enter user name"
+                  placeholder="Enter full name"
                 />
               </div>
+
               <div>
-                <label className="mb-2 block text-sm font-semibold">
-                  Mobile
+                <label className="mb-1 block text-xs font-semibold text-[#1A1A1A]">
+                  Mobile Number *
                 </label>
                 <input
                   type="tel"
@@ -1304,48 +1705,151 @@ const Users = () => {
                   placeholder="Enter mobile number"
                 />
               </div>
+
               <div>
-                <label className="mb-2 block text-sm font-semibold">
-                  New Password
+                <label className="mb-1 block text-xs font-semibold text-[#1A1A1A]">
+                  New Password (Optional)
                 </label>
                 <input
                   type="password"
                   minLength={6}
                   value={form.password}
-                  onChange={(e) =>
-                    setForm({ ...form, password: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
                   className={INPUT_CLS}
-                  placeholder="Leave empty to keep current"
+                  placeholder="Leave empty to keep current password"
                 />
-                <p className="mt-1.5 text-xs text-[#8A8F98]">
-                  Leave empty if you don't want to change the password.
+                <p className="mt-1 text-[11px] text-[#8A8F98]">
+                  Min 6 characters. Leave empty to keep existing password.
                 </p>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-[#1A1A1A]">
+                    Wallet Balance (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.wallet}
+                    onChange={(e) =>
+                      setForm({ ...form, wallet: Number(e.target.value) || 0 })
+                    }
+                    className={INPUT_CLS}
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-[#1A1A1A]">
+                    KYC Status
+                  </label>
+                  <select
+                    value={form.isKycVerified ? "true" : "false"}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        isKycVerified: e.target.value === "true",
+                      })
+                    }
+                    className={INPUT_CLS}
+                  >
+                    <option value="false">Pending</option>
+                    <option value="true">Verified</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
-                <label className="mb-2 block text-sm font-semibold">UUID</label>
-                <div className="break-all rounded-xl border border-[#F3E7C4] bg-[#FFF9E3] px-4 py-3 font-mono text-xs text-[#6B7280]">
+                <label className="mb-1 block text-xs font-semibold text-[#6B7280]">
+                  User UUID (System)
+                </label>
+                <div className="break-all rounded-xl border border-[#F3E7C4] bg-[#FFF9E3] px-3.5 py-2 font-mono text-xs text-[#6B7280]">
                   {editUser.uuid}
                 </div>
               </div>
-              <div className="flex gap-3 pt-2">
+
+              <div className="flex gap-3 pt-3">
                 <button
                   type="button"
                   onClick={closeEdit}
                   disabled={updateLoading}
-                  className={`flex-1 rounded-xl px-4 py-3 text-sm disabled:opacity-50 ${OUTLINE_BTN}`}
+                  className={`flex-1 rounded-xl px-4 py-2.5 text-sm disabled:opacity-50 ${OUTLINE_BTN}`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={updateLoading}
-                  className={`flex-1 rounded-xl px-4 py-3 text-sm disabled:opacity-50 ${GOLD_BTN}`}
+                  className={`flex-1 rounded-xl px-4 py-2.5 text-sm disabled:opacity-50 ${GOLD_BTN}`}
                 >
-                  {updateLoading ? "Updating..." : "Update User"}
+                  {updateLoading ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+         3. DELETE USER CONFIRMATION DIALOG
+      ========================================================= */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1204]/60 p-4 backdrop-blur-[2px]"
+          onClick={closeDelete}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-2xl border border-[#D93025]/30 bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-4 p-6">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#FDE8E6] text-[#D93025]">
+                <Trash2 size={24} />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <h3 className="text-lg font-black text-[#1A1A1A]">
+                  Delete User Account?
+                </h3>
+                <p className="mt-1 text-sm text-[#6B7280]">
+                  Are you sure you want to permanently delete user{" "}
+                  <strong className="text-[#1A1A1A]">
+                    {deleteTarget.name}
+                  </strong>{" "}
+                  ({deleteTarget.mobile})?
+                </p>
+
+                <div className="mt-3 rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-2.5 font-mono text-xs text-[#6B7280]">
+                  UUID: {deleteTarget.uuid}
+                </div>
+
+                <p className="mt-2 text-xs font-semibold text-[#D93025]">
+                  Warning: This action cannot be undone. All data associated with this user will be removed.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-[#F3E7C4] bg-[#FFFDF7] px-6 py-4">
+              <button
+                type="button"
+                onClick={closeDelete}
+                disabled={deleteLoading}
+                className={`rounded-xl px-4 py-2.5 text-sm ${OUTLINE_BTN}`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={deleteLoading}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#D93025] px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-[#B3261E] disabled:opacity-50"
+              >
+                <Trash2 size={16} />
+                {deleteLoading ? "Deleting..." : "Delete User"}
+              </button>
+            </div>
           </div>
         </div>
       )}
