@@ -11,7 +11,7 @@ const PRIZE_COUNTS = {
   first: 1,
   second: 10,
   third: 10,
-  fourth: 10, // adjust if different
+  fourth: 10,
   fifth: 100,
 };
 
@@ -20,7 +20,7 @@ const PRIZE_DIGITS = {
   second: 5, // last 5 digits
   third: 4,  // last 4 digits
   fourth: 4, // last 4 digits
-  fifth: 4,  // last 4 digits
+  fifth: 3,  // last 3 digits
 };
 
 // =====================================================
@@ -29,6 +29,12 @@ const PRIZE_DIGITS = {
 const validateLotteryNumber = (number) => {
   if (number === undefined || number === null) return false;
   return /^[a-zA-Z0-9]{8}$/.test(String(number).trim());
+};
+
+// 5th prize: allow 3-8 alphanumeric chars
+const validateShortLotteryNumber = (number) => {
+  if (number === undefined || number === null) return false;
+  return /^[a-zA-Z0-9]{3,8}$/.test(String(number).trim());
 };
 
 const validateSixDigitNumber = validateLotteryNumber;
@@ -70,7 +76,7 @@ const getLastNDigits = (number, n) => {
 // 2nd = 10 numbers (last 5 digits)
 // 3rd = 10 numbers (last 4 digits)
 // 4th = 10 numbers (last 4 digits)
-// 5th = 100 numbers (last 4 digits)
+// 5th = 100 numbers (last 3 digits)
 // =====================================================
 const getPrize = (userNumber, winningNumbers) => {
   const user = String(userNumber).trim().toUpperCase();
@@ -135,15 +141,15 @@ const getPrize = (userNumber, winningNumbers) => {
     }
   }
 
-  // 5TH PRIZE — LAST 4 DIGITS
+  // 5TH PRIZE — LAST 3 DIGITS
   if (Array.isArray(wn.fifth)) {
-    const userLast4 = getLastNDigits(user, 4);
+    const userLast3 = getLastNDigits(user, 3);
     for (const num of wn.fifth) {
       if (!num) continue;
-      if (getLastNDigits(num, 4) === userLast4) {
+      if (getLastNDigits(num, 3) === userLast3) {
         return {
           prize: "5th",
-          matchedDigits: 4,
+          matchedDigits: 3,
           matchedNumber: String(num).trim().toUpperCase(),
         };
       }
@@ -188,6 +194,9 @@ const buildUserPrizeObject = (prizeType, prizeAmounts) => {
 
 // =====================================================
 // VALIDATE WINNING NUMBERS OBJECT
+// 1st: exact 8 chars
+// 2nd/3rd/4th: exact 8 chars
+// 5th: 3-8 alphanumeric chars (flexible)
 // =====================================================
 const validateWinningNumbers = (winningNumbers) => {
   const errors = [];
@@ -197,13 +206,17 @@ const validateWinningNumbers = (winningNumbers) => {
   }
 
   // First: single 8-char
-  if (winningNumbers.first !== undefined && winningNumbers.first !== null && winningNumbers.first !== "") {
+  if (
+    winningNumbers.first !== undefined &&
+    winningNumbers.first !== null &&
+    winningNumbers.first !== ""
+  ) {
     if (!validateLotteryNumber(winningNumbers.first)) {
       errors.push("1st prize winning number must be 8 alphanumeric characters");
     }
   }
 
-  // Second: array of 10 (last 5 digit)
+  // Second: array (max 10), 8-char each
   if (winningNumbers.second !== undefined) {
     if (!Array.isArray(winningNumbers.second)) {
       errors.push("2nd prize winningNumbers.second must be an array");
@@ -218,7 +231,7 @@ const validateWinningNumbers = (winningNumbers) => {
     }
   }
 
-  // Third: array of 10 (last 4 digit)
+  // Third: array (max 10), 8-char each
   if (winningNumbers.third !== undefined) {
     if (!Array.isArray(winningNumbers.third)) {
       errors.push("3rd prize winningNumbers.third must be an array");
@@ -233,7 +246,7 @@ const validateWinningNumbers = (winningNumbers) => {
     }
   }
 
-  // Fourth: array of 10 (last 4 digit)
+  // Fourth: array (max 10), 8-char each
   if (winningNumbers.fourth !== undefined) {
     if (!Array.isArray(winningNumbers.fourth)) {
       errors.push("4th prize winningNumbers.fourth must be an array");
@@ -248,7 +261,7 @@ const validateWinningNumbers = (winningNumbers) => {
     }
   }
 
-  // Fifth: array of 100 (last 4 digit)
+  // Fifth: array (max 100), 3-8 alphanumeric chars each (flexible)
   if (winningNumbers.fifth !== undefined) {
     if (!Array.isArray(winningNumbers.fifth)) {
       errors.push("5th prize winningNumbers.fifth must be an array");
@@ -256,8 +269,10 @@ const validateWinningNumbers = (winningNumbers) => {
       errors.push(`5th prize allows max ${PRIZE_COUNTS.fifth} numbers`);
     } else {
       for (const n of winningNumbers.fifth) {
-        if (n && !validateLotteryNumber(n)) {
-          errors.push(`Invalid 5th prize number: ${n}`);
+        if (n && !validateShortLotteryNumber(n)) {
+          errors.push(
+            `Invalid 5th prize number: ${n} (3-8 alphanumeric chars)`
+          );
         }
       }
     }
@@ -270,7 +285,10 @@ const validateWinningNumbers = (winningNumbers) => {
 // NORMALIZE WINNING NUMBERS
 // =====================================================
 const normalizeWinningNumbers = (winningNumbers) => {
-  const src = typeof winningNumbers === "object" && winningNumbers !== null ? winningNumbers : {};
+  const src =
+    typeof winningNumbers === "object" && winningNumbers !== null
+      ? winningNumbers
+      : {};
 
   return {
     first: src.first ? String(src.first).trim().toUpperCase() : null,
@@ -823,7 +841,11 @@ const publishResult = async (req, res) => {
     console.error("Publish Result Error:", error);
     return res
       .status(500)
-      .json({ success: false, message: "Internal server error", error: error.message });
+      .json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
   }
 };
 
@@ -854,7 +876,11 @@ const unpublishResult = async (req, res) => {
     console.error("Unpublish Result Error:", error);
     return res
       .status(500)
-      .json({ success: false, message: "Internal server error", error: error.message });
+      .json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
   }
 };
 
@@ -1038,7 +1064,11 @@ const updateResult = async (req, res) => {
     console.error("Update Result Error:", error);
     return res
       .status(500)
-      .json({ success: false, message: "Internal server error", error: error.message });
+      .json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
   }
 };
 
@@ -1299,7 +1329,11 @@ const checkNumber = async (req, res) => {
     console.error("Check Number Error:", error);
     return res
       .status(500)
-      .json({ success: false, message: "Internal server error", error: error.message });
+      .json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
   }
 };
 
@@ -1321,7 +1355,11 @@ const getPublishedResults = async (req, res) => {
     console.error("Get Published Results Error:", error);
     return res
       .status(500)
-      .json({ success: false, message: "Internal server error", error: error.message });
+      .json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
   }
 };
 
@@ -1355,7 +1393,11 @@ const getPublishedResultByDate = async (req, res) => {
     console.error("Get Published Result By Date Error:", error);
     return res
       .status(500)
-      .json({ success: false, message: "Internal server error", error: error.message });
+      .json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
   }
 };
 
@@ -1376,6 +1418,7 @@ module.exports = {
   getPrize,
   getUnbetLotteryNumbers,
   validateLotteryNumber,
+  validateShortLotteryNumber,
   validateSixDigitNumber,
   PRIZE_COUNTS,
   PRIZE_DIGITS,

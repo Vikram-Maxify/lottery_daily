@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { ClipboardList, RefreshCw, Plus, X, Info, Trash2 } from "lucide-react";
+import { ClipboardList, RefreshCw, Plus, X, Info } from "lucide-react";
 
 import {
   getAllResults,
@@ -49,14 +49,14 @@ const NUMBER_FORMAT_HINT =
   "8 chars — 2 digits + 1 letter (A-Z) + 5 digits. Example: 12A12345";
 
 // =====================================================
-// PRIZE CONFIG
+// PRIZE CONFIG  ✅ 5th = last 3 digits
 // =====================================================
 const PRIZE_CONFIG = {
   first: { label: "1st Prize (8-digit exact)", max: 1, digits: 8 },
   second: { label: "2nd Prize (last 5 digits)", max: 10, digits: 5 },
   third: { label: "3rd Prize (last 4 digits)", max: 10, digits: 4 },
   fourth: { label: "4th Prize (last 4 digits)", max: 10, digits: 4 },
-  fifth: { label: "5th Prize (last 4 digits)", max: 100, digits: 4 },
+  fifth: { label: "5th Prize (last 3 digits)", max: 100, digits: 3 },
 };
 
 // =====================================================
@@ -132,8 +132,7 @@ const Results = () => {
   );
 
   const selectedConfig = useMemo(
-    () =>
-      configs.find((c) => String(c?._id) === String(formData.lotteryConfigId)),
+    () => configs.find((c) => String(c?._id) === String(formData.lotteryConfigId)),
     [configs, formData.lotteryConfigId]
   );
 
@@ -248,12 +247,10 @@ const Results = () => {
 
     const wn = formData.winningNumbers;
 
-    // 1st prize required
     if (!isValidWinningNumber(wn.first)) {
       return "1st prize number is required (e.g. 12A12345).";
     }
 
-    // Validate each array — filter non-empty
     for (const key of ["second", "third", "fourth", "fifth"]) {
       const arr = (wn[key] || []).filter((x) => String(x).trim() !== "");
       if (arr.length === 0) {
@@ -484,7 +481,7 @@ const Results = () => {
           </h2>
           <p className="mb-6 text-sm text-[#6B7280]">
             1st prize = 1 exact 8-digit number. 2nd = 10 numbers (last 5 digits).
-            3rd/4th = 10 numbers (last 4 digits). 5th = 100 numbers (last 4 digits).
+            3rd/4th = 10 numbers (last 4 digits). 5th = 100 numbers (last 3 digits).
           </p>
 
           <form onSubmit={handleCreate} className="grid grid-cols-1 gap-5 md:grid-cols-3">
@@ -567,11 +564,9 @@ const Results = () => {
                   {unbetLoading ? (
                     <p className="text-xs text-[#6B7280]">Loading...</p>
                   ) : unbetNumbers.length === 0 ? (
-                    <p className="text-xs text-[#6B7280]">
-                      No unbet numbers found.
-                    </p>
+                    <p className="text-xs text-[#6B7280]">No unbet numbers found.</p>
                   ) : (
-                    <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+                    <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto">
                       {unbetNumbers.map((n, i) => (
                         <span
                           key={i}
@@ -588,9 +583,7 @@ const Results = () => {
 
             {/* 1ST PRIZE — SINGLE INPUT */}
             <div className="md:col-span-3">
-              <label className={LABEL_CLS}>
-                1st Prize Number (8-digit exact)
-              </label>
+              <label className={LABEL_CLS}>1st Prize Number (8-digit exact)</label>
               <input
                 type="text"
                 value={formData.winningNumbers.first}
@@ -752,7 +745,7 @@ const Results = () => {
                       </td>
 
                       <td className="px-6 py-4">
-                        <div className="space-y-2 min-w-[240px]">
+                        <div className="min-w-[240px] space-y-2">
                           {firstNum && (
                             <div className="flex items-center gap-2">
                               <span className="rounded-md bg-[#FFE680] px-2 py-0.5 text-[10px] font-black text-[#9A5B00]">
