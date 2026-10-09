@@ -1,85 +1,24 @@
 const mongoose = require("mongoose");
 
-// =====================================================
-// WINNER SCHEMA
-// =====================================================
-
 const winnerSchema = new mongoose.Schema(
   {
-    userId: {
-      type: String,
-      required: true,
-      index: true,
-    },
-
-    // ✅ 8-char alphanumeric: 2 digits + 1 letter + 5 digits
-    userNumber: {
-      type: String,
-      required: true,
-      match: /^[0-9]{2}[A-Z][0-9]{5}$/,
-    },
-
-    amount: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    prizeType: {
-      type: String,
-      enum: ["1st", "2nd", "3rd","4th","5th", null],
-      required: true,
-    },
-
+    userId: { type: String, default: null },
+    userNumber: { type: String, required: true },
+    matchedNumber: { type: String, default: null },
+    amount: { type: Number, default: 0 },
+    prizeType: { type: String, enum: ["1st", "2nd", "3rd", "4th", "5th"], default: null },
+    matchedDigits: { type: Number, default: 0 },
     prize: {
-      first: {
-        type: Number,
-        default: 0,
-        min: 0,
-      },
-      second: {
-        type: Number,
-        default: 0,
-        min: 0,
-      },
-      third: {
-        type: Number,
-        default: 0,
-        min: 0,
-      },
+      first: { type: Number, default: 0 },
+      second: { type: Number, default: 0 },
+      third: { type: Number, default: 0 },
+      fourth: { type: Number, default: 0 },
+      fifth: { type: Number, default: 0 },
     },
-
-    prizeAmount: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    // 1st=8, 2nd=7, 3rd=5
-    matchedDigits: {
-      type: Number,
-      enum: [5, 7, 8,4,3],
-      required: true,
-    },
+    prizeAmount: { type: Number, default: 0 },
   },
-  {
-    _id: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
-  }
+  { _id: false }
 );
-
-// =====================================================
-// VIRTUAL: prizeLabel (backward-compat)
-// =====================================================
-
-winnerSchema.virtual("prizeLabel").get(function () {
-  return this.prizeType || null;
-});
-
-// =====================================================
-// LOTTERY RESULT SCHEMA
-// =====================================================
 
 const lotteryResultSchema = new mongoose.Schema(
   {
@@ -87,59 +26,28 @@ const lotteryResultSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "LotteryConfig",
       required: true,
-      index: true,
+    },
+    date: { type: String, required: true },
+
+    // NEW: multi winning numbers
+    winningNumbers: {
+      first: { type: String, default: null },
+      second: { type: [String], default: [] },
+      third: { type: [String], default: [] },
+      fourth: { type: [String], default: [] },
+      fifth: { type: [String], default: [] },
     },
 
-    date: {
-      type: Date,
-      required: true,
-      index: true,
-    },
+    // Legacy support (first prize only)
+    winningNumber: { type: String, default: null },
 
-    // ✅ 8-char alphanumeric: 2 digits + 1 letter + 5 digits
-    winningNumber: {
-      type: String,
-      required: true,
-      match: /^[0-9]{2}[A-Z][0-9]{5}$/,
-    },
-
-    winners: {
-      type: [winnerSchema],
-      default: [],
-    },
-
-    isPublished: {
-      type: Boolean,
-      default: false,
-    },
-
-    createdBy: {
-      type: String,
-      required: true,
-    },
+    winners: { type: [winnerSchema], default: [] },
+    isPublished: { type: Boolean, default: false },
+    createdBy: { type: String, default: null },
   },
-  {
-    timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
-  }
+  { timestamps: true }
 );
 
-// =====================================================
-// UNIQUE: Ek config ke ek date ka sirf ek result
-// =====================================================
+lotteryResultSchema.index({ lotteryConfigId: 1, date: 1 }, { unique: true });
 
-lotteryResultSchema.index(
-  {
-    lotteryConfigId: 1,
-    date: 1,
-  },
-  {
-    unique: true,
-  }
-);
-
-module.exports = mongoose.model(
-  "LotteryResult",
-  lotteryResultSchema
-);
+module.exports = mongoose.model("LotteryResult", lotteryResultSchema);

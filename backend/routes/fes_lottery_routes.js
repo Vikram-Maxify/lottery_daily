@@ -16,6 +16,7 @@ const {
   addBulkUserLotteryEntries,
   updateLotteryConfig,
   checkLotteryResult,
+  getNumbersWithoutBets,
 } = require("../controllers/festival_lottery");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -139,6 +140,9 @@ router.patch(
   adminMiddleware,
   updateEntryStatus
 );
+
+router.get("/:id/no-bets", getNumbersWithoutBets);
+
 
 router.delete(
   "/:id",
