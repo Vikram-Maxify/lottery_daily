@@ -63,6 +63,9 @@ const ALL_DATES_COUNT = 30;
 const BOTTOM_NAV_HEIGHT = 72;
 const PURCHASE_BAR_HEIGHT = 84;
 
+// ✅ Betting closes 1 hour before draw time
+const BET_CLOSE_OFFSET_MS = 60 * 60 * 1000;
+
 // Ticket format:
 // 2 digits + 1 alphabet + 5 digits
 // Example: 12B12345
@@ -363,7 +366,7 @@ const generateUniqueTickets = (count, existing = []) => {
 };
 
 // =====================================================
-// DRAW TIMESTAMP
+// DRAW TIMESTAMP (returns BET CLOSING TIME, 1 hour before draw)
 // =====================================================
 
 const getDrawTimestamp = (lotteryConfig) => {
@@ -403,7 +406,8 @@ const getDrawTimestamp = (lotteryConfig) => {
     return null;
   }
 
-  return Date.UTC(
+  // Draw time in UTC ms
+  const drawTimeUtcMs = Date.UTC(
     drawDate.getUTCFullYear(),
     drawDate.getUTCMonth(),
     drawDate.getUTCDate(),
@@ -412,6 +416,9 @@ const getDrawTimestamp = (lotteryConfig) => {
     0,
     0
   );
+
+  // ✅ Bet closes 1 hour before draw time
+  return drawTimeUtcMs - BET_CLOSE_OFFSET_MS;
 };
 
 // =====================================================
@@ -706,7 +713,7 @@ const BuyTicket = () => {
   }, [dispatch]);
 
   // ===================================================
-  // LIVE COUNTDOWN
+  // LIVE COUNTDOWN (counts down to BET CLOSING TIME)
   // ===================================================
 
   useEffect(() => {
@@ -834,11 +841,15 @@ const BuyTicket = () => {
   const priceText =
     `₹${TICKET_PRICE}/-`;
 
+  // ✅ Bet is closed once countdown expires
+  const isBetClosed =
+    countdown.available && countdown.expired;
+
   const countdownText =
     !countdown.available
       ? "Timer not available"
       : countdown.expired
-        ? "Draw started"
+        ? "Betting Closed"
         : `${
             countdown.days > 0
               ? `${countdown.days}d `
@@ -891,7 +902,7 @@ const BuyTicket = () => {
   // ===================================================
 
   const handleBoxChange = (index, event) => {
-    if (depositLoading) return;
+    if (depositLoading || isBetClosed) return;
 
     const raw = event.target.value;
 
@@ -961,7 +972,7 @@ const BuyTicket = () => {
   const handleBoxPaste = (event) => {
     event.preventDefault();
 
-    if (depositLoading) return;
+    if (depositLoading || isBetClosed) return;
 
     const code = sanitizeCode(
       event.clipboardData.getData("text")
@@ -980,7 +991,7 @@ const BuyTicket = () => {
   // ===================================================
 
   const handleRandomTicket = () => {
-    if (depositLoading) return;
+    if (depositLoading || isBetClosed) return;
     setTicketCode(randomCode());
     setLocalError("");
     setLocalSuccess("");
@@ -991,7 +1002,7 @@ const BuyTicket = () => {
   // ===================================================
 
   const handleClearTicket = () => {
-    if (depositLoading) return;
+    if (depositLoading || isBetClosed) return;
     setTicketCode("");
     focusBox(0);
     setLocalError("");
@@ -1003,7 +1014,7 @@ const BuyTicket = () => {
   // ===================================================
 
   const handleIncrease = () => {
-    if (depositLoading) return;
+    if (depositLoading || isBetClosed) return;
     setQuantity((q) =>
       Math.min(
         MAX_TICKETS,
@@ -1015,7 +1026,7 @@ const BuyTicket = () => {
   };
 
   const handleDecrease = () => {
-    if (depositLoading) return;
+    if (depositLoading || isBetClosed) return;
     setQuantity((q) =>
       Math.max(
         MIN_TICKETS,
@@ -1027,7 +1038,7 @@ const BuyTicket = () => {
   };
 
   const handleQuickSelect = (count) => {
-    if (depositLoading) return;
+    if (depositLoading || isBetClosed) return;
     setQuantity(count);
     setLocalError("");
     setLocalSuccess("");
@@ -1132,6 +1143,16 @@ const BuyTicket = () => {
         ) {
           return setLocalError(
             "Lottery is not active right now"
+          );
+        }
+
+        // -------------------------------------------------
+        // ✅ BET CLOSE CHECK (1 hour before draw)
+        // -------------------------------------------------
+
+        if (countdown.available && countdown.expired) {
+          return setLocalError(
+            "Betting is closed for this draw. Betting closes 1 hour before draw time."
           );
         }
 
@@ -1290,7 +1311,8 @@ const BuyTicket = () => {
     !lotteryConfig?.isActive ||
     !hasApiPrice ||
     !isTicketValid ||
-    quantity < MIN_TICKETS;
+    quantity < MIN_TICKETS ||
+    isBetClosed;
 
   const visibleDateChips =
     showAllDates
@@ -1362,7 +1384,9 @@ const BuyTicket = () => {
 
               <HeroFeature
                 icon={
-                  <Users size={21} />
+                  <Users
+                    size={21}
+                  />
                 }
                 l1="10 Tickets"
                 l2="per Draw"
@@ -1473,6 +1497,23 @@ const BuyTicket = () => {
         {kycLoading && (
           <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
             Checking KYC status...
+          </div>
+        )}
+
+        {/* =================================================
+            BETTING CLOSED BANNER
+        ================================================= */}
+
+        {isBetClosed && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            <p className="font-bold">
+              Betting Closed
+            </p>
+
+            <p className="mt-0.5 text-xs">
+              Betting for this draw closed 1 hour before the draw time.
+              Please wait for the next draw.
+            </p>
           </div>
         )}
 
@@ -1692,7 +1733,7 @@ const BuyTicket = () => {
               <button
                 type="button"
                 onClick={handleDecrease}
-                disabled={totalTickets <= MIN_TICKETS || depositLoading}
+                disabled={totalTickets <= MIN_TICKETS || depositLoading || isBetClosed}
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e9eef7] text-[22px] font-bold text-[#173e70] disabled:opacity-50"
               >
                 −
@@ -1703,7 +1744,7 @@ const BuyTicket = () => {
               <button
                 type="button"
                 onClick={handleIncrease}
-                disabled={totalTickets >= MAX_TICKETS || depositLoading}
+                disabled={totalTickets >= MAX_TICKETS || depositLoading || isBetClosed}
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e9eef7] text-[22px] font-bold text-[#173e70] disabled:opacity-50"
               >
                 +
@@ -1740,7 +1781,7 @@ const BuyTicket = () => {
                     key={count}
                     type="button"
                     onClick={() => handleQuickSelect(count)}
-                    disabled={depositLoading}
+                    disabled={depositLoading || isBetClosed}
                     className={`relative min-w-0 rounded-lg border px-0.5 py-2 text-center transition active:scale-95 disabled:opacity-60 ${
                       active
                         ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
@@ -1800,7 +1841,7 @@ const BuyTicket = () => {
               <button
                 type="button"
                 onClick={handleClearTicket}
-                disabled={!ticketCode || depositLoading}
+                disabled={!ticketCode || depositLoading || isBetClosed}
                 className="text-[12px] font-medium text-[#3d4468] underline underline-offset-2 disabled:opacity-40"
               >
                 Clear
@@ -1808,7 +1849,7 @@ const BuyTicket = () => {
               <button
                 type="button"
                 onClick={handleRandomTicket}
-                disabled={depositLoading}
+                disabled={depositLoading || isBetClosed}
                 className="flex items-center gap-1 rounded-lg border border-[#c9d3e3] bg-white px-3 py-1.5 text-[12px] font-bold text-[#173e70] disabled:opacity-50"
               >
                 <Shuffle size={13} /> Random
@@ -1836,7 +1877,7 @@ const BuyTicket = () => {
                   onKeyDown={(event) => handleBoxKeyDown(i, event)}
                   onPaste={handleBoxPaste}
                   onFocus={(event) => event.target.select()}
-                  disabled={depositLoading}
+                  disabled={depositLoading || isBetClosed}
                   inputMode={isLetter ? "text" : "numeric"}
                   autoCapitalize="characters"
                   autoComplete="off"
@@ -1897,7 +1938,10 @@ const BuyTicket = () => {
         <DailyNumbersSection
           mode="buyTicket"
           selectedNumber={ticketCode}
-          onSelectNumber={(code) => setTicketCode(code)}
+          onSelectNumber={(code) => {
+            if (isBetClosed) return;
+            setTicketCode(code);
+          }}
         />
 
         {/* =================================================
@@ -2168,10 +2212,12 @@ const BuyTicket = () => {
             <span className="truncate">
               {depositLoading
                 ? "Creating..."
-                : "Purchase Now"}
+                : isBetClosed
+                  ? "Betting Closed"
+                  : "Purchase Now"}
             </span>
 
-            {!depositLoading && (
+            {!depositLoading && !isBetClosed && (
               <ArrowRight
                 size={16}
                 className="shrink-0"
