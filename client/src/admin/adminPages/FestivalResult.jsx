@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { ClipboardList, RefreshCw, Plus, X, Pencil, Eye, Search } from "lucide-react";
+import {
+  ClipboardList,
+  RefreshCw,
+  Plus,
+  X,
+  Pencil,
+  Eye,
+  Search,
+  Info,
+} from "lucide-react";
 
 import {
   getAllFestivalResults,
@@ -13,6 +22,8 @@ import {
   clearFestivalResultMessage,
   clearFestivalResultSummary,
   clearFestivalCheckResult,
+  getFestivalUnbetNumbers,
+  clearFestivalUnbetNumbers,
 } from "../../reducer/slice/festivalResultReducer";
 
 import { getAllLotteryConfigs } from "../../reducer/slice/festivalLotteryReducer";
@@ -20,7 +31,6 @@ import { getAllLotteryConfigs } from "../../reducer/slice/festivalLotteryReducer
 /* =========================================================
    WINZOX THEME
 ========================================================= */
-
 const GOLD_BTN =
   "bg-gradient-to-b from-[#FFD83D] via-[#F7B500] to-[#E39A00] text-[#1A1204] font-extrabold shadow-[0_4px_10px_-3px_rgba(227,154,0,0.55),inset_0_1px_0_rgba(255,255,255,0.55)] hover:brightness-105";
 
@@ -43,7 +53,6 @@ const NUM_INPUT = `${INPUT_CLS} font-mono font-bold tracking-widest uppercase`;
 /* =========================================================
    HELPERS
 ========================================================= */
-
 const getName = (c) =>
   c?.marketName || c?.festivalName || c?.name || c?.title || "-";
 
@@ -52,6 +61,11 @@ const WINNING_NUMBER_REGEX = /^[0-9]{2}[A-Z][0-9]{5}$/;
 const isValidWinningNumber = (value) => {
   const v = String(value || "").trim().toUpperCase();
   return WINNING_NUMBER_REGEX.test(v);
+};
+
+const isValidShortNumber = (value) => {
+  const v = String(value || "").trim().toUpperCase();
+  return /^[A-Z0-9]{3,8}$/.test(v);
 };
 
 const cleanWinningNumber = (value) =>
@@ -64,22 +78,18 @@ const toDateOnlyString = (value) => {
   if (!value) return "";
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value))
     return value;
-
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
 };
 
 const formatDate = (date) => {
   if (!date) return "-";
-
   if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}/.test(date)) {
     const [y, m, d] = date.slice(0, 10).split("-");
     return `${d}/${m}/${y}`;
   }
-
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return "-";
-
   return d.toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "2-digit",
@@ -112,7 +122,28 @@ const Modal = ({ title, onClose, wide, children }) => (
   </div>
 );
 
-const EMPTY_FORM = { lotteryConfigId: "", date: "", winningNumber: "" };
+/* =========================================================
+   PRIZE CONFIG
+========================================================= */
+const PRIZE_CONFIG = {
+  first: { label: "1st Prize (8-digit exact)", max: 1, digits: 8 },
+  second: { label: "2nd Prize (last 5 digits)", max: 10, digits: 5 },
+  third: { label: "3rd Prize (last 4 digits)", max: 10, digits: 4 },
+  fourth: { label: "4th Prize (last 4 digits)", max: 10, digits: 4 },
+  fifth: { label: "5th Prize (last 3 digits)", max: 100, digits: 3 },
+};
+
+const EMPTY_FORM = {
+  lotteryConfigId: "",
+  date: "",
+  winningNumbers: {
+    first: "",
+    second: [""],
+    third: [""],
+    fourth: [""],
+    fifth: [""],
+  },
+};
 
 const FestivalResult = () => {
   const dispatch = useDispatch();
@@ -128,6 +159,8 @@ const FestivalResult = () => {
     success,
     error,
     message,
+    unbetNumbers = [],
+    unbetLoading,
   } = useSelector((state) => state.festivalResult);
 
   const { configs: festivals = [], loading: festivalLoading = false } =
@@ -145,13 +178,21 @@ const FestivalResult = () => {
 
   const [viewItem, setViewItem] = useState(null);
   const [editItem, setEditItem] = useState(null);
-  const [editNumber, setEditNumber] = useState("");
+  const [editNumbers, setEditNumbers] = useState(EMPTY_FORM.winningNumbers);
 
   const [showCheck, setShowCheck] = useState(false);
   const [checkForm, setCheckForm] = useState({
     userNumber: "",
-    winningNumber: "",
+    winningNumbers: {
+      first: "",
+      second: [""],
+      third: [""],
+      fourth: [""],
+      fifth: [""],
+    },
   });
+
+  const [showUnbet, setShowUnbet] = useState(false);
 
   const refreshFestivals = () => {
     dispatch(getAllLotteryConfigs());
@@ -172,12 +213,10 @@ const FestivalResult = () => {
     return () => clearTimeout(timer);
   }, [success, error, dispatch]);
 
-  // ✅ FIXED: Saare festivals dikhao (active filter hata diya)
-  // Backend `createResult` kisi bhi config ke saath kaam karta hai,
-  // chahe active ho ya inactive. Toh filter ki zaroorat nahi.
-  const selectableFestivals = useMemo(() => {
-    return Array.isArray(festivals) ? festivals : [];
-  }, [festivals]);
+  const selectableFestivals = useMemo(
+    () => (Array.isArray(festivals) ? festivals : []),
+    [festivals]
+  );
 
   const selectedFestival = useMemo(
     () =>
@@ -191,11 +230,26 @@ const FestivalResult = () => {
 
   const filteredResults = useMemo(() => {
     const q = search.trim().toLowerCase();
-
     return results.filter((item) => {
       const name = getName(item?.lotteryConfigId).toLowerCase();
+      const wn = item?.winningNumbers || {};
+      const allNums = [
+        wn.first,
+        ...(wn.second || []),
+        ...(wn.third || []),
+        ...(wn.fourth || []),
+        ...(wn.fifth || []),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
       const matchSearch =
-        !q || name.includes(q) || String(item?.winningNumber || "").includes(q);
+        !q ||
+        name.includes(q) ||
+        allNums.includes(q) ||
+        String(item?.winningNumber || "").toLowerCase().includes(q);
+
       const matchStatus =
         statusFilter === "all" ||
         (statusFilter === "published" ? item?.isPublished : !item?.isPublished);
@@ -204,77 +258,173 @@ const FestivalResult = () => {
     });
   }, [results, search, statusFilter]);
 
-  /* ---------------- CREATE ---------------- */
+  /* ---------------- FORM ---------------- */
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  const handleConfigChange = (value) => {
+    const cfg = festivals.find((c) => String(c?._id) === String(value));
+    setFormError("");
+    setFormData({
+      lotteryConfigId: value,
+      date: cfg ? toDateOnlyString(cfg.drawDate) : "",
+      winningNumbers: {
+        first: "",
+        second: [""],
+        third: [""],
+        fourth: [""],
+        fifth: [""],
+      },
+    });
+    dispatch(clearFestivalUnbetNumbers());
+    setShowUnbet(false);
+  };
+
+  const handleFirstChange = (value) => {
+    const cleaned = cleanWinningNumber(value);
+    setFormData((prev) => ({
+      ...prev,
+      winningNumbers: { ...prev.winningNumbers, first: cleaned },
+    }));
     if (formError) setFormError("");
+  };
 
-    if (name === "lotteryConfigId") {
-      const cfg = festivals.find((c) => String(c?._id) === String(value));
-      setFormData({
-        lotteryConfigId: value,
-        date: cfg ? toDateOnlyString(cfg.drawDate) : "",
-        winningNumber: "",
-      });
-      return;
-    }
-
-    if (name === "winningNumber") {
-      setFormData((prev) => ({
+  const handleArrayChange = (prizeKey, index, value) => {
+    const cleaned = cleanWinningNumber(value);
+    setFormData((prev) => {
+      const arr = [...prev.winningNumbers[prizeKey]];
+      arr[index] = cleaned;
+      return {
         ...prev,
-        winningNumber: cleanWinningNumber(value),
-      }));
+        winningNumbers: { ...prev.winningNumbers, [prizeKey]: arr },
+      };
+    });
+    if (formError) setFormError("");
+  };
+
+  const addArrayItem = (prizeKey) => {
+    const { max } = PRIZE_CONFIG[prizeKey];
+    setFormData((prev) => {
+      const arr = [...prev.winningNumbers[prizeKey]];
+      if (arr.length >= max) return prev;
+      arr.push("");
+      return {
+        ...prev,
+        winningNumbers: { ...prev.winningNumbers, [prizeKey]: arr },
+      };
+    });
+  };
+
+  const removeArrayItem = (prizeKey, index) => {
+    setFormData((prev) => {
+      const arr = [...prev.winningNumbers[prizeKey]];
+      if (arr.length <= 1) arr[0] = "";
+      else arr.splice(index, 1);
+      return {
+        ...prev,
+        winningNumbers: { ...prev.winningNumbers, [prizeKey]: arr },
+      };
+    });
+  };
+
+  const handleFetchUnbet = () => {
+    if (!formData.lotteryConfigId) {
+      setFormError("Select a festival first.");
       return;
     }
+    setShowUnbet(true);
+    dispatch(getFestivalUnbetNumbers(formData.lotteryConfigId));
+  };
 
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const validateForm = () => {
+    if (!formData.lotteryConfigId) return "Please select a festival lottery.";
+    if (!formData.date) return "Please select the result date.";
+
+    const wn = formData.winningNumbers;
+
+    if (!isValidWinningNumber(wn.first)) {
+      return "1st prize number is required (e.g. 12A12345).";
+    }
+
+    for (const key of ["second", "third", "fourth"]) {
+      const arr = (wn[key] || []).filter((x) => String(x).trim() !== "");
+      if (arr.length === 0) {
+        return `${PRIZE_CONFIG[key].label}: at least 1 number required.`;
+      }
+      if (arr.length > PRIZE_CONFIG[key].max) {
+        return `${PRIZE_CONFIG[key].label}: max ${PRIZE_CONFIG[key].max} numbers allowed.`;
+      }
+      for (const n of arr) {
+        if (!isValidWinningNumber(n)) {
+          return `Invalid number in ${PRIZE_CONFIG[key].label}: ${n}`;
+        }
+      }
+    }
+
+    // 5th prize — 3-8 alphanumeric
+    const fifthArr = (wn.fifth || []).filter((x) => String(x).trim() !== "");
+    if (fifthArr.length === 0) {
+      return "5th Prize: at least 1 number required.";
+    }
+    if (fifthArr.length > PRIZE_CONFIG.fifth.max) {
+      return `5th Prize: max ${PRIZE_CONFIG.fifth.max} numbers allowed.`;
+    }
+    for (const n of fifthArr) {
+      if (!isValidShortNumber(n)) {
+        return `Invalid 5th prize number: ${n} (3-8 alphanumeric chars)`;
+      }
+    }
+
+    return null;
   };
 
   const handleCreate = async (e) => {
     e.preventDefault();
 
-    if (!formData.lotteryConfigId)
-      return setFormError("Please select a festival lottery.");
-
-    if (!formData.date) return setFormError("Please select the result date.");
-
-    if (!isValidWinningNumber(formData.winningNumber)) {
-      return setFormError(
-        "Winning number must be 8 characters: 2 digits + 1 letter + 5 digits (e.g. 12A12345)."
-      );
-    }
-
+    const err = validateForm();
+    if (err) return setFormError(err);
     setFormError("");
 
-    const response = await dispatch(
-      createFestivalResult({
-        ...formData,
-        winningNumber: formData.winningNumber.toUpperCase(),
-      })
-    );
+    const wn = formData.winningNumbers;
+    const payload = {
+      lotteryConfigId: formData.lotteryConfigId,
+      date: formData.date,
+      winningNumbers: {
+        first: wn.first.toUpperCase(),
+        second: wn.second.filter(Boolean).map((n) => n.toUpperCase()),
+        third: wn.third.filter(Boolean).map((n) => n.toUpperCase()),
+        fourth: wn.fourth.filter(Boolean).map((n) => n.toUpperCase()),
+        fifth: wn.fifth.filter(Boolean).map((n) => n.toUpperCase()),
+      },
+    };
+
+    const response = await dispatch(createFestivalResult(payload));
 
     if (createFestivalResult.fulfilled.match(response)) {
       setFormData(EMPTY_FORM);
       setShowCreate(false);
+      setShowUnbet(false);
+      dispatch(clearFestivalUnbetNumbers());
       refreshFestivals();
     } else if (createFestivalResult.rejected.match(response)) {
-      setFormError(
-        response.payload?.message || "Failed to create result"
-      );
+      setFormError(response.payload?.message || "Failed to create result");
     }
   };
 
   /* ---------------- EDIT ---------------- */
 
   const handleEditSave = async () => {
-    if (!isValidWinningNumber(editNumber)) return;
+    const wn = editNumbers;
+    const payload = {
+      winningNumbers: {
+        first: (wn.first || "").toUpperCase(),
+        second: wn.second.filter(Boolean).map((n) => n.toUpperCase()),
+        third: wn.third.filter(Boolean).map((n) => n.toUpperCase()),
+        fourth: wn.fourth.filter(Boolean).map((n) => n.toUpperCase()),
+        fifth: wn.fifth.filter(Boolean).map((n) => n.toUpperCase()),
+      },
+    };
 
     const res = await dispatch(
-      updateFestivalResult({
-        id: editItem._id,
-        data: { winningNumber: editNumber.toUpperCase() },
-      })
+      updateFestivalResult({ id: editItem._id, data: payload })
     );
 
     if (updateFestivalResult.fulfilled.match(res)) {
@@ -304,7 +454,6 @@ const FestivalResult = () => {
       "Delete this result? Winners ka prize unke wallet se wapas kat jayega."
     );
     if (!ok) return;
-
     await runWithId(setDeletingIds, id, deleteFestivalResult(id));
     refreshFestivals();
   };
@@ -313,17 +462,80 @@ const FestivalResult = () => {
 
   const closeCheck = () => {
     setShowCheck(false);
-    setCheckForm({ userNumber: "", winningNumber: "" });
+    setCheckForm({
+      userNumber: "",
+      winningNumbers: {
+        first: "",
+        second: [""],
+        third: [""],
+        fourth: [""],
+        fifth: [""],
+      },
+    });
     dispatch(clearFestivalCheckResult());
   };
 
   const runCheck = () => {
-    if (
-      !isValidWinningNumber(checkForm.userNumber) ||
-      !isValidWinningNumber(checkForm.winningNumber)
-    )
-      return;
-    dispatch(checkFestivalNumber(checkForm));
+    if (!isValidWinningNumber(checkForm.userNumber)) return;
+    dispatch(
+      checkFestivalNumber({
+        userNumber: checkForm.userNumber,
+        winningNumbers: checkForm.winningNumbers,
+      })
+    );
+  };
+
+  /* ---------------- RENDER ARRAY GROUP ---------------- */
+
+  const renderArrayGroup = (prizeKey, source, onChange, onAdd, onRemove) => {
+    const { label, max } = PRIZE_CONFIG[prizeKey];
+    const arr = source[prizeKey] || [""];
+    const filled = arr.filter(Boolean).length;
+
+    return (
+      <div className="md:col-span-3">
+        <div className="mb-2 flex items-center justify-between">
+          <label className={LABEL_CLS + " !mb-0"}>
+            {label}{" "}
+            <span className="text-xs font-medium text-[#8A8F98]">
+              ({filled}/{max})
+            </span>
+          </label>
+          <button
+            type="button"
+            onClick={onAdd}
+            disabled={arr.length >= max}
+            className="inline-flex items-center gap-1 rounded-lg border border-[#F2B705] bg-[#FFEFA8] px-3 py-1.5 text-xs font-bold text-[#9A5B00] transition hover:bg-[#FFE680] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus size={12} /> Add
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+          {arr.map((val, idx) => (
+            <div key={idx} className="relative">
+              <input
+                type="text"
+                value={val}
+                onChange={(e) => onChange(idx, e.target.value)}
+                maxLength={8}
+                placeholder={`#${idx + 1}`}
+                className={`${INPUT_CLS} !py-2 font-mono font-bold tracking-widest uppercase`}
+              />
+              {arr.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => onRemove(idx)}
+                  className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border border-[#D93025]/30 bg-[#FDE8E6] text-[#D93025] transition hover:bg-[#FAD2CE]"
+                  title="Remove"
+                >
+                  <X size={10} strokeWidth={3} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   /* ---------------- RENDER ---------------- */
@@ -337,7 +549,7 @@ const FestivalResult = () => {
             Festival Lottery Results
           </h1>
           <p className="mt-1 text-sm text-[#6B7280]">
-            Manage festival lottery results.
+            Manage festival lottery results with 5 prize tiers.
           </p>
         </div>
 
@@ -390,7 +602,6 @@ const FestivalResult = () => {
           {message}
         </div>
       )}
-
       {error && (
         <div className="rounded-xl border border-[#D93025]/30 bg-[#FDE8E6] px-4 py-3 text-sm font-medium text-[#B3261E]">
           {error}
@@ -402,7 +613,7 @@ const FestivalResult = () => {
         <div className={`p-5 ${CARD_CLS}`}>
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-black text-[#1A1A1A]">
-              Result summary: {summary.winningNumber} ({summary.date})
+              Result summary — {summary.date}
             </h3>
             <button
               type="button"
@@ -412,13 +623,14 @@ const FestivalResult = () => {
               <X size={18} />
             </button>
           </div>
-
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-8">
             {[
               ["Entries", summary.totalUsers],
-              ["1st prize", summary.firstPrize],
-              ["2nd prize", summary.secondPrize],
-              ["3rd prize", summary.thirdPrize],
+              ["1st", summary.firstPrize],
+              ["2nd", summary.secondPrize],
+              ["3rd", summary.thirdPrize],
+              ["4th", summary.fourthPrize],
+              ["5th", summary.fifthPrize],
               ["Lost", summary.lost],
               ["Prize paid", money(summary.totalPrizePaid)],
             ].map(([label, value]) => (
@@ -431,10 +643,6 @@ const FestivalResult = () => {
               </div>
             ))}
           </div>
-
-          <p className="mt-3 text-xs text-[#6B7280]">
-            Result abhi unpublished hai. Table se Publish karo.
-          </p>
         </div>
       )}
 
@@ -445,8 +653,8 @@ const FestivalResult = () => {
             Create Festival Result
           </h2>
           <p className="mb-6 text-sm text-[#6B7280]">
-            Select the festival lottery, then enter the 8-character winning
-            number.
+            1st = 1 exact 8-digit number. 2nd = 10 (last 5 digits). 3rd/4th =
+            10 (last 4 digits). 5th = 100 (last 3 digits).
           </p>
 
           <form
@@ -454,21 +662,15 @@ const FestivalResult = () => {
             className="grid grid-cols-1 gap-5 md:grid-cols-3"
           >
             <div>
-              <label htmlFor="lotteryConfigId" className={LABEL_CLS}>
-                Festival Lottery
-              </label>
+              <label className={LABEL_CLS}>Festival Lottery</label>
               <select
-                id="lotteryConfigId"
-                name="lotteryConfigId"
                 value={formData.lotteryConfigId}
-                onChange={handleChange}
+                onChange={(e) => handleConfigChange(e.target.value)}
                 disabled={festivalLoading}
                 className={INPUT_CLS}
               >
                 <option value="">
-                  {festivalLoading
-                    ? "Loading festivals..."
-                    : "Select Festival Lottery"}
+                  {festivalLoading ? "Loading..." : "Select Festival Lottery"}
                 </option>
                 {selectableFestivals.map((c) => (
                   <option key={c._id} value={c._id}>
@@ -480,65 +682,121 @@ const FestivalResult = () => {
                   </option>
                 ))}
               </select>
-
-              {selectableFestivals.length === 0 && !festivalLoading && (
-                <p className="mt-2 text-xs font-medium text-[#D93025]">
-                  No festival lottery found. Please create one first.
-                </p>
-              )}
             </div>
 
             <div>
-              <label htmlFor="date" className={LABEL_CLS}>
-                Result Date
-              </label>
-              {hasDrawDate || !selectedFestival ? (
-                <input
-                  id="date"
-                  type="text"
-                  readOnly
-                  disabled
-                  value={formData.date ? formatDate(formData.date) : ""}
-                  placeholder="Select festival first"
-                  className={INPUT_CLS}
-                />
-              ) : (
-                <input
-                  id="date"
-                  type="date"
-                  name="date"
-                  value={formData.date}
-                  onChange={handleChange}
-                  className={INPUT_CLS}
-                />
-              )}
-              <p className="mt-2 text-xs text-[#6B7280]">
-                {hasDrawDate || !selectedFestival
-                  ? "Draw date festival se automatically aati hai."
-                  : "Is festival me draw date nahi hai, date khud chuno."}
-              </p>
+              <label className={LABEL_CLS}>Result Date</label>
+              <input
+                type="text"
+                readOnly
+                disabled
+                value={formData.date ? formatDate(formData.date) : ""}
+                placeholder="Select festival first"
+                className={INPUT_CLS}
+              />
             </div>
 
-            <div>
-              <label htmlFor="winningNumber" className={LABEL_CLS}>
-                Winning Number
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={handleFetchUnbet}
+                disabled={!formData.lotteryConfigId || unbetLoading}
+                className={`w-full rounded-xl px-4 py-3 text-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${OUTLINE_BTN}`}
+              >
+                {unbetLoading ? "Loading..." : "Show Unbet Numbers"}
+              </button>
+            </div>
+
+            {showUnbet && (
+              <div className="md:col-span-3">
+                <div className="rounded-xl border border-[#F3E7C4] bg-[#FFF9E3] p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-[#1A1A1A]">
+                      Unbet Numbers ({unbetNumbers.length})
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUnbet(false);
+                        dispatch(clearFestivalUnbetNumbers());
+                      }}
+                      className="text-xs font-bold text-[#9A5B00] hover:underline"
+                    >
+                      Hide
+                    </button>
+                  </div>
+                  {unbetLoading ? (
+                    <p className="text-xs text-[#6B7280]">Loading...</p>
+                  ) : unbetNumbers.length === 0 ? (
+                    <p className="text-xs text-[#6B7280]">
+                      No unbet numbers found.
+                    </p>
+                  ) : (
+                    <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto">
+                      {unbetNumbers.map((n, i) => (
+                        <span
+                          key={i}
+                          className="rounded-lg bg-white px-2.5 py-1 font-mono text-xs font-bold text-[#1A1204] ring-1 ring-[#F2B705]/60"
+                        >
+                          {n}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 1st */}
+            <div className="md:col-span-3">
+              <label className={LABEL_CLS}>
+                1st Prize Number (8-digit exact)
               </label>
               <input
-                id="winningNumber"
                 type="text"
-                inputMode="text"
-                name="winningNumber"
-                value={formData.winningNumber}
-                onChange={handleChange}
+                value={formData.winningNumbers.first}
+                onChange={(e) => handleFirstChange(e.target.value)}
                 maxLength={8}
                 placeholder="e.g. 12A12345"
                 className={NUM_INPUT}
               />
-              <p className="mt-2 text-xs text-[#6B7280]">
-                {formData.winningNumber.length}/8 characters — 2 digits, 1
-                letter, 5 digits
+              <p className="mt-2 flex items-start gap-1.5 text-xs text-[#6B7280]">
+                <Info size={12} className="mt-0.5 shrink-0" />
+                <span>
+                  8 chars — 2 digits + 1 letter + 5 digits (e.g. 12A12345)
+                </span>
               </p>
             </div>
+
+            {/* 2nd - 5th */}
+            {renderArrayGroup(
+              "second",
+              formData.winningNumbers,
+              (idx, v) => handleArrayChange("second", idx, v),
+              () => addArrayItem("second"),
+              (idx) => removeArrayItem("second", idx)
+            )}
+            {renderArrayGroup(
+              "third",
+              formData.winningNumbers,
+              (idx, v) => handleArrayChange("third", idx, v),
+              () => addArrayItem("third"),
+              (idx) => removeArrayItem("third", idx)
+            )}
+            {renderArrayGroup(
+              "fourth",
+              formData.winningNumbers,
+              (idx, v) => handleArrayChange("fourth", idx, v),
+              () => addArrayItem("fourth"),
+              (idx) => removeArrayItem("fourth", idx)
+            )}
+            {renderArrayGroup(
+              "fifth",
+              formData.winningNumbers,
+              (idx, v) => handleArrayChange("fifth", idx, v),
+              () => addArrayItem("fifth"),
+              (idx) => removeArrayItem("fifth", idx)
+            )}
 
             {selectedFestival && (
               <div className="md:col-span-3">
@@ -638,16 +896,15 @@ const FestivalResult = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px]">
+            <table className="w-full min-w-[1200px]">
               <thead className="bg-[#FFF9E3]">
                 <tr>
                   {[
                     "#",
                     "Festival",
                     "Draw Date",
-                    "Draw Time",
                     "Result Date",
-                    "Winning Number",
+                    "Winning Numbers",
                     "Winners",
                     "Prize Paid",
                     "Status",
@@ -672,35 +929,113 @@ const FestivalResult = () => {
                     0
                   );
 
+                  const wn = item?.winningNumbers || {};
+                  const firstNum = wn.first || item?.winningNumber || null;
+                  const secondArr = Array.isArray(wn.second) ? wn.second : [];
+                  const thirdArr = Array.isArray(wn.third) ? wn.third : [];
+                  const fourthArr = Array.isArray(wn.fourth) ? wn.fourth : [];
+                  const fifthArr = Array.isArray(wn.fifth) ? wn.fifth : [];
+
                   return (
                     <tr
                       key={item?._id || index}
-                      className="transition hover:bg-[#FFFDF7]"
+                      className="align-top transition hover:bg-[#FFFDF7]"
                     >
                       <td className="whitespace-nowrap px-6 py-4 text-sm text-[#8A8F98]">
                         {index + 1}
                       </td>
-
                       <td className="whitespace-nowrap px-6 py-4 font-semibold text-[#1A1A1A]">
                         {getName(config)}
                       </td>
-
                       <td className="whitespace-nowrap px-6 py-4 text-sm text-[#1A1A1A]">
                         {formatDate(config?.drawDate)}
                       </td>
-
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-[#1A1A1A]">
-                        {config?.drawTime || "-"}
-                      </td>
-
                       <td className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-[#1A1A1A]">
                         {formatDate(item?.date)}
                       </td>
 
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <span className="rounded-full bg-[#FFEFA8] px-3.5 py-1.5 font-mono text-sm font-black tracking-widest text-[#1A1204] ring-1 ring-[#F2B705]/60">
-                          {item?.winningNumber || "-"}
-                        </span>
+                      <td className="px-6 py-4">
+                        <div className="min-w-[240px] space-y-2">
+                          {firstNum && (
+                            <div className="flex items-center gap-2">
+                              <span className="rounded-md bg-[#FFE680] px-2 py-0.5 text-[10px] font-black text-[#9A5B00]">
+                                1st
+                              </span>
+                              <span className="rounded-full bg-[#FFEFA8] px-3 py-1 font-mono text-xs font-black tracking-widest text-[#1A1204] ring-1 ring-[#F2B705]/60">
+                                {firstNum}
+                              </span>
+                            </div>
+                          )}
+
+                          {secondArr.length > 0 && (
+                            <div className="flex flex-wrap items-start gap-1">
+                              <span className="rounded-md bg-[#E6F6EF] px-2 py-0.5 text-[10px] font-black text-[#0E7A52]">
+                                2nd ({secondArr.length})
+                              </span>
+                              {secondArr.map((n, i) => (
+                                <span
+                                  key={i}
+                                  className="rounded bg-[#F5F1E4] px-2 py-0.5 font-mono text-[10px] font-bold text-[#1A1204]"
+                                >
+                                  {n}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {thirdArr.length > 0 && (
+                            <div className="flex flex-wrap items-start gap-1">
+                              <span className="rounded-md bg-[#E0F0FF] px-2 py-0.5 text-[10px] font-black text-[#1E5FA8]">
+                                3rd ({thirdArr.length})
+                              </span>
+                              {thirdArr.map((n, i) => (
+                                <span
+                                  key={i}
+                                  className="rounded bg-[#F5F1E4] px-2 py-0.5 font-mono text-[10px] font-bold text-[#1A1204]"
+                                >
+                                  {n}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {fourthArr.length > 0 && (
+                            <div className="flex flex-wrap items-start gap-1">
+                              <span className="rounded-md bg-[#F3E7FF] px-2 py-0.5 text-[10px] font-black text-[#6B2FA8]">
+                                4th ({fourthArr.length})
+                              </span>
+                              {fourthArr.map((n, i) => (
+                                <span
+                                  key={i}
+                                  className="rounded bg-[#F5F1E4] px-2 py-0.5 font-mono text-[10px] font-bold text-[#1A1204]"
+                                >
+                                  {n}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {fifthArr.length > 0 && (
+                            <div className="flex flex-wrap items-start gap-1">
+                              <span className="rounded-md bg-[#FFE8E0] px-2 py-0.5 text-[10px] font-black text-[#A83E1E]">
+                                5th ({fifthArr.length})
+                              </span>
+                              {fifthArr.slice(0, 8).map((n, i) => (
+                                <span
+                                  key={i}
+                                  className="rounded bg-[#F5F1E4] px-2 py-0.5 font-mono text-[10px] font-bold text-[#1A1204]"
+                                >
+                                  {n}
+                                </span>
+                              ))}
+                              {fifthArr.length > 8 && (
+                                <span className="text-[10px] font-bold text-[#8A8F98]">
+                                  +{fifthArr.length - 8} more
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </td>
 
                       <td className="whitespace-nowrap px-6 py-4 text-sm text-[#1A1A1A]">
@@ -739,13 +1074,23 @@ const FestivalResult = () => {
                             type="button"
                             onClick={() => {
                               setEditItem(item);
-                              setEditNumber(item.winningNumber || "");
+                              setEditNumbers({
+                                first: wn.first || item?.winningNumber || "",
+                                second:
+                                  secondArr.length > 0 ? [...secondArr] : [""],
+                                third:
+                                  thirdArr.length > 0 ? [...thirdArr] : [""],
+                                fourth:
+                                  fourthArr.length > 0 ? [...fourthArr] : [""],
+                                fifth:
+                                  fifthArr.length > 0 ? [...fifthArr] : [""],
+                              });
                             }}
                             disabled={published}
                             title={
                               published
                                 ? "Unpublish result before editing"
-                                : "Edit winning number"
+                                : "Edit winning numbers"
                             }
                             className={`rounded-lg px-3 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50 ${OUTLINE_BTN}`}
                           >
@@ -805,29 +1150,28 @@ const FestivalResult = () => {
             viewItem.date
           )}`}
         >
-          <p className="mb-4 text-sm text-[#6B7280]">
-            Winning number:{" "}
-            <span className="font-mono text-base font-black tracking-widest text-[#1A1A1A]">
-              {viewItem.winningNumber}
-            </span>
-          </p>
-
           {(viewItem.winners || []).length === 0 ? (
             <p className="py-8 text-center text-sm text-[#6B7280]">
               Is result mein koi winner nahi hai.
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px]">
+              <table className="w-full min-w-[620px]">
                 <thead className="bg-[#FFF9E3]">
                   <tr>
-                    {["User ID", "Number", "Played", "Prize", "Match", "Won"].map(
-                      (h) => (
-                        <th key={h} className={TH_CLS}>
-                          {h}
-                        </th>
-                      )
-                    )}
+                    {[
+                      "User ID",
+                      "Number",
+                      "Matched",
+                      "Played",
+                      "Prize",
+                      "Match",
+                      "Won",
+                    ].map((h) => (
+                      <th key={h} className={TH_CLS}>
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F3E7C4]">
@@ -838,6 +1182,9 @@ const FestivalResult = () => {
                       </td>
                       <td className="px-6 py-3 font-mono text-sm font-bold tracking-widest">
                         {w.userNumber}
+                      </td>
+                      <td className="px-6 py-3 font-mono text-sm">
+                        {w.matchedNumber || "-"}
                       </td>
                       <td className="px-6 py-3 text-sm">{money(w.amount)}</td>
                       <td className="px-6 py-3 text-sm font-semibold text-[#9A5B00]">
@@ -858,33 +1205,108 @@ const FestivalResult = () => {
         </Modal>
       )}
 
-      {/* EDIT WINNING NUMBER */}
+      {/* EDIT */}
       {editItem && (
-        <Modal title="Edit winning number" onClose={() => setEditItem(null)}>
+        <Modal
+          wide
+          title="Edit winning numbers"
+          onClose={() => setEditItem(null)}
+        >
           <p className="mb-4 text-sm text-[#6B7280]">
             {getName(editItem.lotteryConfigId)} - {formatDate(editItem.date)}
           </p>
 
-          <label className={LABEL_CLS}>Winning Number</label>
-          <input
-            type="text"
-            inputMode="text"
-            maxLength={8}
-            value={editNumber}
-            onChange={(e) => setEditNumber(cleanWinningNumber(e.target.value))}
-            className={NUM_INPUT}
-            placeholder="e.g. 12A12345"
-          />
+          <div className="space-y-4">
+            <div>
+              <label className={LABEL_CLS}>1st Prize (8-digit exact)</label>
+              <input
+                type="text"
+                maxLength={8}
+                value={editNumbers.first}
+                onChange={(e) =>
+                  setEditNumbers((p) => ({
+                    ...p,
+                    first: cleanWinningNumber(e.target.value),
+                  }))
+                }
+                className={NUM_INPUT}
+                placeholder="e.g. 12A12345"
+              />
+            </div>
 
-          <p className="mt-3 rounded-xl border border-[#F3E7C4] bg-[#FFF9E3] p-3 text-xs text-[#9A5B00]">
+            {["second", "third", "fourth", "fifth"].map((key) => {
+              const { label, max } = PRIZE_CONFIG[key];
+              const arr = editNumbers[key] || [""];
+              return (
+                <div key={key}>
+                  <div className="mb-2 flex items-center justify-between">
+                    <label className={LABEL_CLS + " !mb-0"}>{label}</label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditNumbers((p) => {
+                          const a = [...p[key]];
+                          if (a.length >= max) return p;
+                          a.push("");
+                          return { ...p, [key]: a };
+                        })
+                      }
+                      disabled={arr.length >= max}
+                      className="rounded-lg border border-[#F2B705] bg-[#FFEFA8] px-3 py-1.5 text-xs font-bold text-[#9A5B00] disabled:opacity-50"
+                    >
+                      <Plus size={12} /> Add
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+                    {arr.map((v, idx) => (
+                      <div key={idx} className="relative">
+                        <input
+                          type="text"
+                          maxLength={8}
+                          value={v}
+                          onChange={(e) =>
+                            setEditNumbers((p) => {
+                              const a = [...p[key]];
+                              a[idx] = cleanWinningNumber(e.target.value);
+                              return { ...p, [key]: a };
+                            })
+                          }
+                          className={`${INPUT_CLS} !py-2 font-mono font-bold tracking-widest uppercase`}
+                          placeholder={`#${idx + 1}`}
+                        />
+                        {arr.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditNumbers((p) => {
+                                const a = [...p[key]];
+                                if (a.length <= 1) a[0] = "";
+                                else a.splice(idx, 1);
+                                return { ...p, [key]: a };
+                              })
+                            }
+                            className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border border-[#D93025]/30 bg-[#FDE8E6] text-[#D93025]"
+                          >
+                            <X size={10} strokeWidth={3} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="mt-4 rounded-xl border border-[#F3E7C4] bg-[#FFF9E3] p-3 text-xs text-[#9A5B00]">
             Save karte hi purane winners ka prize wallet se wapas kat jayega aur
-            naye number se dobara calculate hoga.
+            naye numbers se dobara calculate hoga.
           </p>
 
           <button
             type="button"
             onClick={handleEditSave}
-            disabled={updateLoading || !isValidWinningNumber(editNumber)}
+            disabled={updateLoading || !isValidWinningNumber(editNumbers.first)}
             className={`mt-5 w-full rounded-xl py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60 ${GOLD_BTN}`}
           >
             {updateLoading ? "Saving..." : "Save changes"}
@@ -894,30 +1316,66 @@ const FestivalResult = () => {
 
       {/* CHECK NUMBER */}
       {showCheck && (
-        <Modal title="Check number" onClose={closeCheck}>
+        <Modal wide title="Check number" onClose={closeCheck}>
           <p className="mb-4 text-xs text-[#6B7280]">
             Sirf test ke liye. Isse koi result ya wallet nahi badalta.
           </p>
 
           <div className="space-y-4">
-            {[
-              ["userNumber", "User ka number"],
-              ["winningNumber", "Winning number"],
-            ].map(([key, label]) => (
+            <div>
+              <label className={LABEL_CLS}>User ka number</label>
+              <input
+                type="text"
+                maxLength={8}
+                value={checkForm.userNumber}
+                onChange={(e) =>
+                  setCheckForm((p) => ({
+                    ...p,
+                    userNumber: cleanWinningNumber(e.target.value),
+                  }))
+                }
+                placeholder="e.g. 12A12345"
+                className={NUM_INPUT}
+              />
+            </div>
+
+            <div>
+              <label className={LABEL_CLS}>1st Prize (8-digit exact)</label>
+              <input
+                type="text"
+                maxLength={8}
+                value={checkForm.winningNumbers.first}
+                onChange={(e) =>
+                  setCheckForm((p) => ({
+                    ...p,
+                    winningNumbers: {
+                      ...p.winningNumbers,
+                      first: cleanWinningNumber(e.target.value),
+                    },
+                  }))
+                }
+                placeholder="e.g. 12A12345"
+                className={NUM_INPUT}
+              />
+            </div>
+
+            {["second", "third", "fourth", "fifth"].map((key) => (
               <div key={key}>
-                <label className={LABEL_CLS}>{label}</label>
+                <label className={LABEL_CLS}>{PRIZE_CONFIG[key].label}</label>
                 <input
                   type="text"
-                  inputMode="text"
                   maxLength={8}
-                  value={checkForm[key]}
+                  value={checkForm.winningNumbers[key][0] || ""}
                   onChange={(e) =>
                     setCheckForm((p) => ({
                       ...p,
-                      [key]: cleanWinningNumber(e.target.value),
+                      winningNumbers: {
+                        ...p.winningNumbers,
+                        [key]: [cleanWinningNumber(e.target.value)],
+                      },
                     }))
                   }
-                  placeholder="e.g. 12A12345"
+                  placeholder="Optional"
                   className={NUM_INPUT}
                 />
               </div>

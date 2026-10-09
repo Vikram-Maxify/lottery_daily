@@ -266,6 +266,21 @@ const validateStatus = (status) => {
 };
 
 // =====================================================
+// GET BET CLOSING TIME (1 hour before draw time)
+// =====================================================
+
+const getBetClosingTime = (dateString, drawTime) => {
+  const drawDateTime = new Date(`${dateString}T${drawTime}:00+05:30`);
+
+  if (Number.isNaN(drawDateTime.getTime())) {
+    return null;
+  }
+
+  // 1 hour before draw
+  return new Date(drawDateTime.getTime() - 60 * 60 * 1000);
+};
+
+// =====================================================
 // RESERVE LOTTERY NUMBER (atomic, mark as sold)
 // Ek baar sold = hamesha sold. No rollback.
 // Returns updated doc or null if not available.
@@ -632,8 +647,6 @@ const createLotteryConfig = async (req, res) => {
   }
 };
 
-
-
 const getNumbersWithoutBets = async (req, res) => {
   try {
     const { id } = req.params;
@@ -680,22 +693,7 @@ const getNumbersWithoutBets = async (req, res) => {
     // ================================================
     // GET ALL NUMBERS OF THIS DAY FROM LotteryNumber
     // ================================================
-    // NOTE:
-    // Agar aapke LotteryNumber model me `drawDate` ya
-    // `date` field hai to yahan filter lagayein.
-    //
-    // Neeche main maan raha hoon ki LotteryNumber model
-    // me `number` field hai aur optional `date` field
-    // bhi ho sakti hai. Agar date field nahi hai to
-    // saare numbers le rahe hain.
-    // ================================================
 
-    // ---- OPTION A: Agar LotteryNumber me date field hai ----
-    // const allNumbers = await LotteryNumber.find({
-    //   date: drawDateString,
-    // }).lean();
-
-    // ---- OPTION B: Agar date field nahi hai (saare numbers) ----
     const allNumbers = await LotteryNumber.find().lean();
 
     if (!allNumbers || allNumbers.length === 0) {
@@ -944,17 +942,20 @@ const addUserLotteryEntry = async (req, res) => {
       });
     }
 
-    const drawDateTime = new Date(
-      `${dateString}T${config.drawTime}:00+05:30`
-    );
+    // ✅ Bet closes 1 hour before draw time
+    const betClosingTime = getBetClosingTime(dateString, config.drawTime);
 
-    if (Number.isNaN(drawDateTime.getTime())) {
+    if (!betClosingTime) {
       return res.status(500).json({
         success: false,
-        message: "Unable to calculate lottery draw time",
+        message: "Unable to calculate lottery bet closing time",
         configId: config._id,
       });
     }
+
+    const drawDateTime = new Date(
+      `${dateString}T${config.drawTime}:00+05:30`
+    );
 
     const now = new Date();
 
@@ -965,20 +966,22 @@ const addUserLotteryEntry = async (req, res) => {
     console.log("DRAW DATE       :", dateString);
     console.log("DRAW TIME IST   :", config.drawTime);
     console.log("DRAW DATETIME   :", drawDateTime.toISOString());
+    console.log("BET CLOSE TIME  :", betClosingTime.toISOString());
     console.log("CURRENT UTC     :", now.toISOString());
     console.log("USER WALLET     :", user.wallet);
     console.log("TICKET AMOUNT   :", amountValidation.amount);
     console.log("NUMBER          :", numberValidation.number);
     console.log("==============================================");
 
-    if (now >= drawDateTime) {
+    if (now >= betClosingTime) {
       return res.status(400).json({
         success: false,
-        message: "Lottery ticket sale time has ended",
+        message: "Lottery ticket sale closed 1 hour before draw time",
         configId: config._id,
         marketName: config.marketName,
         drawDate: dateString,
         drawTime: config.drawTime,
+        betClosingTime: betClosingTime.toISOString(),
       });
     }
 
@@ -1336,17 +1339,20 @@ const addBulkUserLotteryEntries = async (req, res) => {
       });
     }
 
-    const drawDateTime = new Date(
-      `${dateString}T${config.drawTime}:00+05:30`
-    );
+    // ✅ Bet closes 1 hour before draw time
+    const betClosingTime = getBetClosingTime(dateString, config.drawTime);
 
-    if (Number.isNaN(drawDateTime.getTime())) {
+    if (!betClosingTime) {
       return res.status(500).json({
         success: false,
-        message: "Unable to calculate lottery draw time",
+        message: "Unable to calculate lottery bet closing time",
         configId: config._id,
       });
     }
+
+    const drawDateTime = new Date(
+      `${dateString}T${config.drawTime}:00+05:30`
+    );
 
     const now = new Date();
 
@@ -1355,6 +1361,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     console.log("CONFIG ID       :", config._id);
     console.log("MARKET NAME     :", config.marketName);
     console.log("DRAW DATETIME   :", drawDateTime.toISOString());
+    console.log("BET CLOSE TIME  :", betClosingTime.toISOString());
     console.log("CURRENT UTC     :", now.toISOString());
     console.log("USER WALLET     :", user.wallet);
     console.log("TOTAL AMOUNT    :", totalAmount);
@@ -1362,14 +1369,15 @@ const addBulkUserLotteryEntries = async (req, res) => {
     console.log("NUMBERS         :", numbers.join(", "));
     console.log("==============================================");
 
-    if (now >= drawDateTime) {
+    if (now >= betClosingTime) {
       return res.status(400).json({
         success: false,
-        message: "Lottery ticket sale time has ended",
+        message: "Lottery ticket sale closed 1 hour before draw time",
         configId: config._id,
         marketName: config.marketName,
         drawDate: dateString,
         drawTime: config.drawTime,
+        betClosingTime: betClosingTime.toISOString(),
       });
     }
 
@@ -2587,7 +2595,7 @@ module.exports = {
   deactivateLotteryConfig,
 
   updateEntryStatus,
-  
+
   checkLotteryResult,
 
   deleteLotteryConfig,

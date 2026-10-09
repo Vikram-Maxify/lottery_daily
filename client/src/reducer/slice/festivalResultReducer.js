@@ -2,12 +2,6 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 
 import api from "../api";
 
-// =====================================================
-// BASE PATH
-// server.js: app.use("/api/festival-result", ...)
-// api.js: baseURL = "http://localhost:6099/api"
-// Final URL: http://localhost:6099/api/festival-result/...
-// =====================================================
 const BASE = "/festival-result";
 
 // =====================================================
@@ -15,15 +9,10 @@ const BASE = "/festival-result";
 // =====================================================
 const extractError = (error, fallback) => {
   const data = error?.response?.data;
-
-  if (!data) {
-    return error?.message || fallback;
-  }
-
+  if (!data) return error?.message || fallback;
   if (data.message && data.error && data.message !== data.error) {
     return `${data.message} (${data.error})`;
   }
-
   return data.message || data.error || error?.message || fallback;
 };
 
@@ -46,8 +35,7 @@ const makeThunk = (type, fallback, call) =>
   );
 
 // =====================================================
-// CREATE FESTIVAL RESULT
-// POST /festival-result/create
+// THUNKS
 // =====================================================
 export const createFestivalResult = makeThunk(
   "create",
@@ -55,74 +43,55 @@ export const createFestivalResult = makeThunk(
   async (data) => (await api.post(`${BASE}/create`, data)).data
 );
 
-// =====================================================
-// GET ALL FESTIVAL RESULTS
-// GET /festival-result/all
-// =====================================================
 export const getAllFestivalResults = makeThunk(
   "getAll",
   "Failed to fetch results",
   async () => (await api.get(`${BASE}/all`)).data
 );
 
-// =====================================================
-// GET FESTIVAL RESULT BY ID
-// GET /festival-result/:id
-// =====================================================
 export const getFestivalResultById = makeThunk(
   "getById",
   "Failed to fetch result",
   async (id) => (await api.get(`${BASE}/${id}`)).data
 );
 
-// =====================================================
-// UPDATE FESTIVAL RESULT
-// PATCH /festival-result/:id
-// =====================================================
 export const updateFestivalResult = makeThunk(
   "update",
   "Failed to update result",
   async ({ id, data }) => (await api.patch(`${BASE}/${id}`, data)).data
 );
 
-// =====================================================
-// PUBLISH FESTIVAL RESULT
-// PATCH /festival-result/:id/publish
-// =====================================================
 export const publishFestivalResult = makeThunk(
   "publish",
   "Failed to publish result",
   async (id) => (await api.patch(`${BASE}/${id}/publish`)).data
 );
 
-// =====================================================
-// UNPUBLISH FESTIVAL RESULT
-// PATCH /festival-result/:id/unpublish
-// =====================================================
 export const unpublishFestivalResult = makeThunk(
   "unpublish",
   "Failed to unpublish result",
   async (id) => (await api.patch(`${BASE}/${id}/unpublish`)).data
 );
 
-// =====================================================
-// DELETE FESTIVAL RESULT
-// DELETE /festival-result/:id
-// =====================================================
 export const deleteFestivalResult = makeThunk(
   "delete",
   "Failed to delete result",
   async (id) => ({ id, ...(await api.delete(`${BASE}/${id}`)).data })
 );
 
-// =====================================================
-// CHECK NUMBER
-// POST /festival-result/check-number
-// =====================================================
 export const checkFestivalNumber = makeThunk(
   "checkNumber",
   "Failed to check number",
   async (data) => (await api.post(`${BASE}/check-number`, data)).data
+);
+
+// ✅ NEW: Unbet numbers
+export const getFestivalUnbetNumbers = makeThunk(
+  "getUnbetNumbers",
+  "Failed to fetch unbet numbers",
+  async (lotteryConfigId) =>
+    (await api.get(`${BASE}/unbet-numbers?lotteryConfigId=${lotteryConfigId}`))
+      .data
 );
 
 // =====================================================
@@ -133,6 +102,9 @@ const initialState = {
   result: null,
   checkResult: null,
   summary: null,
+
+  unbetNumbers: [],
+  unbetLoading: false,
 
   loading: false,
   createLoading: false,
@@ -147,7 +119,7 @@ const initialState = {
 };
 
 // =====================================================
-// HELPER — UPSERT RESULT INTO LIST
+// HELPER — UPSERT RESULT
 // =====================================================
 const upsertResult = (state, newResult) => {
   if (!newResult?._id) return;
@@ -178,7 +150,6 @@ const upsertResult = (state, newResult) => {
 // =====================================================
 const festivalResultSlice = createSlice({
   name: "festivalResult",
-
   initialState,
 
   reducers: {
@@ -203,12 +174,13 @@ const festivalResultSlice = createSlice({
     clearFestivalResultSummary: (state) => {
       state.summary = null;
     },
+    clearFestivalUnbetNumbers: (state) => {
+      state.unbetNumbers = [];
+    },
   },
 
   extraReducers: (builder) => {
-    // =================================================
     // GET ALL
-    // =================================================
     builder
       .addCase(getAllFestivalResults.pending, (state) => {
         state.loading = true;
@@ -224,9 +196,7 @@ const festivalResultSlice = createSlice({
         state.error = action.payload?.message || "Failed to fetch results";
       });
 
-    // =================================================
     // GET BY ID
-    // =================================================
     builder
       .addCase(getFestivalResultById.pending, (state) => {
         state.loading = true;
@@ -242,9 +212,7 @@ const festivalResultSlice = createSlice({
         state.error = action.payload?.message || "Failed to fetch result";
       });
 
-    // =================================================
     // CREATE
-    // =================================================
     builder
       .addCase(createFestivalResult.pending, (state) => {
         state.createLoading = true;
@@ -267,9 +235,7 @@ const festivalResultSlice = createSlice({
         state.error = action.payload?.message || "Failed to create result";
       });
 
-    // =================================================
     // UPDATE
-    // =================================================
     builder
       .addCase(updateFestivalResult.pending, (state) => {
         state.updateLoading = true;
@@ -292,9 +258,7 @@ const festivalResultSlice = createSlice({
         state.error = action.payload?.message || "Failed to update result";
       });
 
-    // =================================================
     // PUBLISH
-    // =================================================
     builder
       .addCase(publishFestivalResult.pending, (state) => {
         state.publishLoading = true;
@@ -314,9 +278,7 @@ const festivalResultSlice = createSlice({
         state.error = action.payload?.message || "Failed to publish result";
       });
 
-    // =================================================
     // UNPUBLISH
-    // =================================================
     builder
       .addCase(unpublishFestivalResult.pending, (state) => {
         state.publishLoading = true;
@@ -336,9 +298,7 @@ const festivalResultSlice = createSlice({
         state.error = action.payload?.message || "Failed to unpublish result";
       });
 
-    // =================================================
     // DELETE
-    // =================================================
     builder
       .addCase(deleteFestivalResult.pending, (state) => {
         state.deleteLoading = true;
@@ -362,9 +322,7 @@ const festivalResultSlice = createSlice({
         state.error = action.payload?.message || "Failed to delete result";
       });
 
-    // =================================================
     // CHECK NUMBER
-    // =================================================
     builder
       .addCase(checkFestivalNumber.pending, (state) => {
         state.checkLoading = true;
@@ -380,6 +338,23 @@ const festivalResultSlice = createSlice({
         state.checkLoading = false;
         state.error = action.payload?.message || "Failed to check number";
       });
+
+    // UNBET NUMBERS
+    builder
+      .addCase(getFestivalUnbetNumbers.pending, (state) => {
+        state.unbetLoading = true;
+        state.unbetNumbers = [];
+        state.error = null;
+      })
+      .addCase(getFestivalUnbetNumbers.fulfilled, (state, action) => {
+        state.unbetLoading = false;
+        state.unbetNumbers = action.payload?.numbers || [];
+      })
+      .addCase(getFestivalUnbetNumbers.rejected, (state, action) => {
+        state.unbetLoading = false;
+        state.unbetNumbers = [];
+        state.error = action.payload?.message || "Failed to fetch unbet numbers";
+      });
   },
 });
 
@@ -393,6 +368,7 @@ export const {
   clearFestivalResults,
   clearFestivalResultError,
   clearFestivalResultSummary,
+  clearFestivalUnbetNumbers,
 } = festivalResultSlice.actions;
 
 // =====================================================
@@ -424,5 +400,9 @@ export const selectFestivalError = (state) =>
   state.festivalResult?.error || null;
 export const selectFestivalMessage = (state) =>
   state.festivalResult?.message || "";
+export const selectFestivalUnbetNumbers = (state) =>
+  state.festivalResult?.unbetNumbers || [];
+export const selectFestivalUnbetLoading = (state) =>
+  state.festivalResult?.unbetLoading || false;
 
 export default festivalResultSlice.reducer;
