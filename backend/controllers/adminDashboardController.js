@@ -123,6 +123,30 @@ const getDashboardStats = async (req, res) => {
         : 0;
 
     // ===============================================
+    // ACTIVE USERS (LOGGED IN WITHIN LAST 3-4 DAYS)
+    // ===============================================
+    const fourDaysAgo = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000);
+    const activeUsersQuery = {
+      role: "user",
+      $or: [
+        { "lastLogin.time": { $gte: fourDaysAgo } },
+        {
+          $and: [
+            { "lastLogin.time": null },
+            { updatedAt: { $gte: fourDaysAgo } },
+          ],
+        },
+      ],
+    };
+
+    const activeUsersCount = await User.countDocuments(activeUsersQuery);
+    const activeUsersList = await User.find(activeUsersQuery)
+      .sort({ "lastLogin.time": -1, updatedAt: -1 })
+      .limit(30)
+      .select("name mobile uuid lastLogin wallet createdAt isKycVerified")
+      .lean();
+
+    // ===============================================
     // RESPONSE
     // ===============================================
     res.status(200).json({
@@ -135,6 +159,8 @@ const getDashboardStats = async (req, res) => {
         totalResults,
         todayResults,
         todayDeposit,
+        activeUsersCount,
+        activeUsers: activeUsersList,
       },
     });
   } catch (error) {

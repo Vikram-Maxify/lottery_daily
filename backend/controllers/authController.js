@@ -139,10 +139,17 @@ const register = async (req, res) => {
 
     // 🔥 Validate referralBy (if provided)
     let validReferralBy = null;
-    if (referralBy) {
+    if (referralBy && String(referralBy).trim()) {
       const cleanCode = String(referralBy).trim().toUpperCase();
 
-      const referrer = await User.findOne({ referralCode: cleanCode });
+      const referrer = await User.findOne({
+        $or: [
+          { referralCode: cleanCode },
+          { referralCode: { $regex: new RegExp(`^${cleanCode}$`, "i") } },
+          { refCode: cleanCode },
+          { refCode: { $regex: new RegExp(`^${cleanCode}$`, "i") } },
+        ],
+      });
 
       if (!referrer) {
         return res.status(400).json({
@@ -151,7 +158,7 @@ const register = async (req, res) => {
         });
       }
 
-      validReferralBy = referrer.referralCode;
+      validReferralBy = referrer.referralCode || referrer.refCode;
     }
 
     // 🔥 Upload profile image if provided
@@ -225,7 +232,7 @@ const register = async (req, res) => {
 // =======================
 const login = async (req, res) => {
   try {
-    const { mobile, password } = req.body;
+    const { mobile, password, referralBy } = req.body;
 
     if (!mobile || !password) {
       return res.status(400).json({
@@ -253,6 +260,31 @@ const login = async (req, res) => {
     }
 
     // 🔥 Save last login info
+    // 🔥 Ensure user has a referralCode
+    if (!user.referralCode) {
+      user.referralCode = await generateUniqueReferralCode(user.name);
+    }
+
+    // 🔥 Attach referral if provided and user doesn't already have one
+    if (referralBy && String(referralBy).trim() && !user.referralBy) {
+      const cleanCode = String(referralBy).trim().toUpperCase();
+      if (cleanCode !== user.referralCode) {
+        const referrer = await User.findOne({
+          $or: [
+            { referralCode: cleanCode },
+            { referralCode: { $regex: new RegExp(`^${cleanCode}$`, "i") } },
+            { refCode: cleanCode },
+            { refCode: { $regex: new RegExp(`^${cleanCode}$`, "i") } },
+          ],
+        });
+
+        if (referrer && referrer._id.toString() !== user._id.toString()) {
+          user.referralBy = referrer.referralCode || referrer.refCode;
+        }
+      }
+    }
+
+    // 🔥 Save last login info (IP, browser, OS, device, time)
     const clientInfo = getClientInfo(req);
 
     user.lastLogin = {
@@ -311,6 +343,12 @@ const getProfile = async (req, res) => {
         success: false,
         message: "User not found",
       });
+    }
+
+    // Auto-generate referral code if missing
+    if (!user.referralCode) {
+      user.referralCode = await generateUniqueReferralCode(user.name);
+      await user.save();
     }
 
     return res.status(200).json({
@@ -627,4 +665,5 @@ module.exports = {
   adminUpdateUserProfile,
   getAllUsers,
   logout,
+  generateUniqueReferralCode,
 };

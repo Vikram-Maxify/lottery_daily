@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Clock,
   Edit3,
+  Gift,
   HandCoins,
   Headphones,
   History,
@@ -482,6 +483,36 @@ const ProfilePage = () => {
             MODERN GROUPED MENU IN CLEAN WHITE THEME
         ===================================================== */}
         <div className="mt-4 px-3.5 space-y-3.5">
+          {/* REFER & EARN PROMO CARD */}
+          <div
+            onClick={() => navigate("/referral")}
+            className="cursor-pointer relative overflow-hidden rounded-[24px] border border-[#FFD84A]/30 bg-gradient-to-r from-[#2A0815] via-[#3B0E1E] to-[#1F050F] p-4 text-white shadow-md transition hover:shadow-lg active:scale-[0.99]"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#FFD84A]/30 bg-[#FFD84A]/10 text-[#FFD84A]">
+                  <Gift size={22} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-black text-white">
+                      Refer & Earn Program
+                    </p>
+                    <span className="rounded-full bg-[#ED1D43] px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-white">
+                      Cashback
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-white/70">
+                    Invite friends & earn instant commission rewards
+                  </p>
+                </div>
+              </div>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-white">
+                <ChevronRight size={16} />
+              </span>
+            </div>
+          </div>
+
           {/* SECTION 1: TRANSACTIONS & RECORDS */}
           <div>
             <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#8A97AB] px-1 mb-2">
@@ -489,6 +520,15 @@ const ProfilePage = () => {
             </p>
 
             <div className="rounded-[24px] bg-white border border-[#E2E8F0] shadow-sm overflow-hidden divide-y divide-[#F1F5F9]">
+              <MenuRowLight
+                icon={<Gift size={19} className="text-[#ED1D43]" />}
+                iconBg="bg-rose-50"
+                title="Refer & Earn"
+                subtitle="Your invite code, referrals & commission stats"
+                onClick={() => navigate("/referral")}
+                badge="Earn Cash"
+              />
+
               <MenuRowLight
                 icon={<HandCoins size={19} className="text-[#FF8A00]" />}
                 iconBg="bg-amber-50"

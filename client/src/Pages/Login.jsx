@@ -12,9 +12,9 @@ import {
   Users,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { login } from "../reducer/slice/authSlice";
 
@@ -33,11 +33,20 @@ const inputBase =
 const Login = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const [searchParams] = useSearchParams();
+  const urlRef = searchParams.get("ref") || "";
 
   const [form, setForm] = useState({
     number: "",
     password: "",
+    referralBy: urlRef,
   });
+
+  useEffect(() => {
+    if (urlRef && !form.referralBy) {
+      setForm((prev) => ({ ...prev, referralBy: urlRef }));
+    }
+  }, [urlRef]);
 
   const [showPass, setShowPass] = useState(false);
   const [remember, setRemember] = useState(true);
@@ -56,6 +65,15 @@ const Login = () => {
         [name]: numericValue,
       }));
 
+      if (error) setError("");
+      return;
+    }
+
+    if (name === "referralBy") {
+      setForm((prev) => ({
+        ...prev,
+        [name]: value.toUpperCase(),
+      }));
       if (error) setError("");
       return;
     }
@@ -82,12 +100,16 @@ const Login = () => {
       return;
     }
 
-    const result = await dispatch(
-      login({
-        mobile: form.number,
-        password: form.password,
-      })
-    );
+    const payload = {
+      mobile: form.number,
+      password: form.password,
+    };
+
+    if (form.referralBy && form.referralBy.trim()) {
+      payload.referralBy = form.referralBy.trim().toUpperCase();
+    }
+
+    const result = await dispatch(login(payload));
 
     if (login.fulfilled.match(result)) {
       navigate("/");
@@ -96,13 +118,13 @@ const Login = () => {
 
   const handleForgot = () => {
     const message = encodeURIComponent(
-      "Hello, mujhe apna password reset karna hai."
+      "Hello, mujhe apna password reset karna hai.",
     );
 
     window.open(
       `https://wa.me/917234806209?text=${message}`,
       "_blank",
-      "noopener,noreferrer"
+      "noopener,noreferrer",
     );
   };
 
@@ -257,11 +279,7 @@ const Login = () => {
             {/* PASSWORD */}
             <div className={inputWrap}>
               <div className="flex w-[45px] shrink-0 justify-center">
-                <Lock
-                  size={20}
-                  strokeWidth={2.3}
-                  className="text-[#d7193f]"
-                />
+                <Lock size={20} strokeWidth={2.3} className="text-[#d7193f]" />
               </div>
 
               <div className="h-[28px] w-px shrink-0 bg-[#d6dfec]" />
@@ -291,11 +309,7 @@ const Login = () => {
                     className="text-[#173e70]"
                   />
                 ) : (
-                  <Eye
-                    size={19}
-                    strokeWidth={2.3}
-                    className="text-[#173e70]"
-                  />
+                  <Eye size={19} strokeWidth={2.3} className="text-[#173e70]" />
                 )}
               </button>
             </div>
@@ -345,11 +359,7 @@ const Login = () => {
             >
               {loginLoading ? (
                 <>
-                  <Loader2
-                    size={19}
-                    strokeWidth={3}
-                    className="animate-spin"
-                  />
+                  <Loader2 size={19} strokeWidth={3} className="animate-spin" />
                   Logging in...
                 </>
               ) : (
@@ -373,7 +383,11 @@ const Login = () => {
           </div>
 
           <Link
-            to="/register"
+            to={
+              form.referralBy
+                ? `/register?ref=${form.referralBy.trim().toUpperCase()}`
+                : "/register"
+            }
             className="mt-3 flex h-[48px] w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#173e70] to-[#0d2547] text-[15px] font-bold text-white shadow-lg transition active:scale-[0.99]"
           >
             Create New Account

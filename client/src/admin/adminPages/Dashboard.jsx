@@ -14,6 +14,7 @@ import {
   BarChart3,
   ArrowRight,
   ChevronRight,
+  Clock,
   Medal,
   UserCheck,
 } from "lucide-react";
@@ -224,6 +225,26 @@ const Dashboard = () => {
         .slice(0, 5),
     [users]
   );
+
+  /* ---------- ACTIVE USERS (LOGGED IN WITHIN LAST 3-4 DAYS) ---------- */
+  const activeUsersList = useMemo(() => {
+    const fourDaysAgo = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000);
+    const sourceUsers =
+      dashboardStats?.activeUsers && dashboardStats.activeUsers.length > 0
+        ? dashboardStats.activeUsers
+        : users;
+
+    return [...sourceUsers]
+      .filter((u) => {
+        const loginTime = u.lastLogin?.time ? new Date(u.lastLogin.time) : null;
+        return loginTime && loginTime >= fourDaysAgo;
+      })
+      .sort((a, b) => {
+        const timeA = new Date(a.lastLogin?.time || 0).getTime();
+        const timeB = new Date(b.lastLogin?.time || 0).getTime();
+        return timeB - timeA;
+      });
+  }, [dashboardStats?.activeUsers, users]);
 
   /* ---------- USER STATISTICS ---------- */
   const userStats = useMemo(() => {
@@ -595,20 +616,21 @@ const Dashboard = () => {
         <div className={`${CARD} p-4`}>
           <SectionTitle icon={UserCheck} title="Recent Users" to="/users" />
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[420px] text-left text-[11px]">
+            <table className="w-full min-w-[480px] text-left text-[11px]">
               <thead>
                 <tr className="border-b border-[#F3E7C4] text-[10px] font-bold text-[#6B7280]">
                   <th className="py-2">Name</th>
                   <th>Mobile No.</th>
                   <th>KYC</th>
                   <th>Status</th>
+                  <th>Last Login</th>
                   <th>Join Date</th>
                 </tr>
               </thead>
               <tbody>
                 {recentUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-6 text-center text-[#9CA3AF]">
+                    <td colSpan={6} className="py-6 text-center text-[#9CA3AF]">
                       No users found
                     </td>
                   </tr>
@@ -640,6 +662,13 @@ const Dashboard = () => {
                             {active ? "Active" : "Inactive"}
                           </span>
                         </td>
+                        <td className="text-[10px] text-[#374151] whitespace-nowrap">
+                          {u.lastLogin?.time ? (
+                            <span>{fmtDate(u.lastLogin.time)}</span>
+                          ) : (
+                            <span className="text-[#9CA3AF]">Never</span>
+                          )}
+                        </td>
                         <td className="text-[10px] text-[#374151]">
                           {fmtDate(u.createdAt)}
                         </td>
@@ -650,6 +679,126 @@ const Dashboard = () => {
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      {/* ================= ACTIVE USERS BOX (LAST 3-4 DAYS) ================= */}
+      <div className={`${CARD} p-4`}>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F3E7C4] pb-3">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#E6F6EF] text-[#12A36B] ring-1 ring-[#12A36B]/20">
+              <UserCheck size={18} strokeWidth={2.5} />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-extrabold text-[#1A1A1A]">
+                  Active Users (Last 3-4 Days)
+                </h3>
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#E6F6EF] px-2 py-0.5 text-[10px] font-extrabold text-[#12A36B]">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#12A36B] opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-[#12A36B]" />
+                  </span>
+                  {activeUsersList.length} Active
+                </span>
+              </div>
+              <p className="text-[11px] text-[#6B7280]">
+                Users who logged into the platform within the past 3 to 4 days
+              </p>
+            </div>
+          </div>
+
+          <Link
+            to="/users"
+            className="inline-flex items-center gap-1 text-xs font-bold text-[#9A5B00] hover:text-[#E39A00]"
+          >
+            Manage All Users <ArrowRight size={13} />
+          </Link>
+        </div>
+
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[560px] text-left text-[11px]">
+            <thead>
+              <tr className="border-b border-[#F3E7C4] text-[10px] font-bold text-[#6B7280]">
+                <th className="py-2.5">User</th>
+                <th>Mobile No.</th>
+                <th>Last Login Time</th>
+                <th>Device / OS</th>
+                <th>Wallet Balance</th>
+                <th>KYC</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeUsersList.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-[#9CA3AF]">
+                    <UserCheck size={28} className="mx-auto mb-2 text-gray-300" />
+                    <p className="font-bold text-[#374151]">
+                      No active users in the last 3-4 days
+                    </p>
+                    <p className="mt-0.5 text-xs text-[#9CA3AF]">
+                      Users who log in will automatically appear in this box.
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                activeUsersList.map((u) => {
+                  const kyc = KYC_VIEW[getKycStatus(u)] || KYC_VIEW.none;
+                  const active = isUserActive(u);
+                  return (
+                    <tr
+                      key={u.uuid || u._id}
+                      className="border-b border-[#FBF3DB] transition hover:bg-[#FFFDF7] last:border-0"
+                    >
+                      <td className="py-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FFEFA8] text-[10px] font-black text-[#1A1204] ring-1 ring-[#F2B705]">
+                            {(u.name || "U").charAt(0).toUpperCase()}
+                          </span>
+                          <span className="truncate font-semibold text-[#1A1A1A]">
+                            {u.name || "-"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="font-mono text-[#374151]">{u.mobile || "-"}</td>
+                      <td className="whitespace-nowrap font-medium text-[#1A1A1A]">
+                        {u.lastLogin?.time ? (
+                          <div className="flex items-center gap-1 text-[11px]">
+                            <Clock size={12} className="text-[#12A36B]" />
+                            <span>{fmtDateTime(u.lastLogin.time)}</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">Never</span>
+                        )}
+                      </td>
+                      <td className="text-[10px] text-[#6B7280]">
+                        {u.lastLogin?.device ? (
+                          <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-[#374151]">
+                            {u.lastLogin.device}{" "}
+                            {u.lastLogin.os ? `• ${u.lastLogin.os}` : ""}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="font-black text-[#9A5B00]">
+                        ₹{Number(u.wallet || 0).toLocaleString("en-IN")}
+                      </td>
+                      <td>
+                        <span className={pill(kyc.tone)}>{kyc.label}</span>
+                      </td>
+                      <td>
+                        <span className={pill(active ? "green" : "red")}>
+                          {active ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

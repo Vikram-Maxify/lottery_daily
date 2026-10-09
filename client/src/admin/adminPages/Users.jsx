@@ -751,6 +751,7 @@ const Users = () => {
 
                   <th className={TH_CLS}>KYC Status</th>
                   <th className={TH_CLS}>Account Status</th>
+                  <th className={TH_CLS}>Last Login</th>
                   <th className={TH_CLS}>Join Date</th>
                   <th className={`${TH_CLS} text-center`}>Action</th>
                 </tr>
@@ -818,6 +819,22 @@ const Users = () => {
                           <Pill tone={u._suspended ? "red" : "green"}>
                             {u._suspended ? "Suspended" : "Active"}
                           </Pill>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-xs text-[#6B7280]">
+                          {u.lastLogin?.time ? (
+                            <div>
+                              <span className="font-semibold text-[#1A1A1A]">
+                                {fmtDateTime(u.lastLogin.time)}
+                              </span>
+                              {u.lastLogin.device && (
+                                <span className="block text-[10px] text-[#8A8F98]">
+                                  {u.lastLogin.device} {u.lastLogin.os ? `• ${u.lastLogin.os}` : ""}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[#9CA3AF]">Never</span>
+                          )}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2.5 text-sm text-[#6B7280]">
                           {fmtDate(u.createdAt)}
@@ -1003,6 +1020,22 @@ const Users = () => {
               <div className="flex items-center gap-2">
                 <CalendarDays size={15} className="shrink-0 text-[#6B7280]" />
                 Joined {fmtDateTime(activeUser.createdAt)}
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock size={15} className="shrink-0 text-[#6B7280]" />
+                <span>
+                  Last Login:{" "}
+                  <strong className="text-[#1A1A1A]">
+                    {activeUser.lastLogin?.time
+                      ? fmtDateTime(activeUser.lastLogin.time)
+                      : "Never"}
+                  </strong>
+                  {activeUser.lastLogin?.device && (
+                    <span className="ml-1 text-[11px] text-[#8A8F98]">
+                      ({activeUser.lastLogin.device} {activeUser.lastLogin.os ? `• ${activeUser.lastLogin.os}` : ""})
+                    </span>
+                  )}
+                </span>
               </div>
             </div>
 

@@ -111,6 +111,26 @@ export const updateReferralPercentageSetting = createAsyncThunk(
 );
 
 // =====================================================
+// FETCH MY REFERRAL DETAILS (LOGGED IN USER)
+// GET /api/referral/my-referral
+// =====================================================
+export const fetchMyReferralDetails = createAsyncThunk(
+  "settings/fetchMyReferralDetails",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get("/referral/my-referral");
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to fetch referral details"
+      );
+    }
+  }
+);
+
+// =====================================================
 // INITIAL STATE
 // =====================================================
 const initialState = {
@@ -122,6 +142,10 @@ const initialState = {
 
   referralPercentage: 5,
   referralUpdatedAt: null,
+
+  referralDetails: null,
+  referralLoading: false,
+  referralError: null,
 
   loading: false,
   updateLoading: false,
@@ -284,6 +308,22 @@ const settingsSlice = createSlice({
         state.updateLoading = false;
         state.success = false;
         state.error = action.payload || "Failed to update referral percentage";
+      })
+
+      // -------------------------------------------------
+      // FETCH MY REFERRAL DETAILS
+      // -------------------------------------------------
+      .addCase(fetchMyReferralDetails.pending, (state) => {
+        state.referralLoading = true;
+        state.referralError = null;
+      })
+      .addCase(fetchMyReferralDetails.fulfilled, (state, action) => {
+        state.referralLoading = false;
+        state.referralDetails = action.payload?.data || null;
+      })
+      .addCase(fetchMyReferralDetails.rejected, (state, action) => {
+        state.referralLoading = false;
+        state.referralError = action.payload || "Failed to fetch referral details";
       });
   },
 });
@@ -299,6 +339,12 @@ export const selectFestivalLotteryAmount = (state) =>
   state.settings?.festivalLotteryAmount ?? 0;
 export const selectReferralPercentage = (state) =>
   state.settings?.referralPercentage ?? 5;
+export const selectMyReferralDetails = (state) =>
+  state.settings?.referralDetails ?? null;
+export const selectReferralLoading = (state) =>
+  state.settings?.referralLoading ?? false;
+export const selectReferralError = (state) =>
+  state.settings?.referralError ?? null;
 export const selectSettingsLoading = (state) =>
   state.settings?.loading ?? false;
 export const selectSettingsUpdateLoading = (state) =>

@@ -3,6 +3,7 @@ import {
   Crown,
   Eye,
   EyeOff,
+  Gift,
   Loader2,
   Lock,
   ShieldCheck,
@@ -12,9 +13,9 @@ import {
   Users,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { register } from "../reducer/slice/authSlice";
 
@@ -34,13 +35,22 @@ const inputBase =
 const Register = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const [searchParams] = useSearchParams();
+  const urlRef = searchParams.get("ref") || "";
 
   const [form, setForm] = useState({
     number: "",
     name: "",
     password: "",
     confirmPassword: "",
+    referralBy: urlRef,
   });
+
+  useEffect(() => {
+    if (urlRef && !form.referralBy) {
+      setForm((prev) => ({ ...prev, referralBy: urlRef }));
+    }
+  }, [urlRef]);
 
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -61,6 +71,15 @@ const Register = () => {
         [name]: numericValue,
       }));
 
+      if (error) setError("");
+      return;
+    }
+
+    if (name === "referralBy") {
+      setForm((prev) => ({
+        ...prev,
+        [name]: value.toUpperCase(),
+      }));
       if (error) setError("");
       return;
     }
@@ -102,13 +121,17 @@ const Register = () => {
       return;
     }
 
-    const result = await dispatch(
-      register({
-        name: form.name.trim(),
-        mobile: form.number,
-        password: form.password,
-      })
-    );
+    const payload = {
+      name: form.name.trim(),
+      mobile: form.number,
+      password: form.password,
+    };
+
+    if (form.referralBy && form.referralBy.trim()) {
+      payload.referralBy = form.referralBy.trim().toUpperCase();
+    }
+
+    const result = await dispatch(register(payload));
 
     if (register.fulfilled.match(result)) {
       navigate("/");
@@ -379,6 +402,36 @@ const Register = () => {
               </button>
             </div>
 
+            {/* REFERRAL CODE (OPTIONAL) */}
+            <div className={inputWrap}>
+              <div className="flex w-[45px] shrink-0 justify-center">
+                <Gift
+                  size={20}
+                  strokeWidth={2.3}
+                  className="text-[#d7193f]"
+                />
+              </div>
+
+              <div className="h-[28px] w-px shrink-0 bg-[#d6dfec]" />
+
+              <input
+                type="text"
+                name="referralBy"
+                value={form.referralBy}
+                onChange={handleChange}
+                placeholder="Referral Code (Optional)"
+                autoCapitalize="characters"
+                disabled={registerLoading}
+                className={`${inputBase} px-3 font-semibold uppercase tracking-wider`}
+              />
+
+              {form.referralBy && (
+                <span className="mr-3 shrink-0 rounded-md bg-[#d7193f]/10 px-2 py-0.5 text-[10px] font-bold text-[#d7193f]">
+                  APPLIED
+                </span>
+              )}
+            </div>
+
             {(error || registerError) && (
               <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-center text-[11px] font-medium text-red-600">
                 {error || registerError}
@@ -420,7 +473,13 @@ const Register = () => {
             {/* LOGIN BUTTON */}
             <button
               type="button"
-              onClick={() => navigate("/login")}
+              onClick={() =>
+                navigate(
+                  form.referralBy
+                    ? `/login?ref=${form.referralBy.trim().toUpperCase()}`
+                    : "/login"
+                )
+              }
               disabled={registerLoading}
               className="flex h-[50px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#173e70] to-[#0d2547] text-[15px] font-bold text-white shadow-lg transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60"
             >
