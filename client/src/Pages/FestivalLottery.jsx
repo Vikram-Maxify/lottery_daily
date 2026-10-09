@@ -4,17 +4,12 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
-  Flame,
-  Flower2,
   Gift,
-  PartyPopper,
   Plus,
   ShieldCheck,
   Shuffle,
   Sparkles,
-  Target,
   Ticket,
-  TreePine,
   Trophy,
   Users,
 } from "lucide-react";
@@ -35,14 +30,12 @@ import {
   getActiveLotteryConfig,
 } from "../reducer/slice/lotteryConfigSlice";
 
-// 🔥 FESTIVAL SLICE - all created lotteries (tab images + prizes)
-// NOTE: path apni actual festival slice file ke naam se match kar lena
 import {
   getAllLotteryConfigs as getAllFestivalConfigs,
   getActiveLotteryConfig as getActiveFestivalConfig,
   selectLotteryConfigs as selectFestivalConfigs,
   selectActiveLottery as selectActiveFestivalLottery,
-  selectActiveLotteryLoading as selectFestivalActiveLoading,
+  selectActiveLotteryLoading as selectActiveFestivalLoading,
 } from "../reducer/slice/festivalLotteryReducer";
 
 import {
@@ -64,7 +57,6 @@ import {
 import { getAmount } from "../reducer/slice/amountReducer";
 import { fetchAllSettings } from "../reducer/slice/settingsSlice";
 
-// 🔥 KYC REDUCER IMPORT
 import {
   getMyKyc,
   selectKycDocuments,
@@ -79,76 +71,33 @@ const PURCHASE_BAR_HEIGHT = 90;
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1605196560547-b2f7281b7355?auto=format&fit=crop&w=1400&q=80";
 
-const EN_MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-const EN_DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const QUICK_OPTIONS = [10, 20, 30, 50, 100];
 const MAX_TICKETS = 100;
 const MIN_TICKETS = 10;
-const TICKET_STEP = 10; // +/- buttons move in steps of 10
-const INITIAL_VISIBLE_TICKETS = 10; // tickets shown before "View More"
-const ALL_DATES_COUNT = 30;
+const TICKET_STEP = 10;
 
-// Ticket format: 2 digits + 1 alphabet + 5 digits  →  12A12345
+// Ticket format: 2 digits + 1 alphabet + 5 digits -> 12A12345
 const SLOT_PATTERN = ["D", "D", "L", "D", "D", "D", "D", "D"];
 const TICKET_LENGTH = SLOT_PATTERN.length;
 const TICKET_EXAMPLE = "12A12345";
 const TICKET_REGEX = /^\d{2}[A-Z]\d{5}$/;
 
-const DEFAULT_TICKET_PRICE = 20;
-
-// Festival price admin se "10 tickets ke set" ke liye aata hai (e.g. ₹270 = 10 tickets)
 const PRICE_SET_SIZE = 10;
 const DEFAULT_SET_PRICE = 270;
 
-// count tickets ka total amount (set price ke hisab se), 2 decimal tak round
 const calcFestivalAmount = (setPrice, count) =>
   Math.round(((Number(setPrice) || 0) * count * 100) / PRICE_SET_SIZE) / 100;
-
-const CHIP_COLORS = [
-  { badge: "bg-[#ed1d43]", row: "bg-[#fff0f2]" },
-  { badge: "bg-[#2e7dd7]", row: "bg-[#eef6ff]" },
-  { badge: "bg-[#f08a25]", row: "bg-[#fff5ea]" },
-  { badge: "bg-[#20a66a]", row: "bg-[#edfff6]" },
-  { badge: "bg-[#8c4bd6]", row: "bg-[#f7efff]" },
-  { badge: "bg-[#ff4d8d]", row: "bg-[#fff0f6]" },
-  { badge: "bg-[#14a3a3]", row: "bg-[#e9fbfb]" },
-  { badge: "bg-[#e0a800]", row: "bg-[#fff9e3]" },
-  { badge: "bg-[#5b5fe0]", row: "bg-[#eeefff]" },
-  { badge: "bg-[#a0561b]", row: "bg-[#fff1e8]" },
-];
-
-
-
-// =====================================================
-// PRIZE HELPERS (Winning Rules)
-// =====================================================
-const formatPrize = (amount) => formatINR(amount);
 
 // =====================================================
 // TICKET HELPERS
 // =====================================================
 const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 
-// "New Year" / "new-year" / "NEWYEAR" -> "newyear"
 const normalizeKey = (value) =>
   String(value || "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
 
-// Format: DD L DDDDD  →  12A12345
 const randomTicketNumber = () => {
   const d = () => String(Math.floor(Math.random() * 10));
   const l = () => LETTERS[Math.floor(Math.random() * LETTERS.length)];
@@ -202,7 +151,6 @@ const readPrice = (raw) => {
   return Number(raw);
 };
 
-// 🔥 KYC STATUS DERIVE HELPER
 const deriveKycStatus = (documents) => {
   if (!Array.isArray(documents) || documents.length === 0) {
     return "not_submitted";
@@ -230,30 +178,24 @@ const FestivalLottery = () => {
   // ---------- AUTH ----------
   const user = useSelector((state) => state.auth?.user);
 
-  // ---------- LOTTERY CONFIG ----------
-  const {
-    activeConfig,
-    activeLoading,
-    error: configError,
-  } = useSelector(
+  // ---------- DAILY LOTTERY CONFIG ----------
+  const { activeConfig, activeLoading } = useSelector(
     (state) =>
       state.lotteryConfig || {
         activeConfig: null,
         activeLoading: false,
-        error: null,
       },
   );
 
-  // ---------- ALL FESTIVAL LOTTERIES (tab images + prizes) ----------
+  // ---------- ALL FESTIVAL LOTTERIES ----------
   const allFestivalConfigs = useSelector(selectFestivalConfigs);
   const activeFestivalConfig = useSelector(selectActiveFestivalLottery);
   const festivalActiveLoading = useSelector(selectActiveFestivalLoading);
 
-  // ---------- FESTIVAL SET PRICE (10 tickets) FROM SETTINGS SLICE ----------
+  // ---------- FESTIVAL SET PRICE (10 tickets) ----------
   const festivalPriceFromSettings = useSelector(
     (state) => state.settings?.festivalLotteryAmount,
   );
-
   const apiPrice = readPrice(festivalPriceFromSettings);
 
   // ---------- DEPOSIT / PAYMENT ----------
@@ -262,20 +204,17 @@ const FestivalLottery = () => {
   const depositPaymentUrl = useSelector(selectDepositPaymentUrl);
   const depositOrderId = useSelector(selectDepositOrderId);
 
-  // 🔥 KYC SELECTORS
+  // ---------- KYC ----------
   const kycDocuments = useSelector(selectKycDocuments);
   const kycLoading = useSelector(selectKycLoading);
 
   // ---------- LOCAL UI STATE ----------
   const [festivalKey, setFestivalKey] = useState("");
-  const [selectedDateIndex, setSelectedDateIndex] = useState(0);
-  const [showAllDates, setShowAllDates] = useState(false);
   const [searchParams] = useSearchParams();
   const [showQuick, setShowQuick] = useState(true);
   const [tickets, setTickets] = useState(() =>
     generateUniqueTickets(MIN_TICKETS, []),
   );
-  const [showAllTickets, setShowAllTickets] = useState(false);
   const [draft, setDraft] = useState(() => {
     const urlNum = new URLSearchParams(window.location.search).get("number");
     if (urlNum && TICKET_REGEX.test(urlNum.toUpperCase())) {
@@ -290,14 +229,13 @@ const FestivalLottery = () => {
   const tabRefs = useRef({});
 
   // =====================================================
-  // FESTIVAL TABS (Derived strictly from backend configurations)
+  // FESTIVAL TABS (Derived from backend configurations)
   // =====================================================
   const festivalTabs = useMemo(() => {
     const list = Array.isArray(allFestivalConfigs) ? allFestivalConfigs : [];
     const seen = new Set();
     const tabs = [];
 
-    // same marketName ki multiple configs ho to active wali preferred
     const pickConfig = (normalizedName) => {
       const matches = list.filter(
         (c) => normalizeKey(c?.marketName) === normalizedName,
@@ -330,14 +268,37 @@ const FestivalLottery = () => {
     return tabs;
   }, [allFestivalConfigs]);
 
-  const festival = useMemo(
-    () => festivalTabs.find((f) => f.key === festivalKey) || festivalTabs[0] || null,
-    [festivalTabs, festivalKey],
-  );
+  const festival = useMemo(() => {
+    const found =
+      festivalTabs.find((f) => f.key === festivalKey) || festivalTabs[0];
+    if (found) return found;
+
+    const fallbackConfig =
+      activeFestivalConfig || allFestivalConfigs?.[0] || null;
+    if (fallbackConfig) {
+      const name = String(fallbackConfig.marketName || "Festival").trim();
+      return {
+        key: normalizeKey(name),
+        tab: name,
+        icon: Sparkles,
+        name,
+        special: `${name} Special`,
+        desc: `Play & celebrate ${name} with bigger prizes and more happiness!`,
+        price: Number(
+          fallbackConfig.ticketPrice ||
+            fallbackConfig.price ||
+            DEFAULT_SET_PRICE,
+        ),
+        drawTime: formatDrawTime(fallbackConfig.drawTime) || "9:00 PM",
+        imageUrl: fallbackConfig.imageUrl || null,
+        config: fallbackConfig,
+      };
+    }
+    return null;
+  }, [festivalTabs, festivalKey, activeFestivalConfig, allFestivalConfigs]);
 
   // =====================================================
   // PRICE RESOLUTION
-  // SET_PRICE = 10 tickets ka price (admin settings se, default ₹270)
   // =====================================================
   const SET_PRICE = useMemo(() => {
     if (Number.isFinite(apiPrice) && apiPrice > 0) return apiPrice;
@@ -348,16 +309,7 @@ const FestivalLottery = () => {
   const totalTickets = tickets.length;
   const totalAmount = calcFestivalAmount(SET_PRICE, totalTickets);
 
-  // Tickets list: first 10 only, rest behind "View More"
-  const visibleTickets = showAllTickets
-    ? tickets
-    : tickets.slice(0, INITIAL_VISIBLE_TICKETS);
-  const hiddenTicketsCount = Math.max(
-    tickets.length - INITIAL_VISIBLE_TICKETS,
-    0,
-  );
-
-  // 🔥 KYC STATUS
+  // KYC status
   const kycStatus = useMemo(
     () => deriveKycStatus(kycDocuments),
     [kycDocuments],
@@ -370,15 +322,14 @@ const FestivalLottery = () => {
   useEffect(() => {
     dispatch(getActiveFestivalConfig());
     dispatch(getActiveLotteryConfig());
-    dispatch(getAllFestivalConfigs()); // 🔥 tab images + prizes
+    dispatch(getAllFestivalConfigs());
     dispatch(getAmount());
     dispatch(fetchAllSettings());
     dispatch(clearDepositState());
-    // 🔥 FETCH KYC
     dispatch(getMyKyc());
   }, [dispatch]);
 
-  // Sync active festival tab on initial load or when festival configs update
+  // Sync active festival tab
   useEffect(() => {
     if (activeFestivalConfig?.marketName) {
       const activeKey = normalizeKey(activeFestivalConfig.marketName);
@@ -395,36 +346,24 @@ const FestivalLottery = () => {
     }
   }, [activeFestivalConfig, festivalTabs, festivalKey]);
 
-  // =====================================================
-  // RESET LOCAL SELECTION ON FESTIVAL / DATE CHANGE
-  // Preserves default 10 tickets on initial load, only resets when user explicitly changes tab or date
-  // =====================================================
+  // Reset local selection ONLY when user explicitly changes festival tab
   const prevFestivalKeyRef = useRef(null);
-  const prevDateIndexRef = useRef(selectedDateIndex);
 
   useEffect(() => {
     if (prevFestivalKeyRef.current === null) {
       prevFestivalKeyRef.current = festivalKey;
       return;
     }
-    // Only reset tickets if the user explicitly switches festival tab or date
-    if (
-      (festivalKey && prevFestivalKeyRef.current !== festivalKey) ||
-      prevDateIndexRef.current !== selectedDateIndex
-    ) {
+    if (festivalKey && prevFestivalKeyRef.current !== festivalKey) {
       setTickets(generateUniqueTickets(MIN_TICKETS, []));
-      setShowAllTickets(false);
       setDraft("");
       setManualError("");
       setLocalSuccess("");
     }
     prevFestivalKeyRef.current = festivalKey;
-    prevDateIndexRef.current = selectedDateIndex;
-  }, [festivalKey, selectedDateIndex]);
+  }, [festivalKey]);
 
-  // =====================================================
-  // KEEP SELECTED TAB CENTERED IN THE SCROLL ROW
-  // =====================================================
+  // Center selected tab in scroll row
   useEffect(() => {
     const container = tabsScrollRef.current;
     const el = tabRefs.current[festivalKey];
@@ -436,9 +375,7 @@ const FestivalLottery = () => {
     });
   }, [festivalKey, festivalTabs.length]);
 
-  // =====================================================
-  // CLEANUP ON UNMOUNT
-  // =====================================================
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       dispatch(clearLotteryConfigError());
@@ -451,40 +388,19 @@ const FestivalLottery = () => {
   useEffect(() => {
     const numParam = searchParams.get("number");
     if (numParam && TICKET_REGEX.test(numParam.toUpperCase())) {
-      updateDraft(numParam.toUpperCase());
+      setDraft(numParam.toUpperCase());
     }
   }, [searchParams]);
 
   // =====================================================
-  // DATES
-  // =====================================================
-  const dateOptions = useMemo(() => {
-    const today = new Date();
-    return Array.from({ length: ALL_DATES_COUNT }, (_, i) => {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      return {
-        day: d.getDate(),
-        month: EN_MONTHS[d.getMonth()],
-        year: d.getFullYear(),
-        weekday: EN_DAYS[d.getDay()],
-        raw: d,
-      };
-    });
-  }, []);
-
-  const visibleDates = showAllDates ? dateOptions : dateOptions.slice(0, 8);
-  const selectedDate = dateOptions[selectedDateIndex] || dateOptions[0];
-  const summaryDate = `${String(selectedDate.day).padStart(2, "0")} ${selectedDate.month} ${selectedDate.year}`;
-
-  // =====================================================
-  // DYNAMIC FESTIVAL LOTTERY CONFIG & PRIZES FROM API
+  // DYNAMIC CONFIG & PRIZES
   // =====================================================
   const currentLottery = useMemo(() => {
     return (
       festival?.config ||
       (activeFestivalConfig &&
-      normalizeKey(activeFestivalConfig.marketName) === normalizeKey(festival?.name)
+      normalizeKey(activeFestivalConfig.marketName) ===
+        normalizeKey(festival?.name)
         ? activeFestivalConfig
         : null) ||
       (activeConfig &&
@@ -499,25 +415,30 @@ const FestivalLottery = () => {
 
   const marketName = currentLottery?.marketName || festival?.name || "Festival";
   const drawDateText = formatDrawDate(currentLottery?.drawDate);
-  const drawTimeText = formatDrawTime(currentLottery?.drawTime || festival?.drawTime);
-  const festivalImageUrl = currentLottery?.imageUrl || festival?.imageUrl || null;
+  const drawTimeText = formatDrawTime(
+    currentLottery?.drawTime || festival?.drawTime,
+  );
+  const festivalImageUrl =
+    currentLottery?.imageUrl || festival?.imageUrl || null;
   const lotteryPrizes = currentLottery?.prizes || {};
   const firstPrizeAmount = formatINR(lotteryPrizes?.first);
-  const firstPrizeText = firstPrizeAmount;
 
-  // Exactly 5 dynamic winning rules directly mapped to API prizes
   const winningRules = useMemo(
-    () => getFestivalWinningRules(lotteryPrizes, TICKET_EXAMPLE, PRICE_SET_SIZE),
-    [lotteryPrizes]
+    () =>
+      getFestivalWinningRules(lotteryPrizes, TICKET_EXAMPLE, PRICE_SET_SIZE),
+    [lotteryPrizes],
   );
 
-  // Purchase config — prefer festival-matched, fallback to any active
   const purchaseConfig =
     currentLottery ||
     activeFestivalConfig ||
     allFestivalConfigs?.[0] ||
     activeConfig ||
     null;
+
+  const festivalDesc =
+    festival?.desc ||
+    `Play & celebrate ${marketName} with bigger prizes and more happiness!`;
 
   // =====================================================
   // HANDLERS — TICKET SELECTION
@@ -540,20 +461,19 @@ const FestivalLottery = () => {
     setLocalSuccess("");
   };
 
-  // + / − always move to the next / previous multiple of 10 (10 → 20 → 30 ...)
   const handleIncrease = () =>
-    setQuantity(totalTickets === 0 ? MIN_TICKETS : (Math.floor(totalTickets / TICKET_STEP) + 1) * TICKET_STEP);
+    setQuantity(
+      totalTickets === 0
+        ? MIN_TICKETS
+        : (Math.floor(totalTickets / TICKET_STEP) + 1) * TICKET_STEP,
+    );
 
   const handleDecrease = () =>
-    setQuantity(totalTickets <= MIN_TICKETS ? 0 : (Math.ceil(totalTickets / TICKET_STEP) - 1) * TICKET_STEP);
-
-  const handleClear = () => {
-    if (depositLoading) return;
-    setTickets([]);
-    setShowAllTickets(false);
-    setManualError("");
-    setLocalSuccess("");
-  };
+    setQuantity(
+      totalTickets <= MIN_TICKETS
+        ? 0
+        : (Math.ceil(totalTickets / TICKET_STEP) - 1) * TICKET_STEP,
+    );
 
   const focusDraft = (index) => {
     const el = draftRefs.current[index];
@@ -656,13 +576,8 @@ const FestivalLottery = () => {
     setTimeout(() => focusDraft(0), 60);
   };
 
-  const handleRemoveTicket = (id) => {
-    if (depositLoading) return;
-    setTickets((prev) => prev.filter((t) => t.id !== id));
-  };
-
   // =====================================================
-  // HANDLER — PURCHASE (same flow as BuyTicket)
+  // HANDLER — PURCHASE
   // =====================================================
   const handlePurchase = async () => {
     if (depositLoading) return;
@@ -675,13 +590,11 @@ const FestivalLottery = () => {
       dispatch(clearLotteryConfigError());
       dispatch(clearLotteryConfigSuccess());
 
-      // ---------- VALIDATIONS ----------
       if (!user) {
         setManualError("Please login first");
         return;
       }
 
-      // 🔥 KYC CHECK
       if (!isKycApproved) {
         if (kycStatus === "pending") {
           setManualError(
@@ -694,7 +607,6 @@ const FestivalLottery = () => {
           setTimeout(() => navigate("/kyc"), 1500);
           return;
         }
-        // not_submitted
         setManualError(
           "Please complete your KYC first. Redirecting to KYC page...",
         );
@@ -719,15 +631,12 @@ const FestivalLottery = () => {
         return;
       }
 
-      // ---------- RESOLVE PRICE (10 tickets ka set price) ----------
       const setPriceAmount = SET_PRICE;
-
       if (!Number.isFinite(setPriceAmount) || setPriceAmount <= 0) {
         setManualError("Ticket price is not available");
         return;
       }
 
-      // ---------- VALIDATE TICKETS ----------
       const invalidIndex = tickets.findIndex((t) => !TICKET_REGEX.test(t.code));
       if (invalidIndex !== -1) {
         setManualError(
@@ -746,12 +655,10 @@ const FestivalLottery = () => {
       }
 
       const totalPayable = calcFestivalAmount(setPriceAmount, tickets.length);
-
       setLocalSuccess(
         `Creating payment order for ${tickets.length} ticket(s)...`,
       );
 
-      // ---------- CREATE PAYMENT ORDER (same as BuyTicket) ----------
       const result = await dispatch(
         createDeposit({
           paymentMethod: "INR",
@@ -778,32 +685,26 @@ const FestivalLottery = () => {
         `Order ${orderId} created. Redirecting to payment page...`,
       );
 
-      // Reset local selection to empty
       setTickets([]);
-      setShowAllTickets(false);
       setDraft("");
 
-      // ---------- REDIRECT TO PAYMENT GATEWAY ----------
       setTimeout(() => {
         window.location.href = paymentUrl;
       }, 600);
-    } catch (purchaseError) {
-      console.error("FESTIVAL LOTTERY PURCHASE ERROR:", purchaseError);
+    } catch (purchaseErr) {
+      console.error("FESTIVAL LOTTERY PURCHASE ERROR:", purchaseErr);
       setLocalSuccess("");
       setManualError(
-        typeof purchaseError === "string"
-          ? purchaseError
-          : purchaseError?.message ||
-              purchaseError?.payload?.message ||
-              purchaseError?.payload ||
+        typeof purchaseErr === "string"
+          ? purchaseErr
+          : purchaseErr?.message ||
+              purchaseErr?.payload?.message ||
+              purchaseErr?.payload ||
               "Could not buy tickets",
       );
     }
   };
 
-  // =====================================================
-  // DERIVED — VALIDATION
-  // =====================================================
   const hasDuplicates = useMemo(() => {
     const codes = tickets
       .filter((t) => t.code.length === TICKET_LENGTH)
@@ -813,11 +714,6 @@ const FestivalLottery = () => {
 
   const displayError = manualError || depositError;
 
-  // Purchase enabled when:
-  //  • user logged in
-  //  • active config exists & is active
-  //  • tickets.length > 0 AND >= MIN_TICKETS valid unique tickets
-  // NOTE: KYC check intentionally NOT in disabled — so user gets a clear message on click
   const isPurchaseDisabled =
     depositLoading ||
     !user ||
@@ -828,9 +724,6 @@ const FestivalLottery = () => {
     hasDuplicates ||
     tickets.some((t) => !TICKET_REGEX.test(t.code));
 
-  // =====================================================
-  // UI
-  // =====================================================
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#eef3fa] text-[#173e70]">
       {/* Real-time Number Sold Notification */}
@@ -839,10 +732,7 @@ const FestivalLottery = () => {
       <div
         className="relative mx-auto w-[calc(100%-0px)] max-w-[500px] overflow-x-hidden"
         style={{
-          paddingBottom:
-            (festival
-              ? BOTTOM_NAV_HEIGHT + PURCHASE_BAR_HEIGHT
-              : BOTTOM_NAV_HEIGHT) + 16,
+          paddingBottom: BOTTOM_NAV_HEIGHT + PURCHASE_BAR_HEIGHT + 16,
         }}
       >
         {/* ================= HERO ================= */}
@@ -952,7 +842,7 @@ const FestivalLottery = () => {
             </div>
           )}
 
-          {/* 🔥 KYC STATUS BANNER */}
+          {/* KYC STATUS BANNER */}
           {!kycLoading && kycStatus !== "approved" && (
             <div
               className={`rounded-xl border px-4 py-3 text-sm font-medium ${
@@ -1035,7 +925,7 @@ const FestivalLottery = () => {
                   {marketName} Festival Lottery
                 </h3>
                 <p className="mt-0.5 text-[10px] leading-snug text-[#4b5563]">
-                  {festival.desc}
+                  {festivalDesc}
                 </p>
                 <div className="mt-2 grid grid-cols-3 gap-1">
                   <InfoMini
@@ -1057,56 +947,6 @@ const FestivalLottery = () => {
               </div>
             </div>
           </section>
-
-          {/* ================= SELECT DRAW DATE ================= */}
-          {/* <section className="rounded-[16px] bg-white p-3 shadow-sm">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <CalendarDays size={24} className="text-[#173e70]" />
-                <h2 className="text-[16px] font-extrabold text-[#173e70]">
-                  Select Draw Date
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAllDates((s) => !s)}
-                className="flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[#c9d3e3] bg-white px-2.5 text-[10px] font-semibold text-[#173e70]"
-              >
-                {showAllDates ? "Show Less" : "View Full Schedule"}
-                <ArrowRight
-                  size={12}
-                  className={`transition-transform ${showAllDates ? "rotate-90" : ""}`}
-                />
-              </button>
-            </div>
-
-            {showAllDates ? (
-              <div className="mt-3 grid grid-cols-4 gap-2 min-[400px]:grid-cols-5">
-                {visibleDates.map((d, index) => (
-                  <DateChip
-                    key={`${d.day}-${d.month}-${index}`}
-                    date={d}
-                    today={index === 0}
-                    active={index === selectedDateIndex}
-                    onClick={() => setSelectedDateIndex(index)}
-                    fluid
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {visibleDates.map((d, index) => (
-                  <DateChip
-                    key={`${d.day}-${d.month}-${index}`}
-                    date={d}
-                    today={index === 0}
-                    active={index === selectedDateIndex}
-                    onClick={() => setSelectedDateIndex(index)}
-                  />
-                ))}
-              </div>
-            )}
-          </section> */}
 
           {/* ================= HOW MANY TICKETS ================= */}
           <section className="rounded-[16px] bg-white p-3 shadow-sm">
@@ -1337,94 +1177,6 @@ const FestivalLottery = () => {
             onSelectNumber={(code) => updateDraft(code)}
           />
 
-          {/* ================= SELECTED TICKETS ================= */}
-          {/* <section className="rounded-[16px] bg-white p-3 shadow-sm">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <FileText size={22} className="shrink-0 text-[#173e70]" />
-                <h2 className="truncate text-[15px] font-extrabold text-[#173e70]">
-                  Selected Tickets ({totalTickets})
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={handleClear}
-                disabled={depositLoading}
-                className="flex h-8 shrink-0 items-center gap-1 px-1 text-[12px] font-semibold text-[#173e70] disabled:opacity-50"
-              >
-                <Trash2 size={14} /> Clear
-              </button>
-            </div>
-
-            <div className="mt-3 rounded-xl border border-[#e2e5f0] bg-[#f9fbff] p-2">
-              {tickets.length === 0 ? (
-                <div className="flex min-h-[100px] items-center justify-center px-3 text-center">
-                  <p className="text-[12px] font-medium leading-relaxed text-[#6b7280]">
-                    No tickets selected yet. Use Quick Select to select your tickets.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-2 gap-2">
-                    {visibleTickets.map((ticket, index) => {
-                      const color = CHIP_COLORS[index % CHIP_COLORS.length];
-                      return (
-                        <div
-                          key={ticket.id}
-                          className={`flex min-w-0 items-center gap-1.5 rounded-lg border-2 border-white px-1.5 py-2 shadow-sm ${color.row}`}
-                        >
-                          <span
-                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-black text-white ${color.badge}`}
-                          >
-                            {index + 1}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-[13px] font-bold tracking-wider text-[#26354b]">
-                            {ticket.code}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveTicket(ticket.id)}
-                            disabled={tickets.length <= MIN_TICKETS || depositLoading}
-                            aria-label={`Remove ticket ${index + 1}`}
-                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#ed1d43] text-white disabled:opacity-40"
-                          >
-                            <X size={13} strokeWidth={3} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {hiddenTicketsCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllTickets((s) => !s)}
-                      className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#c9d3e3] bg-white py-2 text-[12px] font-bold text-[#173e70] transition active:scale-[0.99]"
-                    >
-                      {showAllTickets
-                        ? "Show Less"
-                        : `View More Tickets (${hiddenTicketsCount} more)`}
-                      <ChevronDown
-                        size={16}
-                        className={`transition ${showAllTickets ? "rotate-180" : ""}`}
-                      />
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-
-            <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#bfe8d3] bg-[#e7f8ef] px-3 py-2">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#14a06a] text-white">
-                <Info size={13} />
-              </span>
-              <p className="text-[11px] leading-snug text-[#26354b]">
-                {totalTickets} unique tickets for the draw on {summaryDate}. Every{" "}
-                {PRICE_SET_SIZE} tickets cost ₹{price} (minimum {MIN_TICKETS} tickets).
-              </p>
-            </div>
-          </section> */}
-
           {/* ================= QUICK TICKET VERIFICATION WIDGET ================= */}
           <QuickVerifyTicket
             defaultMode="festival"
@@ -1441,7 +1193,7 @@ const FestivalLottery = () => {
               <div className="flex min-w-0 items-center gap-2">
                 <BookOpen size={26} className="shrink-0 text-[#ffd34e]" />
                 <h2 className="text-[15px] font-extrabold leading-tight text-white">
-                  {festival.name} Festival Lottery Winning Rules
+                  {festival?.name || marketName} Festival Lottery Winning Rules
                 </h2>
               </div>
               <button
@@ -1518,7 +1270,7 @@ const FestivalLottery = () => {
       </div>
 
       {/* ================= BOTTOM PURCHASE BAR ================= */}
-      {festival && (
+      {(festival || purchaseConfig) && (
         <div
           className="fixed left-1/2 z-[70] mb-[11px] w-[calc(100%-16px)] max-w-[450px] -translate-x-1/2 overflow-hidden rounded-lg border-t border-[#ff3155]/20 bg-gradient-to-b from-[#2b0a16] to-[#160610] shadow-[0_-4px_14px_rgba(0,0,0,0.4)] sm:mb-4"
           style={{ bottom: BOTTOM_NAV_HEIGHT + 8 }}
@@ -1549,7 +1301,8 @@ const FestivalLottery = () => {
                   ₹ {totalAmount.toLocaleString("en-IN")} /-
                 </span>
                 <span className="min-w-0 truncate pb-0.5 text-[7.5px] leading-tight text-white/70 sm:text-[8.5px]">
-                  {totalTickets} Tickets • {summaryDate} <br />
+                  {totalTickets} Tickets • {drawDateText || "Festival Draw"}{" "}
+                  <br />
                   {festival?.name || marketName || "Festival"} Lottery
                 </span>
               </div>
@@ -1560,7 +1313,13 @@ const FestivalLottery = () => {
               disabled={isPurchaseDisabled}
               className="flex h-[44px] w-auto min-w-[108px] shrink-0 items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-[#ff1744] to-[#e0102f] px-2.5 text-[12px] font-extrabold text-white shadow-[0_8px_25px_rgba(255,20,67,0.45)] transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none sm:h-[50px] sm:min-w-[125px] sm:gap-1.5 sm:px-3 sm:text-[14px]"
             >
-              <span>{depositLoading ? "Processing..." : tickets.length === 0 ? "Select Tickets" : "Purchase Now"}</span>
+              <span>
+                {depositLoading
+                  ? "Processing..."
+                  : tickets.length === 0
+                    ? "Select Tickets"
+                    : "Purchase Now"}
+              </span>
               {!depositLoading && (
                 <ArrowRight
                   size={17}
@@ -1579,16 +1338,15 @@ const FestivalLottery = () => {
 // SMALL COMPONENTS
 // =====================================================
 
-// 🔥 FESTIVAL TAB (image from backend, icon fallback, clear clickable look)
 const FestivalTab = ({ festival, active, disabled, onClick, innerRef }) => {
-  const Icon = festival.icon;
+  const Icon = festival?.icon || Sparkles;
   const [imgFailed, setImgFailed] = useState(false);
 
   useEffect(() => {
     setImgFailed(false);
-  }, [festival.imageUrl]);
+  }, [festival?.imageUrl]);
 
-  const showImage = Boolean(festival.imageUrl) && !imgFailed;
+  const showImage = Boolean(festival?.imageUrl) && !imgFailed;
 
   return (
     <button
@@ -1616,8 +1374,8 @@ const FestivalTab = ({ festival, active, disabled, onClick, innerRef }) => {
       >
         {showImage ? (
           <img
-            src={festival.imageUrl}
-            alt={`${festival.name} lottery`}
+            src={festival?.imageUrl}
+            alt={`${festival?.name || "Festival"} lottery`}
             loading="lazy"
             onError={() => setImgFailed(true)}
             className="h-full w-full object-cover"
@@ -1631,47 +1389,14 @@ const FestivalTab = ({ festival, active, disabled, onClick, innerRef }) => {
       </span>
 
       <span className="w-full min-w-0 text-[10px] font-bold leading-tight">
-        <span className="block truncate">{festival.tab}</span>
+        <span className="block truncate">
+          {festival?.tab || festival?.name || "Festival"}
+        </span>
         <span className="block">Lottery</span>
       </span>
     </button>
   );
 };
-
-const DateChip = ({ date, today, active, onClick, fluid = false }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={`relative flex h-[66px] ${
-      fluid ? "w-full" : "w-[64px] shrink-0"
-    } flex-col items-center justify-center rounded-xl border text-center transition active:scale-95 ${
-      active
-        ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
-        : "border-transparent bg-[#e3e9f3]"
-    }`}
-  >
-    {today && (
-      <span className="text-[10px] font-semibold text-[#ed1d43]">Today</span>
-    )}
-    <span
-      className={`whitespace-nowrap text-[13px] font-extrabold ${
-        active ? "text-[#ed1d43]" : "text-[#26354b]"
-      }`}
-    >
-      {date.day} {date.month}
-    </span>
-    <span
-      className={`text-[10px] ${active ? "text-[#ed1d43]" : "text-[#6b7280]"}`}
-    >
-      {date.weekday}
-    </span>
-    <span
-      className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
-        active ? "bg-[#ed1d43]" : "bg-[#20a66a]"
-      }`}
-    />
-  </button>
-);
 
 const HeroFeature = ({ icon, text }) => (
   <div className="flex min-w-0 flex-col items-center gap-1 text-center">
