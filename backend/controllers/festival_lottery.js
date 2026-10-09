@@ -302,11 +302,7 @@ const createLotteryConfig = async (req, res) => {
     // MARKET VALIDATION
     // ================================================
 
-    if (
-      !marketName ||
-      typeof marketName !== "string" ||
-      !marketName.trim()
-    ) {
+    if (!marketName || typeof marketName !== "string" || !marketName.trim()) {
       return res.status(400).json({
         success: false,
         message: "Market name is required",
@@ -483,7 +479,6 @@ const createLotteryConfig = async (req, res) => {
       });
     }
 
-
     // ================================================
     // CHECK DUPLICATE
     // ================================================
@@ -529,13 +524,10 @@ const createLotteryConfig = async (req, res) => {
 
       const uploadResult = await uploadToImgBB(
         req.file.buffer,
-        req.file.originalname
+        req.file.originalname,
       );
 
-      imageUrl =
-        uploadResult?.imageUrl ||
-        uploadResult?.displayUrl ||
-        null;
+      imageUrl = uploadResult?.imageUrl || uploadResult?.displayUrl || null;
     } catch (uploadError) {
       console.error("ImgBB upload error:", uploadError);
 
@@ -574,6 +566,8 @@ const createLotteryConfig = async (req, res) => {
         first: firstPrize,
         second: secondPrize,
         third: thirdPrize,
+        fourth: fourthPrize,
+        fifth: fifthPrize,
       },
 
       users: [],
@@ -655,14 +649,7 @@ const updateLotteryConfig = async (req, res) => {
       });
     }
 
-    const {
-      marketName,
-      month,
-      year,
-      drawDate,
-      drawTime,
-      prizes,
-    } = req.body;
+    const { marketName, month, year, drawDate, drawTime, prizes } = req.body;
 
     // ================================================
     // PARSE PRIZES (multipart form-data => string)
@@ -776,9 +763,11 @@ const updateLotteryConfig = async (req, res) => {
     // ================================================
 
     let updatedPrizes = {
-      first: config.prizes?.first || 0,
-      second: config.prizes?.second || 0,
-      third: config.prizes?.third || 0,
+      first: config.prizes?.first ?? 0,
+      second: config.prizes?.second ?? 0,
+      third: config.prizes?.third ?? 0,
+      fourth: config.prizes?.fourth ?? 0,
+      fifth: config.prizes?.fifth ?? 0,
     };
 
     if (parsedPrizes !== undefined && parsedPrizes !== null) {
@@ -901,13 +890,11 @@ const updateLotteryConfig = async (req, res) => {
 
         const uploadResult = await uploadToImgBB(
           req.file.buffer,
-          req.file.originalname
+          req.file.originalname,
         );
 
         const newImageUrl =
-          uploadResult?.imageUrl ||
-          uploadResult?.displayUrl ||
-          null;
+          uploadResult?.imageUrl || uploadResult?.displayUrl || null;
 
         if (!newImageUrl) {
           return res.status(500).json({
@@ -1030,10 +1017,7 @@ const addUserLotteryEntry = async (req, res) => {
     const isObjectId = /^[a-f\d]{24}$/i.test(String(userId));
 
     const user = await User.findOne({
-      $or: [
-        ...(isObjectId ? [{ _id: userId }] : []),
-        { uuid: String(userId) },
-      ],
+      $or: [...(isObjectId ? [{ _id: userId }] : []), { uuid: String(userId) }],
     });
 
     if (!user) {
@@ -1105,9 +1089,7 @@ const addUserLotteryEntry = async (req, res) => {
       });
     }
 
-    const drawDateTime = new Date(
-      `${dateString}T${config.drawTime}:00+05:30`
-    );
+    const drawDateTime = new Date(`${dateString}T${config.drawTime}:00+05:30`);
 
     if (Number.isNaN(drawDateTime.getTime())) {
       return res.status(500).json({
@@ -1155,7 +1137,7 @@ const addUserLotteryEntry = async (req, res) => {
       {
         $inc: { wallet: -Number(amountValidation.amount) },
       },
-      { new: true }
+      { new: true },
     );
 
     if (!updatedUser) {
@@ -1168,7 +1150,7 @@ const addUserLotteryEntry = async (req, res) => {
     }
 
     console.log(
-      `WALLET DEDUCTED: ₹${amountValidation.amount} from user ${user._id}. New balance: ₹${updatedUser.wallet}`
+      `WALLET DEDUCTED: ₹${amountValidation.amount} from user ${user._id}. New balance: ₹${updatedUser.wallet}`,
     );
 
     config.users.push({
@@ -1229,7 +1211,7 @@ const addUserLotteryEntry = async (req, res) => {
     const userEntries = config.users.filter(
       (entry) =>
         String(entry.userId) === String(user._id) &&
-        String(entry.entryDate) === String(dateString)
+        String(entry.entryDate) === String(dateString),
     );
 
     return res.status(201).json({
@@ -1376,7 +1358,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
 
     const totalAmount = normalizedEntries.reduce(
       (sum, entry) => sum + entry.amount,
-      0
+      0,
     );
 
     if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
@@ -1389,10 +1371,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     const isObjectId = /^[a-f\d]{24}$/i.test(String(userId));
 
     const user = await User.findOne({
-      $or: [
-        ...(isObjectId ? [{ _id: userId }] : []),
-        { uuid: String(userId) },
-      ],
+      $or: [...(isObjectId ? [{ _id: userId }] : []), { uuid: String(userId) }],
     });
 
     if (!user) {
@@ -1465,9 +1444,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
       });
     }
 
-    const drawDateTime = new Date(
-      `${dateString}T${config.drawTime}:00+05:30`
-    );
+    const drawDateTime = new Date(`${dateString}T${config.drawTime}:00+05:30`);
 
     if (Number.isNaN(drawDateTime.getTime())) {
       return res.status(500).json({
@@ -1514,7 +1491,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
       {
         $inc: { wallet: -totalAmount },
       },
-      { new: true }
+      { new: true },
     );
 
     if (!updatedUser) {
@@ -1527,7 +1504,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     }
 
     console.log(
-      `WALLET DEDUCTED: ₹${totalAmount} from user ${user._id}. New balance: ₹${updatedUser.wallet}`
+      `WALLET DEDUCTED: ₹${totalAmount} from user ${user._id}. New balance: ₹${updatedUser.wallet}`,
     );
 
     const startIndex = config.users.length;
@@ -1600,7 +1577,7 @@ const addBulkUserLotteryEntries = async (req, res) => {
     const userEntries = config.users.filter(
       (entry) =>
         String(entry.userId) === String(user._id) &&
-        String(entry.entryDate) === String(dateString)
+        String(entry.entryDate) === String(dateString),
     );
 
     return res.status(201).json({
@@ -1675,15 +1652,12 @@ const getMyLotteryEntries = async (req, res) => {
     const isObjectId = /^[a-f\d]{24}$/i.test(String(userId));
 
     const user = await User.findOne({
-      $or: [
-        ...(isObjectId ? [{ _id: userId }] : []),
-        { uuid: String(userId) },
-      ],
+      $or: [...(isObjectId ? [{ _id: userId }] : []), { uuid: String(userId) }],
     }).lean();
 
     console.log(
       "STEP 1 user:",
-      user ? { _id: user._id, uuid: user.uuid } : null
+      user ? { _id: user._id, uuid: user.uuid } : null,
     );
 
     if (!user) {
@@ -1713,7 +1687,7 @@ const getMyLotteryEntries = async (req, res) => {
 
     for (const config of configs) {
       const userEntries = (config.users || []).filter((u) =>
-        uniqueIdentifiers.includes(String(u.userId))
+        uniqueIdentifiers.includes(String(u.userId)),
       );
 
       for (const u of userEntries) {
@@ -1918,7 +1892,7 @@ const activateLotteryConfig = async (req, res) => {
       },
       {
         $set: { isActive: false },
-      }
+      },
     );
 
     config.isActive = true;
@@ -2174,7 +2148,7 @@ const getNumbersWithoutBets = async (req, res) => {
     const betNumbers = new Set(
       (config.users || [])
         .filter((u) => u.isBuy === true)
-        .map((u) => String(u.number).trim().toUpperCase())
+        .map((u) => String(u.number).trim().toUpperCase()),
     );
 
     // ================================================
@@ -2201,7 +2175,7 @@ const getNumbersWithoutBets = async (req, res) => {
     // ================================================
 
     noBetNumbers.sort((a, b) =>
-      String(a.number).localeCompare(String(b.number))
+      String(a.number).localeCompare(String(b.number)),
     );
 
     // ================================================
@@ -2313,8 +2287,7 @@ const checkLotteryResult = async (req, res) => {
     if (!/^[a-zA-Z0-9]{8}$/.test(lotteryNumber)) {
       return res.status(400).json({
         success: false,
-        message:
-          "Lottery number must be exactly 8 alphanumeric characters",
+        message: "Lottery number must be exactly 8 alphanumeric characters",
       });
     }
 
@@ -2333,7 +2306,7 @@ const checkLotteryResult = async (req, res) => {
 
     // Find exact entry
     const entry = lotteryConfig.users.find(
-      (user) => user.number === lotteryNumber
+      (user) => user.number === lotteryNumber,
     );
 
     if (!entry) {
@@ -2349,38 +2322,23 @@ const checkLotteryResult = async (req, res) => {
 
     switch (entry.prizeType) {
       case "1st":
-        prizeAmount =
-          lotteryConfig.prizes?.first ||
-          entry.prize?.first ||
-          0;
+        prizeAmount = lotteryConfig.prizes?.first || entry.prize?.first || 0;
         break;
 
       case "2nd":
-        prizeAmount =
-          lotteryConfig.prizes?.second ||
-          entry.prize?.second ||
-          0;
+        prizeAmount = lotteryConfig.prizes?.second || entry.prize?.second || 0;
         break;
 
       case "3rd":
-        prizeAmount =
-          lotteryConfig.prizes?.third ||
-          entry.prize?.third ||
-          0;
+        prizeAmount = lotteryConfig.prizes?.third || entry.prize?.third || 0;
         break;
 
       case "4th":
-        prizeAmount =
-          lotteryConfig.prizes?.fourth ||
-          entry.prize?.fourth ||
-          0;
+        prizeAmount = lotteryConfig.prizes?.fourth || entry.prize?.fourth || 0;
         break;
 
       case "5th":
-        prizeAmount =
-          lotteryConfig.prizes?.fifth ||
-          entry.prize?.fifth ||
-          0;
+        prizeAmount = lotteryConfig.prizes?.fifth || entry.prize?.fifth || 0;
         break;
 
       default:
@@ -2438,7 +2396,6 @@ const checkLotteryResult = async (req, res) => {
   }
 };
 
-
 // =====================================================
 // EXPORTS
 // =====================================================
@@ -2465,7 +2422,6 @@ module.exports = {
   updateEntryStatus,
 
   deleteLotteryConfig,
-
 
   checkLotteryResult,
   updateLotteryConfig,

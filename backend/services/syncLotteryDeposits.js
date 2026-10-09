@@ -1,6 +1,7 @@
 const Deposit = require("../models/Deposit");
 const Amount = require("../models/amountModel");
 const LotteryConfig = require("../models/LotteryConfig");
+const Festival = require("../models/Festival");
 
 /**
  * ============================================================
@@ -393,11 +394,17 @@ const syncLotteryDeposits = async () => {
         // 9. FIND LOTTERY CONFIG
         // ====================================================
 
-        const config =
+        let config =
           await LotteryConfig.findById(
             deposit.configId
           );
 
+        if (!config) {
+          config =
+            await Festival.findById(
+              deposit.configId
+            );
+        }
 
         // ====================================================
         // CONFIG NOT FOUND
@@ -406,7 +413,7 @@ const syncLotteryDeposits = async () => {
         if (!config) {
 
           console.log(
-            "LotteryConfig not found:",
+            "LotteryConfig/Festival not found:",
             deposit.configId
           );
 

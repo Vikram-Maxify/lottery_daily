@@ -7,6 +7,7 @@ const User = require("../models/userModel");
 const TransactionHistory = require("../models/TransactionHistory");
 const QwackPayCallbackLog = require("../models/QwackPayCallbackLog");
 const LotteryConfig = require("../models/LotteryConfig");
+const Festival = require("../models/Festival");
 
 // =====================================================
 // STATUS CONSTANTS
@@ -202,7 +203,15 @@ const createDeposit = async (req, res) => {
           });
         }
 
-        const lotteryConfig = await LotteryConfig.findById(configId);
+        let lotteryConfig = await LotteryConfig.findById(configId);
+        let isFestivalConfig = false;
+
+        if (!lotteryConfig) {
+          lotteryConfig = await Festival.findById(configId);
+          if (lotteryConfig) {
+            isFestivalConfig = true;
+          }
+        }
 
         if (!lotteryConfig) {
           return res.status(404).json({
@@ -243,9 +252,9 @@ const createDeposit = async (req, res) => {
           });
         }
 
-        const ticketPrice = Number(lotteryConfig.ticketPrice) || 0;
+        const ticketPrice = Number(lotteryConfig.ticketPrice || lotteryConfig.price) || 0;
 
-        if (ticketPrice > 0) {
+        if (ticketPrice > 0 && !isFestivalConfig) {
           const expectedAmount =
             ticketPrice * normalizedLotteryNumbers.length;
 
@@ -551,9 +560,19 @@ const processLotteryEntries = async (deposit, user, session = null) => {
 
   try {
     // Verify lottery config exists and is still active
-    const lotteryConfig = await LotteryConfig.findById(
+    let lotteryConfig = await LotteryConfig.findById(
       deposit.configId
     ).session(session);
+    let ConfigModel = LotteryConfig;
+
+    if (!lotteryConfig) {
+      lotteryConfig = await Festival.findById(
+        deposit.configId
+      ).session(session);
+      if (lotteryConfig) {
+        ConfigModel = Festival;
+      }
+    }
 
     if (!lotteryConfig) {
       console.error("LOTTERY CONFIG NOT FOUND:", deposit.configId);
@@ -569,7 +588,7 @@ const processLotteryEntries = async (deposit, user, session = null) => {
     // TICKET PRICE (config ya deposit se fallback)
     // =====================================================
 
-    let ticketPrice = Number(lotteryConfig.ticketPrice) || 0;
+    let ticketPrice = Number(lotteryConfig.ticketPrice || lotteryConfig.price) || 0;
 
     if (!ticketPrice || ticketPrice <= 0) {
       const totalNumbers = deposit.lotteryNumbers.length || 1;
@@ -635,7 +654,7 @@ const processLotteryEntries = async (deposit, user, session = null) => {
     // =====================================================
 
     if (newEntries.length > 0) {
-      await LotteryConfig.findByIdAndUpdate(
+      await ConfigModel.findByIdAndUpdate(
         deposit.configId,
         {
           $push: {
@@ -836,7 +855,10 @@ const getDepositStatusByIdentifier = async (req, res) => {
       Array.isArray(deposit.lotteryNumbers) &&
       deposit.lotteryNumbers.length > 0
     ) {
-      const config = await LotteryConfig.findById(deposit.configId).lean();
+      let config = await LotteryConfig.findById(deposit.configId).lean();
+      if (!config) {
+        config = await Festival.findById(deposit.configId).lean();
+      }
 
       if (config && Array.isArray(config.users)) {
         const wantedNumbers = new Set(

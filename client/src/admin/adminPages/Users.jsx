@@ -1,7 +1,5 @@
 import {
   AlertTriangle,
-  Ban,
-  CalendarDays,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -10,25 +8,16 @@ import {
   Download,
   Eye,
   EyeOff,
-  Gift,
-  Globe,
   History,
-  Key,
-  Laptop,
-  Mail,
   Pencil,
   Phone,
   RefreshCw,
   Search,
   Shield,
   ShieldCheck,
-  Smartphone,
-  Ticket,
   Trash2,
-  UserCheck,
   UserRound,
   Users as UsersIcon,
-  Wallet,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -181,10 +170,10 @@ const deriveKycDocsStatus = (docs) => {
 const isMobileVerified = (u) =>
   Boolean(
     u?.isMobileVerified ??
-      u?.mobileVerified ??
-      u?.phoneVerified ??
-      u?.isVerified ??
-      false
+    u?.mobileVerified ??
+    u?.phoneVerified ??
+    u?.isVerified ??
+    false,
   );
 
 // "Rahul Sharma" -> "RS", "Rahul" -> "RA"
@@ -328,7 +317,7 @@ const Users = () => {
   } = useSelector((state) => state.adminAuth);
 
   const { configs = [], loading: lotteryLoading } = useSelector(
-    (state) => state.lotteryConfig || {}
+    (state) => state.lotteryConfig || {},
   );
 
   const kycDocs = useSelector(selectAdminKycDocuments);
@@ -414,7 +403,8 @@ const Users = () => {
   useEffect(() => {
     if (viewUser) {
       const updated = rows.find(
-        (r) => r.uuid === viewUser.uuid || String(r._id) === String(viewUser._id)
+        (r) =>
+          r.uuid === viewUser.uuid || String(r._id) === String(viewUser._id),
       );
       if (updated) setViewUser(updated);
     }
@@ -430,7 +420,7 @@ const Users = () => {
       pendingKyc: rows.filter((r) => !r._kyc.isVerified).length,
       mobileVerified: rows.filter((r) => r._mobileVerified).length,
     }),
-    [rows]
+    [rows],
   );
 
   // ---------- FILTERING ----------
@@ -454,8 +444,10 @@ const Users = () => {
       // KYC filter
       if (filters.kyc === "approved" && !r._kyc.isVerified) return false;
       if (filters.kyc === "pending" && r._kyc.label !== "Pending") return false;
-      if (filters.kyc === "rejected" && r._kyc.label !== "Rejected") return false;
-      if (filters.kyc === "not_submitted" && r._kycDocs.length > 0) return false;
+      if (filters.kyc === "rejected" && r._kyc.label !== "Rejected")
+        return false;
+      if (filters.kyc === "not_submitted" && r._kycDocs.length > 0)
+        return false;
 
       if (filters.date && toYMD(r.createdAt) !== filters.date) return false;
 
@@ -501,9 +493,7 @@ const Users = () => {
     setChecked((prev) => {
       const next = new Set(prev);
       pageRows.forEach((r) =>
-        allOnPageChecked
-          ? next.delete(String(r._id))
-          : next.add(String(r._id))
+        allOnPageChecked ? next.delete(String(r._id)) : next.add(String(r._id)),
       );
       return next;
     });
@@ -543,7 +533,13 @@ const Users = () => {
 
   const closeEdit = () => {
     setEditUser(null);
-    setForm({ name: "", mobile: "", password: "", wallet: 0, isKycVerified: false });
+    setForm({
+      name: "",
+      mobile: "",
+      password: "",
+      wallet: 0,
+      isKycVerified: false,
+    });
   };
 
   const submitEdit = async (e) => {
@@ -582,9 +578,15 @@ const Users = () => {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
 
-    const res = await dispatch(deleteUser(deleteTarget.uuid || deleteTarget._id));
+    const res = await dispatch(
+      deleteUser(deleteTarget.uuid || deleteTarget._id),
+    );
     if (deleteUser.fulfilled.match(res)) {
-      if (viewUser && (viewUser.uuid === deleteTarget.uuid || viewUser._id === deleteTarget._id)) {
+      if (
+        viewUser &&
+        (viewUser.uuid === deleteTarget.uuid ||
+          viewUser._id === deleteTarget._id)
+      ) {
         closeView();
       }
       closeDelete();
@@ -603,7 +605,7 @@ const Users = () => {
     dispatch(clearAdminKycError());
     dispatch(clearAdminKycSuccess());
     const res = await dispatch(
-      rejectKyc({ id, rejectionReason: rejectReason })
+      rejectKyc({ id, rejectionReason: rejectReason }),
     );
     if (rejectKyc.fulfilled.match(res)) {
       setRejectDocId(null);
@@ -657,7 +659,7 @@ const Users = () => {
       .join("\n");
 
     const url = URL.createObjectURL(
-      new Blob([csv], { type: "text/csv;charset=utf-8;" })
+      new Blob([csv], { type: "text/csv;charset=utf-8;" }),
     );
     const a = document.createElement("a");
     a.href = url;
@@ -678,7 +680,8 @@ const Users = () => {
             User Management
           </h1>
           <p className="mt-1 text-sm text-[#6B7280]">
-            Manage users, view complete account details, edit profiles, and perform actions.
+            Manage users, view complete account details, edit profiles, and
+            perform actions.
           </p>
         </div>
         <button
@@ -923,10 +926,7 @@ const Users = () => {
                   const isChecked = checked.has(id);
 
                   return (
-                    <tr
-                      key={id}
-                      className="transition hover:bg-[#FFFDF7]"
-                    >
+                    <tr key={id} className="transition hover:bg-[#FFFDF7]">
                       <td className="px-3 py-3 text-sm text-[#6B7280]">
                         {start + i + 1}
                       </td>
@@ -962,7 +962,9 @@ const Users = () => {
                         <Pill tone={u._activity.tone}>
                           <span
                             className={`h-1.5 w-1.5 rounded-full ${
-                              u._activity.isActive ? "bg-[#12A36B]" : "bg-[#9CA3AF]"
+                              u._activity.isActive
+                                ? "bg-[#12A36B]"
+                                : "bg-[#9CA3AF]"
                             }`}
                           />
                           {u._activity.label}
@@ -1095,7 +1097,7 @@ const Users = () => {
                 >
                   {p}
                 </button>
-              )
+              ),
             )}
             <button
               type="button"
@@ -1133,9 +1135,7 @@ const Users = () => {
                     <Pill tone={viewUser._activity.tone}>
                       {viewUser._activity.label}
                     </Pill>
-                    <Pill tone={viewUser._kyc.tone}>
-                      {viewUser._kyc.label}
-                    </Pill>
+                    <Pill tone={viewUser._kyc.tone}>{viewUser._kyc.label}</Pill>
                   </div>
                   <p className="text-xs text-[#6B7280]">
                     {viewUser._activity.detail} • Registered on{" "}
@@ -1176,9 +1176,16 @@ const Users = () => {
             {/* Modal Tabs */}
             <div className="flex border-b border-[#F3E7C4] bg-[#FFF9E3]/50 px-6">
               {[
-                { id: "overview", label: "Overview & Credentials", icon: <UserRound size={14} /> },
-                { id: "history", label: "Login History", icon: <History size={14} /> },
-                { id: "kyc", label: "KYC Documents", icon: <ShieldCheck size={14} /> },
+                {
+                  id: "overview",
+                  label: "Overview & Credentials",
+                  icon: <UserRound size={14} />,
+                },
+                {
+                  id: "history",
+                  label: "Login History",
+                  icon: <History size={14} />,
+                },
               ].map((t) => (
                 <button
                   key={t.id}
@@ -1230,42 +1237,6 @@ const Users = () => {
                       </div>
 
                       <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-[11px] font-semibold text-[#6B7280]">
-                            User ID (_id)
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(viewUser._id, "id")}
-                            className="text-xs font-semibold text-[#9A5B00] hover:underline"
-                          >
-                            {copiedKey === "id" ? "Copied!" : "Copy"}
-                          </button>
-                        </div>
-                        <p className="mt-0.5 break-all font-mono text-xs font-bold text-[#1A1A1A]">
-                          {viewUser._id || "Not available"}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-[11px] font-semibold text-[#6B7280]">
-                            UUID
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(viewUser.uuid, "uuid")}
-                            className="text-xs font-semibold text-[#9A5B00] hover:underline"
-                          >
-                            {copiedKey === "uuid" ? "Copied!" : "Copy"}
-                          </button>
-                        </div>
-                        <p className="mt-0.5 break-all font-mono text-xs font-bold text-[#1A1A1A]">
-                          {viewUser.uuid || "Not available"}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-3">
                         <p className="text-[11px] font-semibold text-[#6B7280]">
                           Role
                         </p>
@@ -1304,7 +1275,8 @@ const Users = () => {
                             </p>
                           ) : (
                             <p className="mt-1 text-xs italic text-[#9CA3AF]">
-                              Not available (Encrypted / never stored in plain text)
+                              Not available (Encrypted / never stored in plain
+                              text)
                             </p>
                           )}
                         </div>
@@ -1313,7 +1285,9 @@ const Users = () => {
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => setShowPlainPassword((prev) => !prev)}
+                              onClick={() =>
+                                setShowPlainPassword((prev) => !prev)
+                              }
                               className="inline-flex items-center gap-1 rounded-lg border border-[#F3E7C4] bg-white px-2.5 py-1.5 text-xs font-bold text-[#6B7280] hover:bg-[#FFEFA8]"
                             >
                               {showPlainPassword ? (
@@ -1357,9 +1331,13 @@ const Users = () => {
                           Wallet Balance
                         </p>
                         <p className="mt-0.5 text-base font-black text-[#12A36B]">
-                          ₹{Number(viewUser.wallet || 0).toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                          })}
+                          ₹
+                          {Number(viewUser.wallet || 0).toLocaleString(
+                            "en-IN",
+                            {
+                              minimumFractionDigits: 2,
+                            },
+                          )}
                         </p>
                       </div>
 
@@ -1481,12 +1459,16 @@ const Users = () => {
                     </div>
                   ) : (
                     <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-8 text-center">
-                      <Clock size={28} className="mx-auto mb-2 text-[#8A8F98]" />
+                      <Clock
+                        size={28}
+                        className="mx-auto mb-2 text-[#8A8F98]"
+                      />
                       <p className="text-sm font-bold text-[#1A1A1A]">
                         No Login History Recorded
                       </p>
                       <p className="mt-1 text-xs text-[#6B7280]">
-                        The user has not logged in recently or session tracking was empty.
+                        The user has not logged in recently or session tracking
+                        was empty.
                       </p>
                     </div>
                   )}
@@ -1528,8 +1510,8 @@ const Users = () => {
                                 st === "approved" || st === "verified"
                                   ? "green"
                                   : st === "rejected"
-                                  ? "red"
-                                  : "amber"
+                                    ? "red"
+                                    : "amber"
                               }
                             >
                               {st}
@@ -1622,12 +1604,16 @@ const Users = () => {
                     })
                   ) : (
                     <div className="rounded-xl border border-[#F3E7C4] bg-[#FFFDF7] p-8 text-center">
-                      <Shield size={28} className="mx-auto mb-2 text-[#8A8F98]" />
+                      <Shield
+                        size={28}
+                        className="mx-auto mb-2 text-[#8A8F98]"
+                      />
                       <p className="text-sm font-bold text-[#1A1A1A]">
                         No KYC Documents Submitted
                       </p>
                       <p className="mt-1 text-xs text-[#6B7280]">
-                        The user has not submitted any verification documents yet.
+                        The user has not submitted any verification documents
+                        yet.
                       </p>
                     </div>
                   )}
@@ -1714,7 +1700,9 @@ const Users = () => {
                   type="password"
                   minLength={6}
                   value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, password: e.target.value })
+                  }
                   className={INPUT_CLS}
                   placeholder="Leave empty to keep current password"
                 />
@@ -1826,7 +1814,8 @@ const Users = () => {
                 </div>
 
                 <p className="mt-2 text-xs font-semibold text-[#D93025]">
-                  Warning: This action cannot be undone. All data associated with this user will be removed.
+                  Warning: This action cannot be undone. All data associated
+                  with this user will be removed.
                 </p>
               </div>
             </div>

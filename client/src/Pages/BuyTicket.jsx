@@ -19,7 +19,13 @@ import DailyNumbersSection from "../Components/DailyNumbersSection";
 import QuickVerifyTicket from "../Components/QuickVerifyTicket";
 import LotteryVideoPlayer from "../Components/LotteryVideoPlayer";
 import NumberSoldNotification from "../Components/NumberSoldNotification";
-import { verifyNumberForBet } from "../reducer/slice/dailyNumberSlice";
+import {
+  verifyNumberForBet,
+  fetchAvailableNumbers,
+  fetchSampleLuckyNumbers,
+  selectAvailableDailyNumbers,
+  selectSampleLuckyNumbers,
+} from "../reducer/slice/dailyNumberSlice";
 
 import {
   createDeposit,
@@ -35,6 +41,20 @@ import {
   clearLotteryConfigError,
   clearLotteryConfigSuccess,
 } from "../reducer/slice/lotteryConfigSlice";
+
+import {
+  getAllLotteryConfigs as getAllFestivalConfigs,
+  getActiveLotteryConfig as getActiveFestivalConfig,
+  selectLotteryConfigs as selectFestivalConfigs,
+  selectActiveLottery as selectActiveFestivalLottery,
+} from "../reducer/slice/festivalLotteryReducer";
+
+import {
+  formatINR,
+  formatDrawDate,
+  formatDrawTime,
+  getFestivalWinningRules,
+} from "../utils/lotteryPrizeRules";
 
 import { getAmount } from "../reducer/slice/amountReducer";
 import { fetchAllSettings } from "../reducer/slice/settingsSlice";
@@ -101,23 +121,7 @@ const RULE_TICKETS = 10;
 // lotteryConfig.prizes.first / RULE_TICKETS
 // =====================================================
 
-const RULES = [
-  {
-    cond: "All digits and alphabet match",
-    ex: "12B12345",
-    prizePerTicket: 1000000,
-  },
-  {
-    cond: "Alphabet does not match but all digits match",
-    ex: "12X12345",
-    prizePerTicket: 500000,
-  },
-  {
-    cond: "Last 5 digits match (any alphabet)",
-    ex: "99K12345",
-    prizePerTicket: 50000,
-  }
-];
+const RULES = [];
 
 const BADGES = [
   "bg-[#ed1d43]",
@@ -163,95 +167,21 @@ const readPrice = (raw) => {
 // FORMAT MONEY
 // =====================================================
 
-const formatPrize = (amount) => {
-  const num = Number(amount);
-
-  if (!Number.isFinite(num) || num <= 0) {
-    return "₹0";
-  }
-
-  if (num >= 10000000) {
-    const crore = num / 10000000;
-
-    return `₹${
-      crore % 1 === 0
-        ? crore.toFixed(0)
-        : crore.toFixed(2)
-    } Crore`;
-  }
-
-  if (num >= 100000) {
-    const lakh = num / 100000;
-
-    return `₹${
-      lakh % 1 === 0
-        ? lakh.toFixed(0)
-        : lakh.toFixed(2)
-    } Lakh`;
-  }
-
-  if (num >= 1000) {
-    const thousand = num / 1000;
-
-    return `₹${
-      thousand % 1 === 0
-        ? thousand.toFixed(0)
-        : thousand.toFixed(2)
-    } Thousand`;
-  }
-
-  return `₹${num.toLocaleString("en-IN")}`;
-};
+const formatPrize = (amount) => formatINR(amount);
 
 // Existing UI compatibility.
-const formatCrore = (amount) => {
-  return formatPrize(amount);
-};
+const formatCrore = (amount) => formatPrize(amount);
 
 // =====================================================
 // CALCULATE WINNING RULES
 // =====================================================
 
-const getWinningRules = (firstPrizeTotal) => {
-  const backendFirstPrize = Number(firstPrizeTotal);
-
-  return RULES.map((rule, index) => {
-    let prizePerTicket = Number(rule.prizePerTicket) || 0;
-
-    let totalPrize =
-      prizePerTicket * RULE_TICKETS;
-
-    // -------------------------------------------------
-    // FIRST PRIZE
-    // -------------------------------------------------
-    //
-    // Backend first prize is treated as TOTAL prize.
-    //
-    // Example:
-    // Backend = 10000000
-    // Total   = ₹1 Crore
-    // Per     = ₹10 Lakh
-    //
-    if (
-      index === 0 &&
-      Number.isFinite(backendFirstPrize) &&
-      backendFirstPrize > 0
-    ) {
-      totalPrize = backendFirstPrize;
-
-      prizePerTicket =
-        backendFirstPrize / RULE_TICKETS;
-    }
-
-    return {
-      ...rule,
-      prizePerTicket,
-      totalPrize,
-      prizeText: formatPrize(prizePerTicket),
-      totalText: formatPrize(totalPrize),
-    };
-  });
-};
+const getWinningRules = (prizes) =>
+  getFestivalWinningRules(
+    typeof prizes === "object" && prizes !== null ? prizes : { first: prizes },
+    TICKET_EXAMPLE,
+    RULE_TICKETS
+  );
 
 // =====================================================
 // TIME FORMAT
@@ -536,6 +466,10 @@ const BuyTicket = () => {
   );
 
   const lotteryConfig = activeConfig;
+  const allFestivalConfigs = useSelector(selectFestivalConfigs);
+  const activeFestivalConfig = useSelector(selectActiveFestivalLottery);
+  const availableDailyNumbers = useSelector(selectAvailableDailyNumbers);
+  const sampleLuckyNumbers = useSelector(selectSampleLuckyNumbers);
 
   // ===================================================
   // TICKET PRICE
@@ -667,31 +601,63 @@ const BuyTicket = () => {
     kycStatus === "approved";
 
   // ===================================================
-  // WINNING RULES
+  // FESTIVAL LOTTERY SELECTION & PRIZES
   // ===================================================
 
-  const backendFirstPrize = readPrice(
-    lotteryConfig?.prizes?.first
-  );
+  const selectedFestivalLottery = useMemo(() => {
+    const list = Array.isArray(allFestivalConfigs) ? allFestivalConfigs : [];
+    const fid = searchParams.get("festivalId") || searchParams.get("id");
+    const fname =
+      searchParams.get("festival") ||
+      searchParams.get("market") ||
+      searchParams.get("marketName");
 
+    if (fid) {
+      const match = list.find((c) => String(c?._id) === String(fid));
+      if (match) return match;
+    }
+    if (fname) {
+      const cleanTarget = String(fname)
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+      const match = list.find(
+        (c) =>
+          String(c?.marketName || "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, "") === cleanTarget
+      );
+      if (match) return match;
+    }
+
+    if (activeFestivalConfig && activeFestivalConfig._id) {
+      return activeFestivalConfig;
+    }
+    return list.find((c) => c?.isActive) || list[0] || null;
+  }, [allFestivalConfigs, activeFestivalConfig, searchParams]);
+
+  const displayLottery = selectedFestivalLottery || lotteryConfig;
+
+  // Prizes from selected lottery
+  const lotteryPrizes = displayLottery?.prizes || {};
+
+  // Exactly 5 dynamic winning rules directly mapped to API prizes
   const winningRules = useMemo(
     () =>
-      getWinningRules(
-        backendFirstPrize
+      getFestivalWinningRules(
+        lotteryPrizes,
+        TICKET_EXAMPLE,
+        RULE_TICKETS
       ),
-    [backendFirstPrize]
+    [lotteryPrizes]
   );
 
-  // Total first prize.
-  const calculatedFirstPrize =
-    winningRules[0]?.totalPrize || 0;
+  const firstPrizeAmount = formatINR(lotteryPrizes?.first);
 
-  const firstPrizeAmount =
-    formatPrize(calculatedFirstPrize);
-
-  // First prize for ONE winning ticket.
-  const firstPrizePerTicket =
-    winningRules[0]?.prizeText || "₹0";
+  const firstPrizePerTicket = formatINR(
+    RULE_TICKETS > 0
+      ? Math.round((Number(lotteryPrizes?.first) || 0) / RULE_TICKETS)
+      : lotteryPrizes?.first
+  );
 
   // ===================================================
   // INITIAL API CALLS
@@ -699,6 +665,8 @@ const BuyTicket = () => {
 
   useEffect(() => {
     dispatch(getActiveLotteryConfig());
+    dispatch(getActiveFestivalConfig());
+    dispatch(getAllFestivalConfigs());
     dispatch(getAmount());
     dispatch(fetchAllSettings());
     dispatch(clearDepositState());
@@ -720,15 +688,15 @@ const BuyTicket = () => {
     };
 
     if (
-      !lotteryConfig?.drawDate ||
-      !lotteryConfig?.drawTime
+      !displayLottery?.drawDate ||
+      !displayLottery?.drawTime
     ) {
       setCountdown(empty);
       return;
     }
 
     const drawTimestamp =
-      getDrawTimestamp(lotteryConfig);
+      getDrawTimestamp(displayLottery);
 
     if (!drawTimestamp) {
       setCountdown(empty);
@@ -751,8 +719,8 @@ const BuyTicket = () => {
     return () =>
       clearInterval(interval);
   }, [
-    lotteryConfig?.drawDate,
-    lotteryConfig?.drawTime,
+    displayLottery?.drawDate,
+    displayLottery?.drawTime,
   ]);
 
   // ===================================================
@@ -801,26 +769,12 @@ const BuyTicket = () => {
   // ===================================================
 
   const drawDateText = useMemo(() => {
-    if (lotteryConfig?.drawDate) {
-      const date = new Date(
-        lotteryConfig.drawDate
-      );
+    return formatDrawDate(displayLottery?.drawDate);
+  }, [displayLottery?.drawDate]);
 
-      if (!Number.isNaN(date.getTime())) {
-        return date.toLocaleString(
-          "en-GB",
-          {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-            timeZone: "UTC",
-          }
-        );
-      }
-    }
-
-    return "Draw soon";
-  }, [lotteryConfig]);
+  const drawTimeText = useMemo(() => {
+    return formatDrawTime(displayLottery?.drawTime);
+  }, [displayLottery?.drawTime]);
 
   // ===================================================
   // TICKET CALCULATIONS
@@ -979,11 +933,50 @@ const BuyTicket = () => {
   // RANDOM TICKET
   // ===================================================
 
-  const handleRandomTicket = () => {
+  const handleRandomTicket = async () => {
     if (depositLoading) return;
-    setTicketCode(randomCode());
     setLocalError("");
     setLocalSuccess("");
+
+    if (selectedFestivalLottery) {
+      setTicketCode(randomCode());
+      return;
+    }
+
+    // Daily Lottery: Pick from actual available numbers in the database
+    const pool =
+      availableDailyNumbers && availableDailyNumbers.length > 0
+        ? availableDailyNumbers
+        : sampleLuckyNumbers && sampleLuckyNumbers.length > 0
+        ? sampleLuckyNumbers
+        : [];
+
+    if (pool.length > 0) {
+      const randomItem = pool[Math.floor(Math.random() * pool.length)];
+      const code = typeof randomItem === "string" ? randomItem : randomItem?.number;
+      if (code && TICKET_REGEX.test(code)) {
+        setTicketCode(code);
+        return;
+      }
+    }
+
+    // If pool not loaded yet, fetch sample lucky numbers and pick one
+    try {
+      const res = await dispatch(fetchSampleLuckyNumbers(20)).unwrap();
+      const numbers = res?.numbers || [];
+      if (numbers.length > 0) {
+        const randomItem = numbers[Math.floor(Math.random() * numbers.length)];
+        const code = typeof randomItem === "string" ? randomItem : randomItem?.number;
+        if (code && TICKET_REGEX.test(code)) {
+          setTicketCode(code);
+          return;
+        }
+      }
+    } catch {
+      // Fallback
+    }
+
+    setTicketCode(randomCode());
   };
 
   // ===================================================
@@ -1121,14 +1114,16 @@ const BuyTicket = () => {
         // LOTTERY CONFIG
         // -------------------------------------------------
 
-        if (!lotteryConfig?._id) {
+        const activePurchaseConfig = selectedFestivalLottery || lotteryConfig;
+
+        if (!activePurchaseConfig?._id) {
           return setLocalError(
             "Active lottery configuration not found"
           );
         }
 
         if (
-          !lotteryConfig?.isActive
+          !activePurchaseConfig?.isActive
         ) {
           return setLocalError(
             "Lottery is not active right now"
@@ -1170,19 +1165,22 @@ const BuyTicket = () => {
 
         // -------------------------------------------------
         // CHECK NUMBER AVAILABILITY (checkNumberForBet)
+        // Only daily lottery numbers exist in LotteryNumber collection
         // -------------------------------------------------
 
-        setLocalSuccess("Checking ticket availability...");
-        const availabilityCheck = await verifyNumberForBet(ticketCode);
+        if (!selectedFestivalLottery) {
+          setLocalSuccess("Checking ticket availability...");
+          const availabilityCheck = await verifyNumberForBet(ticketCode);
 
-        if (!availabilityCheck.canBet) {
-          setLocalSuccess("");
-          return setLocalError(
-            availabilityCheck.isSold
-              ? "This number has already been sold. Please choose another number."
-              : availabilityCheck.message ||
-                  "This number has already been sold. Please choose another number."
-          );
+          if (!availabilityCheck.canBet) {
+            setLocalSuccess("");
+            return setLocalError(
+              availabilityCheck.isSold
+                ? "This number has already been sold. Please choose another number."
+                : availabilityCheck.message ||
+                    "This number has already been sold. Please choose another number."
+            );
+          }
         }
 
         // -------------------------------------------------
@@ -1215,7 +1213,7 @@ const BuyTicket = () => {
               amount:
                 totalAmount,
               configId:
-                lotteryConfig._id,
+                activePurchaseConfig._id,
               lotteryNumbers,
             })
           ).unwrap();
@@ -1637,9 +1635,7 @@ const BuyTicket = () => {
                       className="text-[#8a4b12]"
                     />
                   }
-                  title={format12h(
-                    lotteryConfig?.drawTime
-                  )}
+                  title={drawTimeText}
                   sub={
                     countdownText
                   }
@@ -1927,7 +1923,9 @@ const BuyTicket = () => {
               />
 
               <h2 className="text-[15px] font-extrabold leading-tight text-white">
-                Daily Lottery Winning Rules
+                {displayLottery?.marketName
+                  ? `${displayLottery.marketName} Winning Rules`
+                  : "Lottery Winning Rules"}
               </h2>
             </div>
 
@@ -2061,16 +2059,16 @@ const BuyTicket = () => {
                   ) => (
                     <RuleRow
                       key={
-                        rule.ex
+                        rule.number || index
                       }
                       number={
-                        index + 1
+                        rule.number || index + 1
                       }
                       condition={
-                        rule.cond
+                        rule.condition || rule.cond
                       }
                       example={
-                        rule.ex
+                        rule.example || rule.ex
                       }
                       prize={
                         rule.prizeText
@@ -2079,14 +2077,10 @@ const BuyTicket = () => {
                         rule.totalText
                       }
                       badge={
-                        BADGES[
-                          index
-                        ]
+                        rule.badge || BADGES[index]
                       }
                       row={
-                        ROW_TINTS[
-                          index
-                        ]
+                        rule.row || ROW_TINTS[index]
                       }
                     />
                   )

@@ -51,6 +51,7 @@ import {
 import QuickVerifyTicket from "./QuickVerifyTicket";
 import TopWinnersToast from "./TopWinnersToast";
 import LotteryVideoPlayer from "./LotteryVideoPlayer";
+import { getFestivalWinningRules, formatPrize } from "../utils/lotteryPrizeRules";
 
 // =====================================================
 // HELPERS
@@ -277,7 +278,6 @@ const HomeLotterySection = () => {
   const location = useLocation();
 
   const [rulesTab, setRulesTab] = useState("daily");
-  const activeRules = RULES_BY_TAB[rulesTab];
 
   // =====================================================
   // REDUX STATE
@@ -378,11 +378,34 @@ const HomeLotterySection = () => {
   }, [activeBanners.length]);
 
   // =====================================================
-  // DERIVED VALUES
+  // DERIVED VALUES & DYNAMIC RULES
   // =====================================================
 
-  const firstPrize = formatCrore(activeConfig?.prizes?.first);
+  const firstPrize = activeConfig?.prizes?.first
+    ? formatPrize(activeConfig.prizes.first)
+    : formatCrore(activeConfig?.prizes?.first);
+
   const secondPrize = formatCrore(activeConfig?.prizes?.second);
+
+  const festivalFirstPrize = festivalConfig?.prizes?.first
+    ? formatPrize(festivalConfig.prizes.first)
+    : secondPrize;
+
+  const dailyRules = useMemo(() => {
+    if (activeConfig?.prizes && Object.keys(activeConfig.prizes).length > 0) {
+      return getFestivalWinningRules(activeConfig.prizes, "10A2123", 10);
+    }
+    return DAILY_RULES;
+  }, [activeConfig?.prizes]);
+
+  const festivalRules = useMemo(() => {
+    if (festivalConfig?.prizes && Object.keys(festivalConfig.prizes).length > 0) {
+      return getFestivalWinningRules(festivalConfig.prizes, "10B3123", 10);
+    }
+    return FESTIVAL_RULES;
+  }, [festivalConfig?.prizes]);
+
+  const activeRules = rulesTab === "festival" ? festivalRules : dailyRules;
 
   const currentBanner = activeBanners[currentBannerIndex] || null;
 
@@ -550,7 +573,7 @@ const HomeLotterySection = () => {
               title="Festival Lottery"
               subtitle="Bigger Draws, Bigger Celebrations"
               button="Buy Festival Lottery"
-              prize={secondPrize}
+              prize={festivalFirstPrize}
               label="FESTIVAL LOTTERY"
               number="10F 68057"
               price="₹50/-"
@@ -669,7 +692,7 @@ const HomeLotterySection = () => {
                 </div>
 
                 {activeRules.map((rule) => (
-                  <RuleRow key={`${rulesTab}-${rule.n}`} {...rule} />
+                  <RuleRow key={`${rulesTab}-${rule.n || rule.number}`} {...rule} />
                 ))}
               </div>
             </div>

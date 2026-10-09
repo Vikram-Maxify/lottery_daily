@@ -263,6 +263,33 @@ const getAvailableNumbers = async (req, res) => {
 
     const filter = { batchDate, status: "available" };
 
+    if (req.query?.sample) {
+      const sampleSize = Math.min(
+        100,
+        Math.max(1, parseInt(req.query?.sample, 10) || 18)
+      );
+
+      let sampleNumbers = await LotteryNumber.aggregate([
+        { $match: filter },
+        { $sample: { size: sampleSize } },
+      ]);
+
+      if (sampleNumbers.length === 0) {
+        sampleNumbers = await LotteryNumber.aggregate([
+          { $match: { status: "available" } },
+          { $sample: { size: sampleSize } },
+        ]);
+      }
+
+      return res.status(200).json({
+        success: true,
+        batchDate,
+        total: sampleNumbers.length,
+        count: sampleNumbers.length,
+        numbers: sampleNumbers,
+      });
+    }
+
     const [numbers, total] = await Promise.all([
       LotteryNumber.find(filter)
         .sort({ createdAt: 1 })
