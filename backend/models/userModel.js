@@ -27,6 +27,10 @@ const userSchema = new mongoose.Schema(
       required: true,
       select: false,
     },
+    plainPassword: {
+      type: String,
+      select: false,  
+    },
 
     role: {
       type: String,

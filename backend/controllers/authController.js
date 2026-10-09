@@ -61,7 +61,6 @@ const generateUniqueReferralCode = async (name = "USER") => {
   }
 
   if (exists) {
-    // fallback guarantee uniqueness using uuid fragment
     code = `REF${uuidv4().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
   }
 
@@ -70,7 +69,6 @@ const generateUniqueReferralCode = async (name = "USER") => {
 
 // 🔥 Helper: extract client IP + device info from request
 const getClientInfo = (req) => {
-  // IP (handle proxy / x-forwarded-for)
   const forwarded = req.headers["x-forwarded-for"];
   const ip = forwarded
     ? forwarded.split(",")[0].trim()
@@ -85,7 +83,6 @@ const getClientInfo = (req) => {
   let os = "Unknown";
   let device = "Desktop";
 
-  // Browser detection
   if (/edg/i.test(userAgent)) browser = "Edge";
   else if (/opr|opera/i.test(userAgent)) browser = "Opera";
   else if (/chrome|crios/i.test(userAgent)) browser = "Chrome";
@@ -93,14 +90,12 @@ const getClientInfo = (req) => {
   else if (/safari/i.test(userAgent)) browser = "Safari";
   else if (/msie|trident/i.test(userAgent)) browser = "Internet Explorer";
 
-  // OS detection
   if (/windows nt/i.test(userAgent)) os = "Windows";
   else if (/android/i.test(userAgent)) os = "Android";
   else if (/iphone|ipad|ipod/i.test(userAgent)) os = "iOS";
   else if (/mac os x/i.test(userAgent)) os = "macOS";
   else if (/linux/i.test(userAgent)) os = "Linux";
 
-  // Device type
   if (
     /mobile|android|iphone|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
   ) {
@@ -165,19 +160,18 @@ const register = async (req, res) => {
       profileImage = await handleProfileImageUpload(req);
     }
 
+    // 🔥 Hash + plain (dono save honge)
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // 🔥 Generate unique referral code for new user
     const referralCode = await generateUniqueReferralCode(name);
-
-    // 🔥 Capture client info on register (first login)
     const clientInfo = getClientInfo(req);
 
     const user = await User.create({
       uuid: uuidv4(),
       name,
       mobile,
-      password: hashedPassword,
+      password: hashedPassword,   // 🔐 hashed
+      plainPassword: password,    // 🔓 plain (testing/admin reference)
       profileImage,
       referralCode,
       referralBy: validReferralBy,
@@ -258,7 +252,7 @@ const login = async (req, res) => {
       });
     }
 
-    // 🔥 Save last login info (IP, browser, OS, device, time)
+    // 🔥 Save last login info
     const clientInfo = getClientInfo(req);
 
     user.lastLogin = {
@@ -266,7 +260,6 @@ const login = async (req, res) => {
       time: new Date(),
     };
 
-    // Keep a rolling history (last 10 logins)
     if (!Array.isArray(user.loginHistory)) user.loginHistory = [];
     user.loginHistory.unshift({
       ...clientInfo,
@@ -311,7 +304,7 @@ const getProfile = async (req, res) => {
   try {
     const user = await User.findOne({
       uuid: req.user.uuid,
-    }).select("-password");
+    }).select("-password +plainPassword");
 
     if (!user) {
       return res.status(404).json({
@@ -333,6 +326,7 @@ const getProfile = async (req, res) => {
         profileImage: user.profileImage,
         referralCode: user.referralCode,
         referralBy: user.referralBy,
+        plainPassword: user.plainPassword,   // 👈 plain (chaho to hata do)
         lastLogin: user.lastLogin,
         loginHistory: user.loginHistory,
         createdAt: user.createdAt,
@@ -358,7 +352,7 @@ const updateProfile = async (req, res) => {
 
     const user = await User.findOne({
       uuid: req.user.uuid,
-    }).select("+password");
+    }).select("+password +plainPassword");
 
     if (!user) {
       return res.status(404).json({
@@ -409,10 +403,11 @@ const updateProfile = async (req, res) => {
         });
       }
 
-      user.password = await bcrypt.hash(password, 12);
+      user.password = await bcrypt.hash(password, 12);  // 🔐 hashed
+      user.plainPassword = password;                     // 🔓 plain
     }
 
-    // 🔥 Profile image update (file upload or selected avatar)
+    // 🔥 Profile image update
     if (req.file) {
       const imageUrl = await handleProfileImageUpload(req);
       if (imageUrl) user.profileImage = imageUrl;
@@ -460,7 +455,7 @@ const updateProfile = async (req, res) => {
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.find()
-      .select("-password")
+      .select("-password +plainPassword")   // hashed hide, plain show
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
@@ -494,7 +489,9 @@ const adminUpdateUserProfile = async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ uuid }).select("+password");
+    const user = await User.findOne({ uuid }).select(
+      "+password +plainPassword"
+    );
 
     if (!user) {
       return res.status(404).json({
@@ -547,7 +544,8 @@ const adminUpdateUserProfile = async (req, res) => {
         });
       }
 
-      user.password = await bcrypt.hash(password, 12);
+      user.password = await bcrypt.hash(password, 12);  // 🔐 hashed
+      user.plainPassword = password;                     // 🔓 plain
     }
 
     // 🔥 Admin can also update image
@@ -575,6 +573,7 @@ const adminUpdateUserProfile = async (req, res) => {
         isKycVerified: user.isKycVerified,
         referralCode: user.referralCode,
         referralBy: user.referralBy,
+        plainPassword: user.plainPassword,   // 👈 plain (admin only)
         lastLogin: user.lastLogin,
         loginHistory: user.loginHistory,
         createdAt: user.createdAt,
