@@ -3,31 +3,24 @@ const mongoose = require("mongoose");
 // =====================================================
 // WINNER SCHEMA
 // =====================================================
-
 const winnerSchema = new mongoose.Schema(
   {
-    userId: {
-      type: String,
-      required: true,
-      index: true,
-    },
+    userId: { type: String, required: true, index: true },
 
-    // ✅ 8-char alphanumeric: 2 digits + 1 letter + 5 digits
     userNumber: {
       type: String,
       required: true,
       match: /^[0-9]{2}[A-Z][0-9]{5}$/,
     },
 
-    amount: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
+    // ✅ which winning number matched
+    matchedNumber: { type: String, default: null },
+
+    amount: { type: Number, default: 0, min: 0 },
 
     prizeType: {
       type: String,
-      enum: ["1st", "2nd", "3rd"],
+      enum: ["1st", "2nd", "3rd", "4th", "5th"],
       required: true,
     },
 
@@ -35,18 +28,16 @@ const winnerSchema = new mongoose.Schema(
       first: { type: Number, default: 0, min: 0 },
       second: { type: Number, default: 0, min: 0 },
       third: { type: Number, default: 0, min: 0 },
+      fourth: { type: Number, default: 0, min: 0 },
+      fifth: { type: Number, default: 0, min: 0 },
     },
 
-    prizeAmount: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
+    prizeAmount: { type: Number, default: 0, min: 0 },
 
-    // ✅ 1st=8, 2nd=7, 3rd=5
+    // ✅ 1st=8, 2nd=5, 3rd=4, 4th=4, 5th=3
     matchedDigits: {
       type: Number,
-      enum: [5, 7, 8],
+      enum: [3, 4, 5, 8],
       required: true,
     },
   },
@@ -64,7 +55,6 @@ winnerSchema.virtual("prizeLabel").get(function () {
 // =====================================================
 // FESTIVAL RESULT SCHEMA
 // =====================================================
-
 const festivalresultSchema = new mongoose.Schema(
   {
     lotteryConfigId: {
@@ -74,33 +64,27 @@ const festivalresultSchema = new mongoose.Schema(
       index: true,
     },
 
-    date: {
-      type: Date,
-      required: true,
-      index: true,
+    date: { type: Date, required: true, index: true },
+
+    // ✅ NEW: multi winning numbers per prize
+    winningNumbers: {
+      first: { type: String, default: null },
+      second: { type: [String], default: [] },
+      third: { type: [String], default: [] },
+      fourth: { type: [String], default: [] },
+      fifth: { type: [String], default: [] },
     },
 
-    // ✅ 8-char alphanumeric: 2 digits + 1 letter + 5 digits
+    // ✅ Legacy single number (kept for backward compat)
     winningNumber: {
       type: String,
-      required: true,
+      default: null,
       match: /^[0-9]{2}[A-Z][0-9]{5}$/,
     },
 
-    winners: {
-      type: [winnerSchema],
-      default: [],
-    },
-
-    isPublished: {
-      type: Boolean,
-      default: false,
-    },
-
-    createdBy: {
-      type: String,
-      required: true,
-    },
+    winners: { type: [winnerSchema], default: [] },
+    isPublished: { type: Boolean, default: false },
+    createdBy: { type: String, required: true },
   },
   {
     timestamps: true,

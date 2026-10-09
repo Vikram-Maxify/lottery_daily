@@ -2,34 +2,31 @@ import {
   ArrowRight,
   BookOpen,
   CalendarDays,
+  ChevronDown,
   Clock,
   Info,
-  Plus,
   Shuffle,
   Ticket,
-  Trash2,
   Trophy,
   Users,
-  ChevronDown,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import DailyNumbersSection from "../Components/DailyNumbersSection";
-import QuickVerifyTicket from "../Components/QuickVerifyTicket";
 import LotteryVideoPlayer from "../Components/LotteryVideoPlayer";
 import NumberSoldNotification from "../Components/NumberSoldNotification";
+import QuickVerifyTicket from "../Components/QuickVerifyTicket";
 import {
-  verifyNumberForBet,
-  fetchAvailableNumbers,
   fetchSampleLuckyNumbers,
   selectAvailableDailyNumbers,
   selectSampleLuckyNumbers,
+  verifyNumberForBet,
 } from "../reducer/slice/dailyNumberSlice";
 
 import {
-  createDeposit,
   clearDepositState,
+  createDeposit,
   selectDepositError,
   selectDepositLoading,
   selectDepositOrderId,
@@ -37,22 +34,22 @@ import {
 } from "../reducer/slice/depositSlice";
 
 import {
-  getActiveLotteryConfig,
   clearLotteryConfigError,
   clearLotteryConfigSuccess,
+  getActiveLotteryConfig,
 } from "../reducer/slice/lotteryConfigSlice";
 
 import {
-  getAllLotteryConfigs as getAllFestivalConfigs,
   getActiveLotteryConfig as getActiveFestivalConfig,
-  selectLotteryConfigs as selectFestivalConfigs,
+  getAllLotteryConfigs as getAllFestivalConfigs,
   selectActiveLottery as selectActiveFestivalLottery,
+  selectLotteryConfigs as selectFestivalConfigs,
 } from "../reducer/slice/festivalLotteryReducer";
 
 import {
-  formatINR,
   formatDrawDate,
   formatDrawTime,
+  formatINR,
   getFestivalWinningRules,
 } from "../utils/lotteryPrizeRules";
 
@@ -83,19 +80,13 @@ const ALL_DATES_COUNT = 30;
 const BOTTOM_NAV_HEIGHT = 72;
 const PURCHASE_BAR_HEIGHT = 84;
 
+// ✅ Betting closes 1 hour before draw time
+const BET_CLOSE_OFFSET_MS = 60 * 60 * 1000;
+
 // Ticket format:
 // 2 digits + 1 alphabet + 5 digits
 // Example: 12B12345
-const SLOT_PATTERN = [
-  "D",
-  "D",
-  "L",
-  "D",
-  "D",
-  "D",
-  "D",
-  "D",
-];
+const SLOT_PATTERN = ["D", "D", "L", "D", "D", "D", "D", "D"];
 
 const TICKET_LENGTH = SLOT_PATTERN.length;
 
@@ -151,13 +142,7 @@ const pad = (n) => String(n).padStart(2, "0");
 
 const readPrice = (raw) => {
   if (raw && typeof raw === "object") {
-    return Number(
-      raw.amount ??
-        raw.price ??
-        raw.ticketPrice ??
-        raw.value ??
-        0
-    );
+    return Number(raw.amount ?? raw.price ?? raw.ticketPrice ?? raw.value ?? 0);
   }
 
   return Number(raw);
@@ -180,7 +165,7 @@ const getWinningRules = (prizes) =>
   getFestivalWinningRules(
     typeof prizes === "object" && prizes !== null ? prizes : { first: prizes },
     TICKET_EXAMPLE,
-    RULE_TICKETS
+    RULE_TICKETS,
   );
 
 // =====================================================
@@ -192,16 +177,11 @@ const format12h = (time) => {
     .split(":")
     .map(Number);
 
-  if (
-    !Number.isFinite(h) ||
-    !Number.isFinite(m)
-  ) {
+  if (!Number.isFinite(h) || !Number.isFinite(m)) {
     return "--:--";
   }
 
-  return `${h % 12 || 12}:${pad(m)} ${
-    h >= 12 ? "PM" : "AM"
-  }`;
+  return `${h % 12 || 12}:${pad(m)} ${h >= 12 ? "PM" : "AM"}`;
 };
 
 // =====================================================
@@ -209,12 +189,9 @@ const format12h = (time) => {
 // =====================================================
 
 const slotAccepts = (index, ch) =>
-  SLOT_PATTERN[index] === "D"
-    ? /^\d$/.test(ch)
-    : /^[A-Z]$/.test(ch);
+  SLOT_PATTERN[index] === "D" ? /^\d$/.test(ch) : /^[A-Z]$/.test(ch);
 
-const slotPlaceholder = (index) =>
-  SLOT_PATTERN[index] === "D" ? "0" : "A";
+const slotPlaceholder = (index) => (SLOT_PATTERN[index] === "D" ? "0" : "A");
 
 // =====================================================
 // SANITIZE TICKET
@@ -247,12 +224,8 @@ const sanitizeCode = (raw) => {
 const randomCode = () =>
   SLOT_PATTERN.map((slot) =>
     slot === "D"
-      ? String(
-          Math.floor(Math.random() * 10)
-        )
-      : String.fromCharCode(
-          65 + Math.floor(Math.random() * 26)
-        )
+      ? String(Math.floor(Math.random() * 10))
+      : String.fromCharCode(65 + Math.floor(Math.random() * 26)),
   ).join("");
 
 const randomUniqueCode = (usedCodes = []) => {
@@ -261,10 +234,7 @@ const randomUniqueCode = (usedCodes = []) => {
   let code = randomCode();
   let guard = 0;
 
-  while (
-    used.has(code) &&
-    guard < 100
-  ) {
+  while (used.has(code) && guard < 100) {
     code = randomCode();
     guard += 1;
   }
@@ -293,31 +263,23 @@ const generateUniqueTickets = (count, existing = []) => {
 };
 
 // =====================================================
-// DRAW TIMESTAMP
+// DRAW TIMESTAMP (returns BET CLOSING TIME, 1 hour before draw)
 // =====================================================
 
 const getDrawTimestamp = (lotteryConfig) => {
-  if (
-    !lotteryConfig?.drawDate ||
-    !lotteryConfig?.drawTime
-  ) {
+  if (!lotteryConfig?.drawDate || !lotteryConfig?.drawTime) {
     return null;
   }
 
-  const drawDate = new Date(
-    lotteryConfig.drawDate
-  );
+  const drawDate = new Date(lotteryConfig.drawDate);
 
   if (Number.isNaN(drawDate.getTime())) {
     return null;
   }
 
-  const [
-    hoursString,
-    minutesString,
-  ] = String(
-    lotteryConfig.drawTime
-  ).split(":");
+  const [hoursString, minutesString] = String(lotteryConfig.drawTime).split(
+    ":",
+  );
 
   const hours = Number(hoursString);
   const minutes = Number(minutesString);
@@ -333,15 +295,19 @@ const getDrawTimestamp = (lotteryConfig) => {
     return null;
   }
 
-  return Date.UTC(
+  // Draw time in UTC ms
+  const drawTimeUtcMs = Date.UTC(
     drawDate.getUTCFullYear(),
     drawDate.getUTCMonth(),
     drawDate.getUTCDate(),
     hours - 5,
     minutes - 30,
     0,
-    0
+    0,
   );
+
+  // ✅ Bet closes 1 hour before draw time
+  return drawTimeUtcMs - BET_CLOSE_OFFSET_MS;
 };
 
 // =====================================================
@@ -360,8 +326,7 @@ const getCountdown = (drawTimestamp) => {
     };
   }
 
-  const difference =
-    drawTimestamp - Date.now();
+  const difference = drawTimestamp - Date.now();
 
   if (difference <= 0) {
     return {
@@ -374,20 +339,12 @@ const getCountdown = (drawTimestamp) => {
     };
   }
 
-  const totalSeconds = Math.floor(
-    difference / 1000
-  );
+  const totalSeconds = Math.floor(difference / 1000);
 
   return {
-    days: Math.floor(
-      totalSeconds / 86400
-    ),
-    hours: Math.floor(
-      (totalSeconds % 86400) / 3600
-    ),
-    minutes: Math.floor(
-      (totalSeconds % 3600) / 60
-    ),
+    days: Math.floor(totalSeconds / 86400),
+    hours: Math.floor((totalSeconds % 86400) / 3600),
+    minutes: Math.floor((totalSeconds % 3600) / 60),
     seconds: totalSeconds % 60,
     expired: false,
     available: true,
@@ -399,24 +356,15 @@ const getCountdown = (drawTimestamp) => {
 // =====================================================
 
 const deriveKycStatus = (documents) => {
-  if (
-    !Array.isArray(documents) ||
-    documents.length === 0
-  ) {
+  if (!Array.isArray(documents) || documents.length === 0) {
     return "not_submitted";
   }
 
-  const statuses = documents.map(
-    (document) =>
-      String(
-        document?.status || ""
-      ).toLowerCase()
+  const statuses = documents.map((document) =>
+    String(document?.status || "").toLowerCase(),
   );
 
-  if (
-    statuses.includes("approved") ||
-    statuses.includes("verified")
-  ) {
+  if (statuses.includes("approved") || statuses.includes("verified")) {
     return "approved";
   }
 
@@ -443,26 +391,20 @@ const BuyTicket = () => {
   // AUTH
   // ===================================================
 
-  const { user } = useSelector(
-    (state) => state.auth || {}
-  );
+  const { user } = useSelector((state) => state.auth || {});
 
   // ===================================================
   // LOTTERY CONFIG
   // ===================================================
 
-  const {
-    activeConfig,
-    activeLoading,
-    error,
-  } = useSelector(
+  const { activeConfig, activeLoading, error } = useSelector(
     (state) =>
       state.lotteryConfig || {
         configs: [],
         activeConfig: null,
         activeLoading: false,
         error: null,
-      }
+      },
   );
 
   const lotteryConfig = activeConfig;
@@ -475,70 +417,48 @@ const BuyTicket = () => {
   // TICKET PRICE
   // ===================================================
 
-  const {
-    amount: ticketPriceFromApi,
-  } = useSelector(
+  const { amount: ticketPriceFromApi } = useSelector(
     (state) =>
       state.amount || {
         amount: null,
         loading: false,
-      }
+      },
   );
 
   const dailyPriceFromSettings = useSelector(
-    (state) => state.settings?.dailyLotteryAmount
+    (state) => state.settings?.dailyLotteryAmount,
   );
 
-  const rawApiAmount =
-    dailyPriceFromSettings ?? ticketPriceFromApi;
+  const rawApiAmount = dailyPriceFromSettings ?? ticketPriceFromApi;
 
-  const apiPrice = readPrice(
-    rawApiAmount
-  );
+  const apiPrice = readPrice(rawApiAmount);
 
-  const hasApiPrice =
-    Number.isFinite(apiPrice) &&
-    apiPrice > 0;
+  const hasApiPrice = Number.isFinite(apiPrice) && apiPrice > 0;
 
   // Admin se 10 tickets ka price aata hai (e.g. ₹250 for 10 tickets -> ₹25/ticket)
-  const SET_PRICE = hasApiPrice
-    ? apiPrice
-    : DEFAULT_SET_PRICE;
+  const SET_PRICE = hasApiPrice ? apiPrice : DEFAULT_SET_PRICE;
 
-  const TICKET_PRICE =
-    Math.round((SET_PRICE / PRICE_SET_SIZE) * 100) / 100;
+  const TICKET_PRICE = Math.round((SET_PRICE / PRICE_SET_SIZE) * 100) / 100;
 
   // ===================================================
   // DEPOSIT
   // ===================================================
 
-  const depositLoading = useSelector(
-    selectDepositLoading
-  );
+  const depositLoading = useSelector(selectDepositLoading);
 
-  const depositError = useSelector(
-    selectDepositError
-  );
+  const depositError = useSelector(selectDepositError);
 
-  const depositPaymentUrl = useSelector(
-    selectDepositPaymentUrl
-  );
+  const depositPaymentUrl = useSelector(selectDepositPaymentUrl);
 
-  const depositOrderId = useSelector(
-    selectDepositOrderId
-  );
+  const depositOrderId = useSelector(selectDepositOrderId);
 
   // ===================================================
   // KYC
   // ===================================================
 
-  const kycDocuments = useSelector(
-    selectKycDocuments
-  );
+  const kycDocuments = useSelector(selectKycDocuments);
 
-  const kycLoading = useSelector(
-    selectKycLoading
-  );
+  const kycLoading = useSelector(selectKycLoading);
 
   // ===================================================
   // STATE
@@ -563,42 +483,35 @@ const BuyTicket = () => {
     }
   }, [searchParams]);
 
-  const [localError, setLocalError] =
-    useState("");
+  const [localError, setLocalError] = useState("");
 
-  const [localSuccess, setLocalSuccess] =
-    useState("");
+  const [localSuccess, setLocalSuccess] = useState("");
 
-  const [selectedDate, setSelectedDate] =
-    useState(0);
+  const [selectedDate, setSelectedDate] = useState(0);
 
-  const [showAllDates, setShowAllDates] =
-    useState(false);
+  const [showAllDates, setShowAllDates] = useState(false);
 
   const inputRefs = useRef({});
 
-  const [countdown, setCountdown] =
-    useState({
-      days: 0,
-      hours: 0,
-      minutes: 0,
-      seconds: 0,
-      expired: false,
-      available: false,
-    });
+  const [countdown, setCountdown] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    expired: false,
+    available: false,
+  });
 
   // ===================================================
   // KYC STATUS
   // ===================================================
 
   const kycStatus = useMemo(
-    () =>
-      deriveKycStatus(kycDocuments),
-    [kycDocuments]
+    () => deriveKycStatus(kycDocuments),
+    [kycDocuments],
   );
 
-  const isKycApproved =
-    kycStatus === "approved";
+  const isKycApproved = kycStatus === "approved";
 
   // ===================================================
   // FESTIVAL LOTTERY SELECTION & PRIZES
@@ -624,7 +537,7 @@ const BuyTicket = () => {
         (c) =>
           String(c?.marketName || "")
             .toLowerCase()
-            .replace(/[^a-z0-9]/g, "") === cleanTarget
+            .replace(/[^a-z0-9]/g, "") === cleanTarget,
       );
       if (match) return match;
     }
@@ -642,13 +555,8 @@ const BuyTicket = () => {
 
   // Exactly 5 dynamic winning rules directly mapped to API prizes
   const winningRules = useMemo(
-    () =>
-      getFestivalWinningRules(
-        lotteryPrizes,
-        TICKET_EXAMPLE,
-        RULE_TICKETS
-      ),
-    [lotteryPrizes]
+    () => getFestivalWinningRules(lotteryPrizes, TICKET_EXAMPLE, RULE_TICKETS),
+    [lotteryPrizes],
   );
 
   const firstPrizeAmount = formatINR(lotteryPrizes?.first);
@@ -656,7 +564,7 @@ const BuyTicket = () => {
   const firstPrizePerTicket = formatINR(
     RULE_TICKETS > 0
       ? Math.round((Number(lotteryPrizes?.first) || 0) / RULE_TICKETS)
-      : lotteryPrizes?.first
+      : lotteryPrizes?.first,
   );
 
   // ===================================================
@@ -674,7 +582,7 @@ const BuyTicket = () => {
   }, [dispatch]);
 
   // ===================================================
-  // LIVE COUNTDOWN
+  // LIVE COUNTDOWN (counts down to BET CLOSING TIME)
   // ===================================================
 
   useEffect(() => {
@@ -687,16 +595,12 @@ const BuyTicket = () => {
       available: false,
     };
 
-    if (
-      !displayLottery?.drawDate ||
-      !displayLottery?.drawTime
-    ) {
+    if (!displayLottery?.drawDate || !displayLottery?.drawTime) {
       setCountdown(empty);
       return;
     }
 
-    const drawTimestamp =
-      getDrawTimestamp(displayLottery);
+    const drawTimestamp = getDrawTimestamp(displayLottery);
 
     if (!drawTimestamp) {
       setCountdown(empty);
@@ -704,24 +608,15 @@ const BuyTicket = () => {
     }
 
     const update = () => {
-      setCountdown(
-        getCountdown(drawTimestamp)
-      );
+      setCountdown(getCountdown(drawTimestamp));
     };
 
     update();
 
-    const interval = setInterval(
-      update,
-      1000
-    );
+    const interval = setInterval(update, 1000);
 
-    return () =>
-      clearInterval(interval);
-  }, [
-    displayLottery?.drawDate,
-    displayLottery?.drawTime,
-  ]);
+    return () => clearInterval(interval);
+  }, [displayLottery?.drawDate, displayLottery?.drawTime]);
 
   // ===================================================
   // DATE CHIPS
@@ -736,32 +631,22 @@ const BuyTicket = () => {
         (_, i) => {
           const d = new Date();
 
-          d.setDate(
-            d.getDate() + i
-          );
+          d.setDate(d.getDate() + i);
 
           return {
             day: d.getDate(),
-            month:
-              d.toLocaleString(
-                "en-US",
-                {
-                  month: "short",
-                }
-              ),
-            weekday:
-              d
-                .toLocaleString(
-                  "en-US",
-                  {
-                    weekday: "short",
-                  }
-                )
-                .toUpperCase(),
+            month: d.toLocaleString("en-US", {
+              month: "short",
+            }),
+            weekday: d
+              .toLocaleString("en-US", {
+                weekday: "short",
+              })
+              .toUpperCase(),
           };
-        }
+        },
       ),
-    []
+    [],
   );
 
   // ===================================================
@@ -785,25 +670,18 @@ const BuyTicket = () => {
   const totalTicketPrice =
     Math.round(((SET_PRICE * quantity) / PRICE_SET_SIZE) * 100) / 100;
 
-  const priceText =
-    `₹${TICKET_PRICE}/-`;
+  const priceText = `₹${TICKET_PRICE}/-`;
 
-  const countdownText =
-    !countdown.available
-      ? "Timer not available"
-      : countdown.expired
-        ? "Draw started"
-        : `${
-            countdown.days > 0
-              ? `${countdown.days}d `
-              : ""
-          }${pad(
-            countdown.hours
-          )}:${pad(
-            countdown.minutes
-          )}:${pad(
-            countdown.seconds
-          )}`;
+  // ✅ Bet is closed once countdown expires
+  const isBetClosed = countdown.available && countdown.expired;
+
+  const countdownText = !countdown.available
+    ? "Timer not available"
+    : countdown.expired
+      ? "Betting Closed"
+      : `${countdown.days > 0 ? `${countdown.days}d ` : ""}${pad(
+          countdown.hours,
+        )}:${pad(countdown.minutes)}:${pad(countdown.seconds)}`;
 
   // ===================================================
   // MESSAGE CLEAR
@@ -813,13 +691,9 @@ const BuyTicket = () => {
     setLocalError("");
     setLocalSuccess("");
 
-    dispatch(
-      clearLotteryConfigError()
-    );
+    dispatch(clearLotteryConfigError());
 
-    dispatch(
-      clearLotteryConfigSuccess()
-    );
+    dispatch(clearLotteryConfigSuccess());
 
     dispatch(clearDepositState());
   };
@@ -845,7 +719,7 @@ const BuyTicket = () => {
   // ===================================================
 
   const handleBoxChange = (index, event) => {
-    if (depositLoading) return;
+    if (depositLoading || isBetClosed) return;
 
     const raw = event.target.value;
 
@@ -869,8 +743,7 @@ const BuyTicket = () => {
       return;
     }
 
-    const next =
-      ticketCode.slice(0, pos) + ch + ticketCode.slice(pos + 1);
+    const next = ticketCode.slice(0, pos) + ch + ticketCode.slice(pos + 1);
 
     setTicketCode(next);
     setLocalError("");
@@ -915,18 +788,14 @@ const BuyTicket = () => {
   const handleBoxPaste = (event) => {
     event.preventDefault();
 
-    if (depositLoading) return;
+    if (depositLoading || isBetClosed) return;
 
-    const code = sanitizeCode(
-      event.clipboardData.getData("text")
-    );
+    const code = sanitizeCode(event.clipboardData.getData("text"));
 
     if (!code) return;
 
     setTicketCode(code);
-    focusBox(
-      Math.min(code.length, TICKET_LENGTH - 1)
-    );
+    focusBox(Math.min(code.length, TICKET_LENGTH - 1));
   };
 
   // ===================================================
@@ -948,12 +817,13 @@ const BuyTicket = () => {
       availableDailyNumbers && availableDailyNumbers.length > 0
         ? availableDailyNumbers
         : sampleLuckyNumbers && sampleLuckyNumbers.length > 0
-        ? sampleLuckyNumbers
-        : [];
+          ? sampleLuckyNumbers
+          : [];
 
     if (pool.length > 0) {
       const randomItem = pool[Math.floor(Math.random() * pool.length)];
-      const code = typeof randomItem === "string" ? randomItem : randomItem?.number;
+      const code =
+        typeof randomItem === "string" ? randomItem : randomItem?.number;
       if (code && TICKET_REGEX.test(code)) {
         setTicketCode(code);
         return;
@@ -966,7 +836,8 @@ const BuyTicket = () => {
       const numbers = res?.numbers || [];
       if (numbers.length > 0) {
         const randomItem = numbers[Math.floor(Math.random() * numbers.length)];
-        const code = typeof randomItem === "string" ? randomItem : randomItem?.number;
+        const code =
+          typeof randomItem === "string" ? randomItem : randomItem?.number;
         if (code && TICKET_REGEX.test(code)) {
           setTicketCode(code);
           return;
@@ -984,7 +855,7 @@ const BuyTicket = () => {
   // ===================================================
 
   const handleClearTicket = () => {
-    if (depositLoading) return;
+    if (depositLoading || isBetClosed) return;
     setTicketCode("");
     focusBox(0);
     setLocalError("");
@@ -996,31 +867,25 @@ const BuyTicket = () => {
   // ===================================================
 
   const handleIncrease = () => {
-    if (depositLoading) return;
+    if (depositLoading || isBetClosed) return;
     setQuantity((q) =>
-      Math.min(
-        MAX_TICKETS,
-        (Math.floor(q / TICKET_STEP) + 1) * TICKET_STEP
-      )
+      Math.min(MAX_TICKETS, (Math.floor(q / TICKET_STEP) + 1) * TICKET_STEP),
     );
     setLocalError("");
     setLocalSuccess("");
   };
 
   const handleDecrease = () => {
-    if (depositLoading) return;
+    if (depositLoading || isBetClosed) return;
     setQuantity((q) =>
-      Math.max(
-        MIN_TICKETS,
-        (Math.ceil(q / TICKET_STEP) - 1) * TICKET_STEP
-      )
+      Math.max(MIN_TICKETS, (Math.ceil(q / TICKET_STEP) - 1) * TICKET_STEP),
     );
     setLocalError("");
     setLocalSuccess("");
   };
 
   const handleQuickSelect = (count) => {
-    if (depositLoading) return;
+    if (depositLoading || isBetClosed) return;
     setQuantity(count);
     setLocalError("");
     setLocalSuccess("");
@@ -1030,256 +895,199 @@ const BuyTicket = () => {
   // PURCHASE
   // ===================================================
 
-  const handlePurchase =
-    async () => {
-      if (depositLoading) return;
+  const handlePurchase = async () => {
+    if (depositLoading) return;
 
-      try {
-        setLocalError("");
-        setLocalSuccess("");
+    try {
+      setLocalError("");
+      setLocalSuccess("");
 
-        dispatch(
-          clearDepositState()
-        );
+      dispatch(clearDepositState());
 
-        dispatch(
-          clearLotteryConfigError()
-        );
+      dispatch(clearLotteryConfigError());
 
-        dispatch(
-          clearLotteryConfigSuccess()
-        );
+      dispatch(clearLotteryConfigSuccess());
 
-        // -------------------------------------------------
-        // LOGIN
-        // -------------------------------------------------
+      // -------------------------------------------------
+      // LOGIN
+      // -------------------------------------------------
 
-        if (!user) {
+      if (!user) {
+        return setLocalError("Please login first");
+      }
+
+      if (quantity < MIN_TICKETS) {
+        return setLocalError(`Minimum ${MIN_TICKETS} tickets are required`);
+      }
+
+      // -------------------------------------------------
+      // KYC
+      // -------------------------------------------------
+
+      if (!isKycApproved) {
+        if (kycStatus === "pending") {
           return setLocalError(
-            "Please login first"
+            "Your KYC is pending approval. Please wait for admin verification.",
           );
         }
 
-        if (quantity < MIN_TICKETS) {
-          return setLocalError(
-            `Minimum ${MIN_TICKETS} tickets are required`
-          );
-        }
+        if (kycStatus === "rejected") {
+          setLocalError("Your KYC was rejected. Redirecting to KYC page...");
 
-        // -------------------------------------------------
-        // KYC
-        // -------------------------------------------------
-
-        if (!isKycApproved) {
-          if (
-            kycStatus ===
-            "pending"
-          ) {
-            return setLocalError(
-              "Your KYC is pending approval. Please wait for admin verification."
-            );
-          }
-
-          if (
-            kycStatus ===
-            "rejected"
-          ) {
-            setLocalError(
-              "Your KYC was rejected. Redirecting to KYC page..."
-            );
-
-            setTimeout(
-              () =>
-                navigate("/kyc"),
-              1500
-            );
-
-            return;
-          }
-
-          setLocalError(
-            "Please complete your KYC first. Redirecting to KYC page..."
-          );
-
-          setTimeout(
-            () =>
-              navigate("/kyc"),
-            1500
-          );
+          setTimeout(() => navigate("/kyc"), 1500);
 
           return;
         }
 
-        // -------------------------------------------------
-        // LOTTERY CONFIG
-        // -------------------------------------------------
-
-        const activePurchaseConfig = selectedFestivalLottery || lotteryConfig;
-
-        if (!activePurchaseConfig?._id) {
-          return setLocalError(
-            "Active lottery configuration not found"
-          );
-        }
-
-        if (
-          !activePurchaseConfig?.isActive
-        ) {
-          return setLocalError(
-            "Lottery is not active right now"
-          );
-        }
-
-        // -------------------------------------------------
-        // TICKET PRICE
-        // -------------------------------------------------
-
-        const setPriceAmount = SET_PRICE;
-
-        if (
-          !Number.isFinite(
-            setPriceAmount
-          ) ||
-          setPriceAmount <= 0
-        ) {
-          return setLocalError(
-            "Ticket price is not available"
-          );
-        }
-
-        // -------------------------------------------------
-        // TICKET VALIDATION
-        // -------------------------------------------------
-
-        if (!TICKET_REGEX.test(ticketCode)) {
-          return setLocalError(
-            `Please enter a valid 8-character ticket number (e.g. ${TICKET_EXAMPLE})`
-          );
-        }
-
-        if (quantity < MIN_TICKETS) {
-          return setLocalError(
-            `Minimum ${MIN_TICKETS} tickets are required`
-          );
-        }
-
-        // -------------------------------------------------
-        // CHECK NUMBER AVAILABILITY (checkNumberForBet)
-        // Only daily lottery numbers exist in LotteryNumber collection
-        // -------------------------------------------------
-
-        if (!selectedFestivalLottery) {
-          setLocalSuccess("Checking ticket availability...");
-          const availabilityCheck = await verifyNumberForBet(ticketCode);
-
-          if (!availabilityCheck.canBet) {
-            setLocalSuccess("");
-            return setLocalError(
-              availabilityCheck.isSold
-                ? "This number has already been sold. Please choose another number."
-                : availabilityCheck.message ||
-                    "This number has already been sold. Please choose another number."
-            );
-          }
-        }
-
-        // -------------------------------------------------
-        // LOTTERY NUMBERS — "ticket 1 hi jayega"
-        // -------------------------------------------------
-
-        const lotteryNumbers = [ticketCode];
-
-        // -------------------------------------------------
-        // TOTAL AMOUNT (10 tickets ka price SET_PRICE h, so totalTicketPrice)
-        // -------------------------------------------------
-
-        const totalAmount = totalTicketPrice;
-
-        setLocalSuccess(
-          `Creating payment order for ${quantity} ticket(s)...`
-        );
-
-        // -------------------------------------------------
-        // CREATE DEPOSIT
-        // -------------------------------------------------
-
-        const result =
-          await dispatch(
-            createDeposit({
-              paymentMethod:
-                "INR",
-              channel:
-                "qwackpay",
-              amount:
-                totalAmount,
-              configId:
-                activePurchaseConfig._id,
-              lotteryNumbers,
-            })
-          ).unwrap();
-
-        const paymentUrl =
-          result?.paymentUrl ||
-          depositPaymentUrl ||
-          "";
-
-        const orderId =
-          result?.orderId ||
-          depositOrderId ||
-          "";
-
-        if (!paymentUrl) {
-          setLocalSuccess("");
-
-          return setLocalError(
-            result?.message ||
-              "Payment URL not received. Please try again."
-          );
-        }
-
-        setLocalError("");
-
-        setLocalSuccess(
-          `Order ${orderId} created. Redirecting to payment page...`
-        );
-
-        setTimeout(() => {
-          window.location.href =
-            paymentUrl;
-        }, 600);
-
-        setTicketCode(randomCode());
-      } catch (
-        purchaseError
-      ) {
-        console.error(
-          "LOTTERY PURCHASE ERROR:",
-          purchaseError
-        );
-
-        setLocalSuccess("");
-
         setLocalError(
-          typeof purchaseError ===
-            "string"
-            ? purchaseError
-            : purchaseError?.message ||
-                purchaseError?.payload
-                  ?.message ||
-                purchaseError?.payload ||
-                "Could not buy tickets"
+          "Please complete your KYC first. Redirecting to KYC page...",
+        );
+
+        setTimeout(() => navigate("/kyc"), 1500);
+
+        return;
+      }
+
+      // -------------------------------------------------
+      // LOTTERY CONFIG
+      // -------------------------------------------------
+
+      const activePurchaseConfig = selectedFestivalLottery || lotteryConfig;
+
+      if (!activePurchaseConfig?._id) {
+        return setLocalError("Active lottery configuration not found");
+      }
+
+      if (!activePurchaseConfig?.isActive) {
+        return setLocalError("Lottery is not active right now");
+      }
+
+      // -------------------------------------------------
+      // ✅ BET CLOSE CHECK (1 hour before draw)
+      // -------------------------------------------------
+
+      if (countdown.available && countdown.expired) {
+        return setLocalError(
+          "Betting is closed for this draw. Betting closes 1 hour before draw time.",
         );
       }
-    };
+
+      // -------------------------------------------------
+      // TICKET PRICE
+      // -------------------------------------------------
+
+      const setPriceAmount = SET_PRICE;
+
+      if (!Number.isFinite(setPriceAmount) || setPriceAmount <= 0) {
+        return setLocalError("Ticket price is not available");
+      }
+
+      // -------------------------------------------------
+      // TICKET VALIDATION
+      // -------------------------------------------------
+
+      if (!TICKET_REGEX.test(ticketCode)) {
+        return setLocalError(
+          `Please enter a valid 8-character ticket number (e.g. ${TICKET_EXAMPLE})`,
+        );
+      }
+
+      if (quantity < MIN_TICKETS) {
+        return setLocalError(`Minimum ${MIN_TICKETS} tickets are required`);
+      }
+
+      // -------------------------------------------------
+      // CHECK NUMBER AVAILABILITY (checkNumberForBet)
+      // Only daily lottery numbers exist in LotteryNumber collection
+      // -------------------------------------------------
+
+      if (!selectedFestivalLottery) {
+        setLocalSuccess("Checking ticket availability...");
+        const availabilityCheck = await verifyNumberForBet(ticketCode);
+
+        if (!availabilityCheck.canBet) {
+          setLocalSuccess("");
+          return setLocalError(
+            availabilityCheck.isSold
+              ? "This number has already been sold. Please choose another number."
+              : availabilityCheck.message ||
+                  "This number has already been sold. Please choose another number.",
+          );
+        }
+      }
+
+      // -------------------------------------------------
+      // LOTTERY NUMBERS — "ticket 1 hi jayega"
+      // -------------------------------------------------
+
+      const lotteryNumbers = [ticketCode];
+
+      // -------------------------------------------------
+      // TOTAL AMOUNT (10 tickets ka price SET_PRICE h, so totalTicketPrice)
+      // -------------------------------------------------
+
+      const totalAmount = totalTicketPrice;
+
+      setLocalSuccess(`Creating payment order for ${quantity} ticket(s)...`);
+
+      // -------------------------------------------------
+      // CREATE DEPOSIT
+      // -------------------------------------------------
+
+      const result = await dispatch(
+        createDeposit({
+          paymentMethod: "INR",
+          channel: "qwackpay",
+          amount: totalAmount,
+          configId: activePurchaseConfig._id,
+          lotteryNumbers,
+        }),
+      ).unwrap();
+
+      const paymentUrl = result?.paymentUrl || depositPaymentUrl || "";
+
+      const orderId = result?.orderId || depositOrderId || "";
+
+      if (!paymentUrl) {
+        setLocalSuccess("");
+
+        return setLocalError(
+          result?.message || "Payment URL not received. Please try again.",
+        );
+      }
+
+      setLocalError("");
+
+      setLocalSuccess(
+        `Order ${orderId} created. Redirecting to payment page...`,
+      );
+
+      setTimeout(() => {
+        window.location.href = paymentUrl;
+      }, 600);
+
+      setTicketCode(randomCode());
+    } catch (purchaseError) {
+      console.error("LOTTERY PURCHASE ERROR:", purchaseError);
+
+      setLocalSuccess("");
+
+      setLocalError(
+        typeof purchaseError === "string"
+          ? purchaseError
+          : purchaseError?.message ||
+              purchaseError?.payload?.message ||
+              purchaseError?.payload ||
+              "Could not buy tickets",
+      );
+    }
+  };
 
   // ===================================================
   // DISPLAY STATES
   // ===================================================
 
-  const displayError =
-    localError ||
-    depositError ||
-    error;
+  const displayError = localError || depositError || error;
 
   const isPurchaseDisabled =
     activeLoading ||
@@ -1288,12 +1096,10 @@ const BuyTicket = () => {
     !lotteryConfig?.isActive ||
     !hasApiPrice ||
     !isTicketValid ||
-    quantity < MIN_TICKETS;
+    quantity < MIN_TICKETS ||
+    isBetClosed;
 
-  const visibleDateChips =
-    showAllDates
-      ? dateChips
-      : dateChips.slice(0, 7);
+  const visibleDateChips = showAllDates ? dateChips : dateChips.slice(0, 7);
 
   // ===================================================
   // UI
@@ -1303,10 +1109,7 @@ const BuyTicket = () => {
     <div
       className="min-h-screen w-full overflow-x-hidden bg-[#eef3fa] text-[#173e70]"
       style={{
-        paddingBottom:
-          BOTTOM_NAV_HEIGHT +
-          PURCHASE_BAR_HEIGHT +
-          24,
+        paddingBottom: BOTTOM_NAV_HEIGHT + PURCHASE_BAR_HEIGHT + 24,
       }}
     >
       {/* Real-time Number Sold Notification */}
@@ -1341,27 +1144,19 @@ const BuyTicket = () => {
 
             <div className="mt-3 grid grid-cols-3 gap-1">
               <HeroFeature
-                icon={
-                  <CalendarDays
-                    size={21}
-                  />
-                }
+                icon={<CalendarDays size={21} />}
                 l1="Every Day"
                 l2="Draw"
               />
 
               <HeroFeature
-                icon={
-                  <Trophy size={21} />
-                }
+                icon={<Trophy size={21} />}
                 l1={firstPrizeAmount}
                 l2="Total Prize"
               />
 
               <HeroFeature
-                icon={
-                  <Users size={21} />
-                }
+                icon={<Users size={21} />}
                 l1="10 Tickets"
                 l2="per Draw"
               />
@@ -1372,9 +1167,7 @@ const BuyTicket = () => {
             <TicketMock
               prize={firstPrizeAmount}
               price={priceText}
-              number={
-                HERO_TICKET_NUMBER
-              }
+              number={HERO_TICKET_NUMBER}
             />
           </div>
         </div>
@@ -1385,92 +1178,79 @@ const BuyTicket = () => {
             KYC STATUS
         ================================================= */}
 
-        {!kycLoading &&
-          kycStatus !==
-            "approved" && (
-            <div
-              className={`rounded-xl border px-4 py-3 text-sm font-medium ${
-                kycStatus ===
-                "pending"
-                  ? "border-amber-200 bg-amber-50 text-amber-800"
-                  : kycStatus ===
-                      "rejected"
-                    ? "border-red-200 bg-red-50 text-red-700"
-                    : "border-blue-200 bg-blue-50 text-blue-700"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  {kycStatus ===
-                    "pending" && (
-                    <>
-                      <p className="font-bold">
-                        KYC Verification
-                        Pending
-                      </p>
+        {!kycLoading && kycStatus !== "approved" && (
+          <div
+            className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+              kycStatus === "pending"
+                ? "border-amber-200 bg-amber-50 text-amber-800"
+                : kycStatus === "rejected"
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : "border-blue-200 bg-blue-50 text-blue-700"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                {kycStatus === "pending" && (
+                  <>
+                    <p className="font-bold">KYC Verification Pending</p>
 
-                      <p className="mt-0.5 text-xs">
-                        Your KYC is under
-                        review. You
-                        cannot purchase
-                        tickets until
-                        approved.
-                      </p>
-                    </>
-                  )}
+                    <p className="mt-0.5 text-xs">
+                      Your KYC is under review. You cannot purchase tickets
+                      until approved.
+                    </p>
+                  </>
+                )}
 
-                  {kycStatus ===
-                    "rejected" && (
-                    <>
-                      <p className="font-bold">
-                        KYC Rejected
-                      </p>
+                {kycStatus === "rejected" && (
+                  <>
+                    <p className="font-bold">KYC Rejected</p>
 
-                      <p className="mt-0.5 text-xs">
-                        Your KYC was
-                        rejected. Please
-                        re-submit your
-                        documents.
-                      </p>
-                    </>
-                  )}
+                    <p className="mt-0.5 text-xs">
+                      Your KYC was rejected. Please re-submit your documents.
+                    </p>
+                  </>
+                )}
 
-                  {kycStatus ===
-                    "not_submitted" && (
-                    <>
-                      <p className="font-bold">
-                        KYC Required
-                      </p>
+                {kycStatus === "not_submitted" && (
+                  <>
+                    <p className="font-bold">KYC Required</p>
 
-                      <p className="mt-0.5 text-xs">
-                        Please complete
-                        your KYC to
-                        purchase lottery
-                        tickets.
-                      </p>
-                    </>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate("/kyc")
-                  }
-                  className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-bold shadow-sm"
-                >
-                  {kycStatus ===
-                  "rejected"
-                    ? "Re-submit"
-                    : "Complete KYC"}
-                </button>
+                    <p className="mt-0.5 text-xs">
+                      Please complete your KYC to purchase lottery tickets.
+                    </p>
+                  </>
+                )}
               </div>
+
+              <button
+                type="button"
+                onClick={() => navigate("/kyc")}
+                className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-bold shadow-sm"
+              >
+                {kycStatus === "rejected" ? "Re-submit" : "Complete KYC"}
+              </button>
             </div>
-          )}
+          </div>
+        )}
 
         {kycLoading && (
           <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
             Checking KYC status...
+          </div>
+        )}
+
+        {/* =================================================
+            BETTING CLOSED BANNER
+        ================================================= */}
+
+        {isBetClosed && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            <p className="font-bold">Betting Closed</p>
+
+            <p className="mt-0.5 text-xs">
+              Betting for this draw closed 1 hour before the draw time. Please
+              wait for the next draw.
+            </p>
           </div>
         )}
 
@@ -1481,10 +1261,7 @@ const BuyTicket = () => {
         <Card>
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <CalendarDays
-                size={24}
-                className="shrink-0 text-[#173e70]"
-              />
+              <CalendarDays size={24} className="shrink-0 text-[#173e70]" />
 
               <h2 className="truncate text-[16px] font-extrabold text-[#173e70]">
                 Select Draw Date
@@ -1493,24 +1270,15 @@ const BuyTicket = () => {
 
             <button
               type="button"
-              onClick={() =>
-                setShowAllDates(
-                  (value) =>
-                    !value
-                )
-              }
+              onClick={() => setShowAllDates((value) => !value)}
               className="flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[#c9d3e3] bg-white px-2.5 text-[10px] font-semibold text-[#173e70]"
             >
-              {showAllDates
-                ? "Show Less"
-                : "View Full Schedule"}
+              {showAllDates ? "Show Less" : "View Full Schedule"}
 
               <ArrowRight
                 size={12}
                 className={`transition-transform ${
-                  showAllDates
-                    ? "rotate-90"
-                    : ""
+                  showAllDates ? "rotate-90" : ""
                 }`}
               />
             </button>
@@ -1518,56 +1286,28 @@ const BuyTicket = () => {
 
           {showAllDates ? (
             <div className="mt-3 grid grid-cols-4 gap-2 min-[400px]:grid-cols-5">
-              {visibleDateChips.map(
-                (
-                  chip,
-                  index
-                ) => (
-                  <DateChip
-                    key={index}
-                    chip={chip}
-                    today={
-                      index === 0
-                    }
-                    active={
-                      index ===
-                      selectedDate
-                    }
-                    onClick={() =>
-                      setSelectedDate(
-                        index
-                      )
-                    }
-                    fluid
-                  />
-                )
-              )}
+              {visibleDateChips.map((chip, index) => (
+                <DateChip
+                  key={index}
+                  chip={chip}
+                  today={index === 0}
+                  active={index === selectedDate}
+                  onClick={() => setSelectedDate(index)}
+                  fluid
+                />
+              ))}
             </div>
           ) : (
             <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {visibleDateChips.map(
-                (
-                  chip,
-                  index
-                ) => (
-                  <DateChip
-                    key={index}
-                    chip={chip}
-                    today={
-                      index === 0
-                    }
-                    active={
-                      index ===
-                      selectedDate
-                    }
-                    onClick={() =>
-                      setSelectedDate(
-                        index
-                      )
-                    }
-                  />
-                )
-              )}
+              {visibleDateChips.map((chip, index) => (
+                <DateChip
+                  key={index}
+                  chip={chip}
+                  today={index === 0}
+                  active={index === selectedDate}
+                  onClick={() => setSelectedDate(index)}
+                />
+              ))}
             </div>
           )}
         </Card>
@@ -1583,9 +1323,7 @@ const BuyTicket = () => {
                 small
                 prize={firstPrizeAmount}
                 price={priceText}
-                number={
-                  HERO_TICKET_NUMBER
-                }
+                number={HERO_TICKET_NUMBER}
               />
             </div>
 
@@ -1597,48 +1335,27 @@ const BuyTicket = () => {
 
                 <span className="shrink-0 rounded-md bg-[#ed1d43] px-2 py-1.5 text-[11px] font-extrabold text-white">
                   {priceText}{" "}
-                  <span className="text-[8px] font-medium">
-                    per ticket
-                  </span>
+                  <span className="text-[8px] font-medium">per ticket</span>
                 </span>
               </div>
 
               <div className="mt-2 grid grid-cols-3 gap-1">
                 <InfoItem
-                  icon={
-                    <Trophy
-                      size={20}
-                      className="text-[#8a4b12]"
-                    />
-                  }
-                  title={
-                    firstPrizeAmount
-                  }
+                  icon={<Trophy size={20} className="text-[#8a4b12]" />}
+                  title={firstPrizeAmount}
                   sub="Total First Prize"
                 />
 
                 <InfoItem
-                  icon={
-                    <Users
-                      size={20}
-                      className="text-[#8a4b12]"
-                    />
-                  }
+                  icon={<Users size={20} className="text-[#8a4b12]" />}
                   title={`${MAX_TICKETS} Tickets`}
                   sub="Max per Order"
                 />
 
                 <InfoItem
-                  icon={
-                    <Clock
-                      size={20}
-                      className="text-[#8a4b12]"
-                    />
-                  }
+                  icon={<Clock size={20} className="text-[#8a4b12]" />}
                   title={drawTimeText}
-                  sub={
-                    countdownText
-                  }
+                  sub={countdownText}
                 />
               </div>
             </div>
@@ -1688,7 +1405,9 @@ const BuyTicket = () => {
               <button
                 type="button"
                 onClick={handleDecrease}
-                disabled={totalTickets <= MIN_TICKETS || depositLoading}
+                disabled={
+                  totalTickets <= MIN_TICKETS || depositLoading || isBetClosed
+                }
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e9eef7] text-[22px] font-bold text-[#173e70] disabled:opacity-50"
               >
                 −
@@ -1699,7 +1418,9 @@ const BuyTicket = () => {
               <button
                 type="button"
                 onClick={handleIncrease}
-                disabled={totalTickets >= MAX_TICKETS || depositLoading}
+                disabled={
+                  totalTickets >= MAX_TICKETS || depositLoading || isBetClosed
+                }
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e9eef7] text-[22px] font-bold text-[#173e70] disabled:opacity-50"
               >
                 +
@@ -1709,12 +1430,16 @@ const BuyTicket = () => {
             <div className="grid min-w-0 grid-cols-[1fr_auto_1fr_auto_1.2fr] items-center gap-1 rounded-xl bg-[#f3f6fb] px-2 py-2 text-center">
               <div className="min-w-0">
                 <p className="text-[9px] text-[#4b5563]">Ticket Price</p>
-                <p className="text-[14px] font-black text-[#d7193f]">₹{TICKET_PRICE}/-</p>
+                <p className="text-[14px] font-black text-[#d7193f]">
+                  ₹{TICKET_PRICE}/-
+                </p>
               </div>
               <span className="text-[15px] text-[#9aa5b8]">×</span>
               <div className="min-w-0">
                 <p className="text-[9px] text-[#4b5563]">Total Tickets</p>
-                <p className="text-[14px] font-black text-[#d7193f]">{quantity}</p>
+                <p className="text-[14px] font-black text-[#d7193f]">
+                  {quantity}
+                </p>
               </div>
               <span className="text-[15px] text-[#9aa5b8]">=</span>
               <div className="min-w-0">
@@ -1736,7 +1461,7 @@ const BuyTicket = () => {
                     key={count}
                     type="button"
                     onClick={() => handleQuickSelect(count)}
-                    disabled={depositLoading}
+                    disabled={depositLoading || isBetClosed}
                     className={`relative min-w-0 rounded-lg border px-0.5 py-2 text-center transition active:scale-95 disabled:opacity-60 ${
                       active
                         ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
@@ -1755,7 +1480,12 @@ const BuyTicket = () => {
                         active ? "text-[#ed1d43]" : "text-[#173e70]"
                       }`}
                     >
-                      ₹ {(Math.round(((SET_PRICE * count) / PRICE_SET_SIZE) * 100) / 100).toLocaleString("en-IN")}
+                      ₹{" "}
+                      {(
+                        Math.round(
+                          ((SET_PRICE * count) / PRICE_SET_SIZE) * 100,
+                        ) / 100
+                      ).toLocaleString("en-IN")}
                     </p>
                     {active && (
                       <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-[#ed1d43]" />
@@ -1775,10 +1505,7 @@ const BuyTicket = () => {
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2.5">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#e6c97c] bg-[#fff6df] text-[#8a4b12]">
-                <Ticket
-                  size={22}
-                  className="-rotate-45"
-                />
+                <Ticket size={22} className="-rotate-45" />
               </span>
 
               <div className="min-w-0 leading-tight">
@@ -1796,7 +1523,7 @@ const BuyTicket = () => {
               <button
                 type="button"
                 onClick={handleClearTicket}
-                disabled={!ticketCode || depositLoading}
+                disabled={!ticketCode || depositLoading || isBetClosed}
                 className="text-[12px] font-medium text-[#3d4468] underline underline-offset-2 disabled:opacity-40"
               >
                 Clear
@@ -1804,7 +1531,7 @@ const BuyTicket = () => {
               <button
                 type="button"
                 onClick={handleRandomTicket}
-                disabled={depositLoading}
+                disabled={depositLoading || isBetClosed}
                 className="flex items-center gap-1 rounded-lg border border-[#c9d3e3] bg-white px-3 py-1.5 text-[12px] font-bold text-[#173e70] disabled:opacity-50"
               >
                 <Shuffle size={13} /> Random
@@ -1832,7 +1559,7 @@ const BuyTicket = () => {
                   onKeyDown={(event) => handleBoxKeyDown(i, event)}
                   onPaste={handleBoxPaste}
                   onFocus={(event) => event.target.select()}
-                  disabled={depositLoading}
+                  disabled={depositLoading || isBetClosed}
                   inputMode={isLetter ? "text" : "numeric"}
                   autoCapitalize="characters"
                   autoComplete="off"
@@ -1882,7 +1609,10 @@ const BuyTicket = () => {
               <Info size={13} />
             </span>
             <p className="text-[10.5px] leading-snug text-[#26354b]">
-              Purchasing <strong>{quantity} tickets</strong> (₹{TICKET_PRICE} × {quantity} = <strong>₹{totalTicketPrice.toLocaleString("en-IN")}</strong>) for the draw on {drawDateText}. Each ticket costs ₹{TICKET_PRICE}.
+              Purchasing <strong>{quantity} tickets</strong> (₹{TICKET_PRICE} ×{" "}
+              {quantity} ={" "}
+              <strong>₹{totalTicketPrice.toLocaleString("en-IN")}</strong>) for
+              the draw on {drawDateText}. Each ticket costs ₹{TICKET_PRICE}.
             </p>
           </div>
         </Card>
@@ -1893,7 +1623,10 @@ const BuyTicket = () => {
         <DailyNumbersSection
           mode="buyTicket"
           selectedNumber={ticketCode}
-          onSelectNumber={(code) => setTicketCode(code)}
+          onSelectNumber={(code) => {
+            if (isBetClosed) return;
+            setTicketCode(code);
+          }}
         />
 
         {/* =================================================
@@ -1917,10 +1650,7 @@ const BuyTicket = () => {
         <section className="overflow-hidden rounded-[18px] bg-gradient-to-br from-[#3a0b17] via-[#2b0a16] to-[#1a0710] p-2.5 shadow-lg">
           <div className="flex flex-wrap items-center justify-between gap-2 px-1">
             <div className="flex min-w-0 items-center gap-2">
-              <BookOpen
-                size={26}
-                className="shrink-0 text-[#ffd34e]"
-              />
+              <BookOpen size={26} className="shrink-0 text-[#ffd34e]" />
 
               <h2 className="text-[15px] font-extrabold leading-tight text-white">
                 {displayLottery?.marketName
@@ -1947,13 +1677,9 @@ const BuyTicket = () => {
               </span>
 
               <span className="whitespace-nowrap rounded-md bg-white px-2 py-1 text-[17px] font-black tracking-wider">
-                <span className="text-[#d7193f]">
-                  12B
-                </span>
+                <span className="text-[#d7193f]">12B</span>
 
-                <span className="text-[#173e70]">
-                  12345
-                </span>
+                <span className="text-[#173e70]">12345</span>
               </span>
             </div>
 
@@ -1965,26 +1691,14 @@ const BuyTicket = () => {
               />
 
               <div className="min-w-0">
-                <p className="text-[10px] text-white/80">
-                  Total First Prize
-                </p>
+                <p className="text-[10px] text-white/80">Total First Prize</p>
 
                 <p className="whitespace-nowrap text-[20px] font-black uppercase leading-none text-[#ffd34e]">
-                  {
-                    firstPrizeAmount
-                  }
+                  {firstPrizeAmount}
                 </p>
 
                 <p className="mt-0.5 whitespace-nowrap text-[9px] text-white/75">
-                  (
-                  {
-                    RULE_TICKETS
-                  }{" "}
-                  Tickets ×{" "}
-                  {
-                    firstPrizePerTicket
-                  }
-                  )
+                  ({RULE_TICKETS} Tickets × {firstPrizePerTicket})
                 </p>
               </div>
             </div>
@@ -2034,57 +1748,30 @@ const BuyTicket = () => {
                     `Example (For ${TICKET_EXAMPLE})`,
                     "Prize Per Ticket",
                     `Total Prize (${RULE_TICKETS} Tickets)`,
-                  ].map(
-                    (heading) => (
-                      <th
-                        key={
-                          heading
-                        }
-                        className="px-1.5 py-2.5 text-[10px] font-semibold leading-tight"
-                      >
-                        {
-                          heading
-                        }
-                      </th>
-                    )
-                  )}
+                  ].map((heading) => (
+                    <th
+                      key={heading}
+                      className="px-1.5 py-2.5 text-[10px] font-semibold leading-tight"
+                    >
+                      {heading}
+                    </th>
+                  ))}
                 </tr>
               </thead>
 
               <tbody>
-                {winningRules.map(
-                  (
-                    rule,
-                    index
-                  ) => (
-                    <RuleRow
-                      key={
-                        rule.number || index
-                      }
-                      number={
-                        rule.number || index + 1
-                      }
-                      condition={
-                        rule.condition || rule.cond
-                      }
-                      example={
-                        rule.example || rule.ex
-                      }
-                      prize={
-                        rule.prizeText
-                      }
-                      total={
-                        rule.totalText
-                      }
-                      badge={
-                        rule.badge || BADGES[index]
-                      }
-                      row={
-                        rule.row || ROW_TINTS[index]
-                      }
-                    />
-                  )
-                )}
+                {winningRules.map((rule, index) => (
+                  <RuleRow
+                    key={rule.number || index}
+                    number={rule.number || index + 1}
+                    condition={rule.condition || rule.cond}
+                    example={rule.example || rule.ex}
+                    prize={rule.prizeText}
+                    total={rule.totalText}
+                    badge={rule.badge || BADGES[index]}
+                    row={rule.row || ROW_TINTS[index]}
+                  />
+                ))}
               </tbody>
             </table>
           </div>
@@ -2098,27 +1785,22 @@ const BuyTicket = () => {
       <div
         className="fixed inset-x-2 z-[100] mx-auto mb-1 w-auto max-w-[450px] overflow-hidden rounded-lg border-t border-[#ff3155]/20 bg-gradient-to-b from-[#2b0a16] to-[#160610] shadow-[0_-4px_14px_rgba(0,0,0,0.4)] sm:inset-x-3 sm:mb-2"
         style={{
-          bottom:
-            BOTTOM_NAV_HEIGHT +
-            8,
+          bottom: BOTTOM_NAV_HEIGHT + 8,
         }}
       >
         {displayError && (
           <div className="mx-3 mt-2 rounded-lg border border-red-400/40 bg-red-500/15 px-2.5 py-1.5 text-center text-[10px] text-red-200">
-            {typeof displayError ===
-            "string"
+            {typeof displayError === "string"
               ? displayError
-              : displayError?.message ||
-                "Could not buy tickets"}
+              : displayError?.message || "Could not buy tickets"}
           </div>
         )}
 
-        {localSuccess &&
-          !displayError && (
-            <div className="mx-3 mt-2 rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1.5 text-center text-[10px] text-emerald-200">
-              {localSuccess}
-            </div>
-          )}
+        {localSuccess && !displayError && (
+          <div className="mx-3 mt-2 rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1.5 text-center text-[10px] text-emerald-200">
+            {localSuccess}
+          </div>
+        )}
 
         <div className="flex w-full items-center gap-2 px-3 py-3 sm:gap-3">
           <div className="min-w-0 flex-1">
@@ -2128,20 +1810,12 @@ const BuyTicket = () => {
 
             <div className="mt-1 flex min-w-0 items-center gap-2">
               <span className="shrink-0 whitespace-nowrap text-[20px] font-black leading-none text-[#2ee59d] sm:text-[23px]">
-                ₹
-                {totalTicketPrice.toLocaleString(
-                  "en-IN"
-                )}
+                ₹{totalTicketPrice.toLocaleString("en-IN")}
                 /-
               </span>
 
               <p className="min-w-0 truncate text-[7.5px] leading-tight text-white/70 sm:text-[8.5px]">
-                {totalTickets}{" "}
-                {totalTickets ===
-                1
-                  ? "Ticket"
-                  : "Tickets"}{" "}
-                •{" "}
+                {totalTickets} {totalTickets === 1 ? "Ticket" : "Tickets"} •{" "}
                 {drawDateText}
                 <br />
                 Daily Lottery
@@ -2151,25 +1825,20 @@ const BuyTicket = () => {
 
           <button
             type="button"
-            onClick={
-              handlePurchase
-            }
-            disabled={
-              isPurchaseDisabled
-            }
+            onClick={handlePurchase}
+            disabled={isPurchaseDisabled}
             className="flex h-[44px] w-auto min-w-[108px] shrink-0 items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-[#ff1744] to-[#e0102f] px-2.5 text-[12px] font-extrabold text-white shadow-[0_8px_25px_rgba(255,20,67,0.45)] transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none sm:h-[48px] sm:min-w-[125px] sm:text-[14px]"
           >
             <span className="truncate">
               {depositLoading
                 ? "Creating..."
-                : "Purchase Now"}
+                : isBetClosed
+                  ? "Betting Closed"
+                  : "Purchase Now"}
             </span>
 
-            {!depositLoading && (
-              <ArrowRight
-                size={16}
-                className="shrink-0"
-              />
+            {!depositLoading && !isBetClosed && (
+              <ArrowRight size={16} className="shrink-0" />
             )}
           </button>
         </div>
@@ -2182,9 +1851,7 @@ const BuyTicket = () => {
 // SMALL COMPONENTS
 // =====================================================
 
-const Card = ({
-  children,
-}) => (
+const Card = ({ children }) => (
   <section className="rounded-[16px] bg-white p-3 shadow-sm">
     {children}
   </section>
@@ -2194,20 +1861,12 @@ const Card = ({
 // DATE CHIP
 // =====================================================
 
-const DateChip = ({
-  chip,
-  today,
-  active,
-  onClick,
-  fluid = false,
-}) => (
+const DateChip = ({ chip, today, active, onClick, fluid = false }) => (
   <button
     type="button"
     onClick={onClick}
     className={`relative flex h-[66px] ${
-      fluid
-        ? "w-full"
-        : "w-[64px] shrink-0"
+      fluid ? "w-full" : "w-[64px] shrink-0"
     } flex-col items-center justify-center rounded-xl border text-center transition active:scale-95 ${
       active
         ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
@@ -2215,37 +1874,26 @@ const DateChip = ({
     }`}
   >
     {today && (
-      <span className="text-[10px] font-semibold text-[#ed1d43]">
-        Today
-      </span>
+      <span className="text-[10px] font-semibold text-[#ed1d43]">Today</span>
     )}
 
     <span
       className={`whitespace-nowrap text-[13px] font-extrabold ${
-        active
-          ? "text-[#ed1d43]"
-          : "text-[#26354b]"
+        active ? "text-[#ed1d43]" : "text-[#26354b]"
       }`}
     >
-      {chip.day}{" "}
-      {chip.month}
+      {chip.day} {chip.month}
     </span>
 
     <span
-      className={`text-[10px] ${
-        active
-          ? "text-[#ed1d43]"
-          : "text-[#6b7280]"
-      }`}
+      className={`text-[10px] ${active ? "text-[#ed1d43]" : "text-[#6b7280]"}`}
     >
       {chip.weekday}
     </span>
 
     <span
       className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
-        active
-          ? "bg-[#ed1d43]"
-          : "bg-[#20a66a]"
+        active ? "bg-[#ed1d43]" : "bg-[#20a66a]"
       }`}
     />
   </button>
@@ -2255,15 +1903,9 @@ const DateChip = ({
 // HERO FEATURE
 // =====================================================
 
-const HeroFeature = ({
-  icon,
-  l1,
-  l2,
-}) => (
+const HeroFeature = ({ icon, l1, l2 }) => (
   <div className="flex min-w-0 flex-col items-center gap-1 text-center">
-    <span className="text-[#ffd34e]">
-      {icon}
-    </span>
+    <span className="text-[#ffd34e]">{icon}</span>
 
     <span className="break-words text-[8px] font-medium leading-tight text-white/90">
       {l1}
@@ -2277,15 +1919,9 @@ const HeroFeature = ({
 // INFO ITEM
 // =====================================================
 
-const InfoItem = ({
-  icon,
-  title,
-  sub,
-}) => (
+const InfoItem = ({ icon, title, sub }) => (
   <div className="flex min-w-0 flex-col items-center gap-0.5 text-center">
-    <span className="shrink-0">
-      {icon}
-    </span>
+    <span className="shrink-0">{icon}</span>
 
     <p className="w-full truncate text-[10px] font-bold leading-tight text-[#173e70]">
       {title}
@@ -2301,22 +1937,13 @@ const InfoItem = ({
 // TICKET MOCK
 // =====================================================
 
-const TicketMock = ({
-  prize,
-  price,
-  number,
-  small = false,
-}) => (
+const TicketMock = ({ prize, price, number, small = false }) => (
   <div
     className={`relative ${
-      small
-        ? "p-1.5"
-        : "p-3"
+      small ? "p-1.5" : "p-3"
     } -rotate-3 rounded-lg border-[3px] border-[#f2d1b8] bg-[#fffaf0] shadow-lg`}
     style={{
-      fontSize: small
-        ? "9px"
-        : "10px",
+      fontSize: small ? "9px" : "10px",
     }}
   >
     <div className="absolute inset-0 -z-10 -rotate-[7deg] rounded-lg border border-[#e5c8a4] bg-[#fdf1dc]" />
@@ -2325,9 +1952,7 @@ const TicketMock = ({
       <div className="min-w-0">
         <p
           className={`font-black leading-none text-[#d7193f] ${
-            small
-              ? "text-[15px]"
-              : "text-[25px]"
+            small ? "text-[15px]" : "text-[25px]"
           }`}
         >
           DEAR
@@ -2335,9 +1960,7 @@ const TicketMock = ({
 
         <p
           className={`font-bold text-[#153c78] ${
-            small
-              ? "text-[6px]"
-              : "text-[8px]"
+            small ? "text-[6px]" : "text-[8px]"
           }`}
         >
           DAILY LOTTERY
@@ -2346,24 +1969,17 @@ const TicketMock = ({
 
       <span
         className={`shrink-0 rounded-full bg-[#d7198c] text-center font-black leading-tight text-white ${
-          small
-            ? "px-1 py-0.5 text-[5px]"
-            : "px-1.5 py-1 text-[7px]"
+          small ? "px-1 py-0.5 text-[5px]" : "px-1.5 py-1 text-[7px]"
         }`}
       >
         Price
-
-        <span className="block text-[1.3em]">
-          {price}
-        </span>
+        <span className="block text-[1.3em]">{price}</span>
       </span>
     </div>
 
     <p
       className={`mt-1 font-bold text-[#26354b] ${
-        small
-          ? "text-[5px]"
-          : "text-[6px]"
+        small ? "text-[5px]" : "text-[6px]"
       }`}
     >
       First Prize
@@ -2371,9 +1987,7 @@ const TicketMock = ({
 
     <p
       className={`whitespace-nowrap font-black uppercase leading-none text-[#153c78] ${
-        small
-          ? "text-[12px]"
-          : "text-[20px]"
+        small ? "text-[12px]" : "text-[20px]"
       }`}
     >
       {prize}
@@ -2382,9 +1996,7 @@ const TicketMock = ({
     <div className="mt-1 border-y border-[#d7bba5] py-0.5 text-center">
       <p
         className={`font-bold text-[#26354b] ${
-          small
-            ? "text-[5px]"
-            : "text-[6px]"
+          small ? "text-[5px]" : "text-[6px]"
         }`}
       >
         Ticket Number
@@ -2392,9 +2004,7 @@ const TicketMock = ({
 
       <p
         className={`whitespace-nowrap font-black tracking-[0.12em] text-[#173e70] ${
-          small
-            ? "text-[7px]"
-            : "text-[9px]"
+          small ? "text-[7px]" : "text-[9px]"
         }`}
       >
         {number}
@@ -2407,18 +2017,8 @@ const TicketMock = ({
 // RULE ROW
 // =====================================================
 
-const RuleRow = ({
-  number,
-  condition,
-  example,
-  prize,
-  total,
-  badge,
-  row,
-}) => (
-  <tr
-    className={`${row} border-b border-white/60`}
-  >
+const RuleRow = ({ number, condition, example, prize, total, badge, row }) => (
+  <tr className={`${row} border-b border-white/60`}>
     <td className="px-1.5 py-2.5">
       <span
         className={`flex h-6 w-6 items-center justify-center rounded-md text-[11px] font-black text-white ${badge}`}
