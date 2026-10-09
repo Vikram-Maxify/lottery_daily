@@ -2089,6 +2089,167 @@ const updateEntryStatus = async (req, res) => {
   }
 };
 
+const getNumbersWithoutBets = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // ================================================
+    // VALIDATE CONFIG ID
+    // ================================================
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid configuration ID",
+      });
+    }
+
+    // ================================================
+    // FIND CONFIG
+    // ================================================
+
+    const config = await LotteryConfig.findById(id).lean();
+
+    if (!config) {
+      return res.status(404).json({
+        success: false,
+        message: "Lottery configuration not found",
+      });
+    }
+
+    // ================================================
+    // GET CONFIG DRAW DATE STRING (YYYY-MM-DD)
+    // ================================================
+
+    const drawDate = new Date(config.drawDate);
+
+    if (Number.isNaN(drawDate.getTime())) {
+      return res.status(500).json({
+        success: false,
+        message: "Invalid draw date in lottery configuration",
+      });
+    }
+
+    const drawDateString = drawDate.toISOString().slice(0, 10);
+
+    // ================================================
+    // GET ALL NUMBERS OF THIS DAY FROM LotteryNumber
+    // ================================================
+    // NOTE:
+    // Agar aapke LotteryNumber model me `drawDate` ya
+    // `date` field hai to yahan filter lagayein.
+    //
+    // Neeche main maan raha hoon ki LotteryNumber model
+    // me `number` field hai aur optional `date` field
+    // bhi ho sakti hai. Agar date field nahi hai to
+    // saare numbers le rahe hain.
+    // ================================================
+
+    // ---- OPTION A: Agar LotteryNumber me date field hai ----
+    // const allNumbers = await LotteryNumber.find({
+    //   date: drawDateString,
+    // }).lean();
+
+    // ---- OPTION B: Agar date field nahi hai (saare numbers) ----
+    const allNumbers = await LotteryNumber.find().lean();
+
+    if (!allNumbers || allNumbers.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No lottery numbers found for this day",
+        configId: config._id,
+        marketName: config.marketName,
+        drawDate: drawDateString,
+        totalNumbers: 0,
+        betNumbersCount: 0,
+        noBetNumbersCount: 0,
+        noBetNumbers: [],
+      });
+    }
+
+    // ================================================
+    // GET ALL BET NUMBERS FROM CONFIG USERS
+    // ================================================
+
+    const betNumbers = new Set(
+      (config.users || [])
+        .filter((u) => u.isBuy === true)
+        .map((u) => String(u.number).trim().toUpperCase())
+    );
+
+    // ================================================
+    // FILTER NUMBERS JINPAR BET NAHI LAGI
+    // ================================================
+
+    const noBetNumbers = allNumbers
+      .filter((item) => {
+        const num = String(item.number).trim().toUpperCase();
+        return !betNumbers.has(num);
+      })
+      .map((item) => ({
+        _id: item._id,
+        number: item.number,
+        status: item.status || "available",
+        betCount: item.betCount || 0,
+        soldAt: item.soldAt || null,
+        createdAt: item.createdAt || null,
+        updatedAt: item.updatedAt || null,
+      }));
+
+    // ================================================
+    // SORT NUMBERS (ascending)
+    // ================================================
+
+    noBetNumbers.sort((a, b) =>
+      String(a.number).localeCompare(String(b.number))
+    );
+
+    // ================================================
+    // RESPONSE
+    // ================================================
+
+    return res.status(200).json({
+      success: true,
+
+      message: "Numbers without bets fetched successfully",
+
+      data: {
+        configId: config._id,
+
+        marketName: config.marketName,
+
+        imageUrl: config.imageUrl,
+
+        month: config.month,
+
+        year: config.year,
+
+        drawDate: drawDateString,
+
+        drawTime: config.drawTime,
+
+        isActive: config.isActive,
+
+        totalNumbers: allNumbers.length,
+
+        betNumbersCount: betNumbers.size,
+
+        noBetNumbersCount: noBetNumbers.length,
+
+        noBetNumbers: noBetNumbers,
+      },
+    });
+  } catch (error) {
+    console.error("Get numbers without bets error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
 // =====================================================
 // DELETE LOTTERY CONFIG
 // ADMIN
@@ -2308,4 +2469,6 @@ module.exports = {
 
   checkLotteryResult,
   updateLotteryConfig,
+
+  getNumbersWithoutBets,
 };

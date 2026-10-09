@@ -17,6 +17,7 @@ const {
   updateLotteryConfig,
   deactivateLotteryConfig,
   checkLotteryResult,
+  getNumbersWithoutBets,
 } = require("../controllers/lotteryConfigController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -127,6 +128,9 @@ router.patch(
 );
 
 router.put('/:id/deactivate',authMiddleware,adminMiddleware,deactivateLotteryConfig)
+
+router.get("/:id/no-bets", getNumbersWithoutBets);
+
 
 // UPDATE user entry status
 // PATCH /api/lottery-config/:configId/entry/:entryId/status

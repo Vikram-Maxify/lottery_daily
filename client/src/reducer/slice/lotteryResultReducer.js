@@ -7,9 +7,7 @@ import api from "../api";
 const extractError = (error, fallback) => {
   const data = error?.response?.data;
 
-  if (!data) {
-    return error?.message || fallback;
-  }
+  if (!data) return error?.message || fallback;
 
   if (data.message && data.error && data.message !== data.error) {
     return `${data.message} (${data.error})`;
@@ -21,6 +19,7 @@ const extractError = (error, fallback) => {
 // =====================================================
 // CREATE RESULT
 // POST /lottery-result/create
+// body: { lotteryConfigId, date, winningNumbers: {...} }
 // =====================================================
 export const createResult = createAsyncThunk(
   "lotteryResult/createResult",
@@ -34,7 +33,6 @@ export const createResult = createAsyncThunk(
           message: response.data?.message || "Failed to create result",
         });
       }
-
       return response.data;
     } catch (error) {
       return rejectWithValue({
@@ -47,7 +45,6 @@ export const createResult = createAsyncThunk(
 
 // =====================================================
 // GET ALL RESULTS
-// GET /lottery-result/all
 // =====================================================
 export const getAllResults = createAsyncThunk(
   "lotteryResult/getAllResults",
@@ -66,7 +63,6 @@ export const getAllResults = createAsyncThunk(
 
 // =====================================================
 // GET RESULT BY ID
-// GET /lottery-result/:id
 // =====================================================
 export const getResultById = createAsyncThunk(
   "lotteryResult/getResultById",
@@ -86,6 +82,7 @@ export const getResultById = createAsyncThunk(
 // =====================================================
 // UPDATE RESULT
 // PATCH /lottery-result/:id
+// body: { winningNumbers: {...} }
 // =====================================================
 export const updateResult = createAsyncThunk(
   "lotteryResult/updateResult",
@@ -103,8 +100,7 @@ export const updateResult = createAsyncThunk(
 );
 
 // =====================================================
-// PUBLISH RESULT
-// PATCH /lottery-result/:id/publish
+// PUBLISH
 // =====================================================
 export const publishResult = createAsyncThunk(
   "lotteryResult/publishResult",
@@ -122,8 +118,7 @@ export const publishResult = createAsyncThunk(
 );
 
 // =====================================================
-// UNPUBLISH RESULT
-// PATCH /lottery-result/:id/unpublish
+// UNPUBLISH
 // =====================================================
 export const unpublishResult = createAsyncThunk(
   "lotteryResult/unpublishResult",
@@ -141,8 +136,7 @@ export const unpublishResult = createAsyncThunk(
 );
 
 // =====================================================
-// DELETE RESULT
-// DELETE /lottery-result/:id
+// DELETE
 // =====================================================
 export const deleteResult = createAsyncThunk(
   "lotteryResult/deleteResult",
@@ -167,15 +161,33 @@ export const checkNumber = createAsyncThunk(
   "lotteryResult/checkNumber",
   async (numberData, { rejectWithValue }) => {
     try {
-      const response = await api.post(
-        "/lottery-result/check-number",
-        numberData
-      );
+      const response = await api.post("/lottery-result/check-number", numberData);
       return response.data;
     } catch (error) {
       return rejectWithValue({
         success: false,
         message: extractError(error, "Failed to check number"),
+      });
+    }
+  }
+);
+
+// =====================================================
+// GET UNBET NUMBERS
+// GET /lottery-result/unbet-numbers?lotteryConfigId=...
+// =====================================================
+export const getUnbetNumbers = createAsyncThunk(
+  "lotteryResult/getUnbetNumbers",
+  async (lotteryConfigId, { rejectWithValue }) => {
+    try {
+      const response = await api.get(
+        `/lottery-result/unbet-numbers?lotteryConfigId=${lotteryConfigId}`
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue({
+        success: false,
+        message: extractError(error, "Failed to fetch unbet numbers"),
       });
     }
   }
@@ -189,6 +201,9 @@ const initialState = {
   result: null,
   checkResult: null,
   summary: null,
+
+  unbetNumbers: [],
+  unbetLoading: false,
 
   loading: false,
   createLoading: false,
@@ -207,17 +222,9 @@ const initialState = {
 // =====================================================
 const upsertResult = (state, newResult) => {
   if (!newResult?._id) return;
-
-  const index = state.results.findIndex(
-    (item) => item._id === newResult._id
-  );
-
-  if (index !== -1) {
-    state.results[index] = newResult;
-  } else {
-    state.results.unshift(newResult);
-  }
-
+  const index = state.results.findIndex((item) => item._id === newResult._id);
+  if (index !== -1) state.results[index] = newResult;
+  else state.results.unshift(newResult);
   state.result = newResult;
 };
 
@@ -249,6 +256,9 @@ const lotteryResultSlice = createSlice({
     },
     clearResultSummary: (state) => {
       state.summary = null;
+    },
+    clearUnbetNumbers: (state) => {
+      state.unbetNumbers = [];
     },
   },
 
@@ -297,22 +307,16 @@ const lotteryResultSlice = createSlice({
       .addCase(createResult.fulfilled, (state, action) => {
         state.createLoading = false;
         state.success = true;
-        state.message =
-          action.payload?.message || "Result created successfully";
+        state.message = action.payload?.message || "Result created successfully";
         state.error = null;
 
         const newResult = action.payload?.result;
-        const newSummary = action.payload?.summary;
-
         if (newResult) {
-          const exists = state.results.some(
-            (item) => item._id === newResult._id
-          );
+          const exists = state.results.some((item) => item._id === newResult._id);
           if (!exists) state.results.unshift(newResult);
           state.result = newResult;
         }
-
-        state.summary = newSummary || null;
+        state.summary = action.payload?.summary || null;
       })
       .addCase(createResult.rejected, (state, action) => {
         state.createLoading = false;
@@ -332,13 +336,11 @@ const lotteryResultSlice = createSlice({
       .addCase(updateResult.fulfilled, (state, action) => {
         state.updateLoading = false;
         state.success = true;
-        state.message =
-          action.payload?.message || "Result updated successfully";
+        state.message = action.payload?.message || "Result updated successfully";
         state.error = null;
 
         const updated = action.payload?.result;
         state.summary = action.payload?.summary || null;
-
         if (updated?._id) upsertResult(state, updated);
       })
       .addCase(updateResult.rejected, (state, action) => {
@@ -357,10 +359,8 @@ const lotteryResultSlice = createSlice({
       .addCase(publishResult.fulfilled, (state, action) => {
         state.publishLoading = false;
         state.success = true;
-        state.message =
-          action.payload?.message || "Result published successfully";
+        state.message = action.payload?.message || "Result published successfully";
         state.error = null;
-
         const published = action.payload?.result;
         if (published?._id) upsertResult(state, published);
       })
@@ -380,10 +380,8 @@ const lotteryResultSlice = createSlice({
       .addCase(unpublishResult.fulfilled, (state, action) => {
         state.publishLoading = false;
         state.success = true;
-        state.message =
-          action.payload?.message || "Result unpublished successfully";
+        state.message = action.payload?.message || "Result unpublished successfully";
         state.error = null;
-
         const unpublished = action.payload?.result;
         if (unpublished?._id) upsertResult(state, unpublished);
       })
@@ -403,18 +401,11 @@ const lotteryResultSlice = createSlice({
       .addCase(deleteResult.fulfilled, (state, action) => {
         state.deleteLoading = false;
         state.success = true;
-        state.message =
-          action.payload?.message || "Result deleted successfully";
+        state.message = action.payload?.message || "Result deleted successfully";
         state.error = null;
-
         const deletedId = action.payload?.id;
-        state.results = state.results.filter(
-          (item) => item._id !== deletedId
-        );
-
-        if (state.result?._id === deletedId) {
-          state.result = null;
-        }
+        state.results = state.results.filter((item) => item._id !== deletedId);
+        if (state.result?._id === deletedId) state.result = null;
       })
       .addCase(deleteResult.rejected, (state, action) => {
         state.deleteLoading = false;
@@ -439,6 +430,23 @@ const lotteryResultSlice = createSlice({
         state.checkLoading = false;
         state.error = action.payload?.message || "Failed to check number";
       });
+
+    // UNBET NUMBERS
+    builder
+      .addCase(getUnbetNumbers.pending, (state) => {
+        state.unbetLoading = true;
+        state.error = null;
+        state.unbetNumbers = [];
+      })
+      .addCase(getUnbetNumbers.fulfilled, (state, action) => {
+        state.unbetLoading = false;
+        state.unbetNumbers = action.payload?.numbers || [];
+      })
+      .addCase(getUnbetNumbers.rejected, (state, action) => {
+        state.unbetLoading = false;
+        state.unbetNumbers = [];
+        state.error = action.payload?.message || "Failed to fetch unbet numbers";
+      });
   },
 });
 
@@ -449,36 +457,26 @@ export const {
   clearResults,
   clearResultError,
   clearResultSummary,
+  clearUnbetNumbers,
 } = lotteryResultSlice.actions;
 
 // =====================================================
 // SELECTORS
 // =====================================================
-export const selectLotteryResults = (state) =>
-  state.lotteryResult?.results || [];
-export const selectLotteryResult = (state) =>
-  state.lotteryResult?.result || null;
-export const selectLotterySummary = (state) =>
-  state.lotteryResult?.summary || null;
-export const selectLotteryCheckResult = (state) =>
-  state.lotteryResult?.checkResult || null;
-export const selectLotteryLoading = (state) =>
-  state.lotteryResult?.loading || false;
-export const selectLotteryCreateLoading = (state) =>
-  state.lotteryResult?.createLoading || false;
-export const selectLotteryUpdateLoading = (state) =>
-  state.lotteryResult?.updateLoading || false;
-export const selectLotteryPublishLoading = (state) =>
-  state.lotteryResult?.publishLoading || false;
-export const selectLotteryDeleteLoading = (state) =>
-  state.lotteryResult?.deleteLoading || false;
-export const selectLotteryCheckLoading = (state) =>
-  state.lotteryResult?.checkLoading || false;
-export const selectLotterySuccess = (state) =>
-  state.lotteryResult?.success || false;
-export const selectLotteryError = (state) =>
-  state.lotteryResult?.error || null;
-export const selectLotteryMessage = (state) =>
-  state.lotteryResult?.message || "";
+export const selectLotteryResults = (state) => state.lotteryResult?.results || [];
+export const selectLotteryResult = (state) => state.lotteryResult?.result || null;
+export const selectLotterySummary = (state) => state.lotteryResult?.summary || null;
+export const selectLotteryCheckResult = (state) => state.lotteryResult?.checkResult || null;
+export const selectLotteryLoading = (state) => state.lotteryResult?.loading || false;
+export const selectLotteryCreateLoading = (state) => state.lotteryResult?.createLoading || false;
+export const selectLotteryUpdateLoading = (state) => state.lotteryResult?.updateLoading || false;
+export const selectLotteryPublishLoading = (state) => state.lotteryResult?.publishLoading || false;
+export const selectLotteryDeleteLoading = (state) => state.lotteryResult?.deleteLoading || false;
+export const selectLotteryCheckLoading = (state) => state.lotteryResult?.checkLoading || false;
+export const selectLotterySuccess = (state) => state.lotteryResult?.success || false;
+export const selectLotteryError = (state) => state.lotteryResult?.error || null;
+export const selectLotteryMessage = (state) => state.lotteryResult?.message || "";
+export const selectUnbetNumbers = (state) => state.lotteryResult?.unbetNumbers || [];
+export const selectUnbetLoading = (state) => state.lotteryResult?.unbetLoading || false;
 
 export default lotteryResultSlice.reducer;
