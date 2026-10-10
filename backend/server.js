@@ -5,9 +5,9 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const dns = require("dns");
 const path = require("path");
-const http = require("http");                    // ✅ NEW
-const { Server } = require("socket.io");         // ✅ NEW
-const socketManager = require("./socket");       // ✅ NEW
+const http = require("http"); // ✅ NEW
+const { Server } = require("socket.io"); // ✅ NEW
+const socketManager = require("./socket"); // ✅ NEW
 
 // =======================
 // DNS
@@ -30,7 +30,6 @@ const startLotteryDepositCron = require("./cron/lotteryDepositCron");
 const { startLotteryCron } = require("./cron/lotteryCron");
 const lotteryNumberRoutes = require("./routes/lotteryNumberRoutes");
 const resultImageRoutes = require("./routes/resultImageRoutes");
-
 
 // =======================
 // APP
@@ -61,6 +60,7 @@ app.use(
       "http://localhost:5173",
       "https://www.setthelife.com",
       "https://setthelife.com",
+      "https://dearlottery1.com",
     ],
     credentials: true,
   }),
@@ -174,6 +174,7 @@ const io = new Server(server, {
       "http://localhost:5173",
       "https://www.setthelife.com",
       "https://setthelife.com",
+      "https://dearlottery1.com",
     ],
     credentials: true,
   },
@@ -209,7 +210,8 @@ const startServer = async () => {
     startLotteryCron();
     startLotteryNumberJobs();
 
-    server.listen(PORT, "0.0.0.0", () => {   // ✅ app.listen → server.listen
+    server.listen(PORT, "0.0.0.0", () => {
+      // ✅ app.listen → server.listen
       console.log("=================================");
       console.log(`Server running on port ${PORT}`);
       console.log(`Local: http://localhost:${PORT}`);
