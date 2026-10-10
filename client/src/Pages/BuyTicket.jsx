@@ -808,6 +808,19 @@ const BuyTicket = () => {
     setLocalSuccess("");
 
     if (selectedFestivalLottery) {
+      for (let i = 0; i < 15; i++) {
+        const candidate = randomCode();
+        try {
+          const check = await verifyNumberForBet(candidate);
+          if (check.canBet) {
+            setTicketCode(candidate);
+            return;
+          }
+        } catch {
+          setTicketCode(candidate);
+          return;
+        }
+      }
       setTicketCode(randomCode());
       return;
     }
@@ -998,22 +1011,16 @@ const BuyTicket = () => {
 
       // -------------------------------------------------
       // CHECK NUMBER AVAILABILITY (checkNumberForBet)
-      // Only daily lottery numbers exist in LotteryNumber collection
       // -------------------------------------------------
+      setLocalSuccess("Checking ticket availability...");
+      const availabilityCheck = await verifyNumberForBet(ticketCode);
 
-      if (!selectedFestivalLottery) {
-        setLocalSuccess("Checking ticket availability...");
-        const availabilityCheck = await verifyNumberForBet(ticketCode);
-
-        if (!availabilityCheck.canBet) {
-          setLocalSuccess("");
-          return setLocalError(
-            availabilityCheck.isSold
-              ? "This number has already been sold. Please choose another number."
-              : availabilityCheck.message ||
-                  "This number has already been sold. Please choose another number.",
-          );
-        }
+      if (!availabilityCheck.canBet) {
+        setLocalSuccess("");
+        return setLocalError(
+          availabilityCheck.message ||
+            "This number has already been sold. Please choose another number.",
+        );
       }
 
       // -------------------------------------------------

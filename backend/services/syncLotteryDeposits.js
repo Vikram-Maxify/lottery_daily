@@ -2,6 +2,7 @@ const Deposit = require("../models/Deposit");
 const Amount = require("../models/amountModel");
 const LotteryConfig = require("../models/LotteryConfig");
 const Festival = require("../models/Festival");
+const { markNumbersAsSold } = require("./ticketAvailabilityService");
 
 /**
  * ============================================================
@@ -569,6 +570,10 @@ const syncLotteryDeposits = async () => {
         // ====================================================
 
         await config.save();
+
+        if (Array.isArray(deposit.lotteryNumbers) && deposit.lotteryNumbers.length > 0) {
+          await markNumbersAsSold(deposit.lotteryNumbers);
+        }
 
 
         // ====================================================

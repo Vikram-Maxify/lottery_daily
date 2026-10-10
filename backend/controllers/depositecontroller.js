@@ -8,6 +8,12 @@ const TransactionHistory = require("../models/TransactionHistory");
 const QwackPayCallbackLog = require("../models/QwackPayCallbackLog");
 const LotteryConfig = require("../models/LotteryConfig");
 const Festival = require("../models/Festival");
+const {
+  checkNumbersAvailability,
+  reserveNumbersAtomically,
+  rollbackBatchReservations,
+  markNumbersAsSold,
+} = require("../services/ticketAvailabilityService");
 
 // =====================================================
 // STATUS CONSTANTS
@@ -265,6 +271,36 @@ const createDeposit = async (req, res) => {
             });
           }
         }
+
+        // =====================================================
+        // CHECK AVAILABILITY AGAINST CRON-SOLD & EXISTING ENTRIES
+        // =====================================================
+        const availabilityCheck = await checkNumbersAvailability(
+          normalizedLotteryNumbers,
+          { configId: lotteryConfig._id, userId: user._id }
+        );
+
+        if (!availabilityCheck.available) {
+          return res.status(400).json({
+            success: false,
+            message: availabilityCheck.reason,
+            unavailableNumbers: availabilityCheck.unavailableNumbers,
+          });
+        }
+
+        // =====================================================
+        // ATOMICALLY RESERVE NUMBERS IN LOTTERYNUMBER
+        // Prevents simultaneous CRON or concurrent purchases
+        // =====================================================
+        const reservation = await reserveNumbersAtomically(normalizedLotteryNumbers);
+
+        if (!reservation.success) {
+          return res.status(400).json({
+            success: false,
+            message: reservation.message,
+            conflictNumber: reservation.conflictNumber,
+          });
+        }
       }
 
       const orderId = `DEP${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -419,6 +455,10 @@ const createDeposit = async (req, res) => {
           });
         }
 
+        if (normalizedLotteryNumbers.length > 0) {
+          await rollbackBatchReservations(normalizedLotteryNumbers);
+        }
+
         deposit.status = STATUS.FAILED;
         await deposit.save();
 
@@ -438,6 +478,10 @@ const createDeposit = async (req, res) => {
         console.error("QWACKPAY CREATE ERROR:");
         console.error(gatewayErr.response?.data || gatewayErr.message);
         console.error("=================================================");
+
+        if (normalizedLotteryNumbers.length > 0) {
+          await rollbackBatchReservations(normalizedLotteryNumbers);
+        }
 
         deposit.status = STATUS.FAILED;
         await deposit.save();
@@ -663,6 +707,9 @@ const processLotteryEntries = async (deposit, user, session = null) => {
         },
         { session, new: true }
       );
+
+      // Permanently mark numbers as sold in LotteryNumber collection
+      await markNumbersAsSold(deposit.lotteryNumbers, entryDate);
     }
 
     // Mark deposit as lottery processed

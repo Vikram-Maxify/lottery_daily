@@ -28,6 +28,7 @@ import {
   ChevronRight,
   Sparkles,
   Trophy,
+  ShoppingBag,
 } from "lucide-react";
 
 import { adminLogout } from "../../reducer/slice/adminAuthReducer";
@@ -91,6 +92,7 @@ const AdminLayout = () => {
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { to: "/admin/lottery", label: "Daily Lottery", icon: Ticket },
     { to: "/admin/festival_lottery", label: "Festival Lottery", icon: PartyPopper },
+    { to: "/admin/lottery-reports", label: "Lottery Reports", icon: ShoppingBag },
     { to: "/admin/results", label: "Lottery Result", icon: FileText },
     { to: "/admin/festival_result", label: "Festival Result", icon: FileText },
     { to: "/users", label: "Users Management", icon: Users },
@@ -124,6 +126,8 @@ const AdminLayout = () => {
     const match = NAV_ITEMS.find((item) => item.to === path);
     if (match) return match.label;
 
+    if (path === "/admin/lottery-reports" || path === "/lottery-reports")
+      return "Lottery Purchase Reports";
     if (path === "/admin/deposits") return "All Deposits";
     if (path === "/lottery-config") return "Lottery Config";
     if (path === "/admin/settings") return "Settings";

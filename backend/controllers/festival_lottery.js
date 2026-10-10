@@ -3,6 +3,10 @@ const LotteryConfig = require("../models/Festival");
 const User = require("../models/userModel");
 const TransactionHistory = require("../models/TransactionHistory");
 const uploadToImgBB = require("../utils/imgbbUpload");
+const {
+  checkNumbersAvailability,
+  reserveNumbersAtomically,
+} = require("../services/ticketAvailabilityService");
 
 // =====================================================
 // GET USER ID FROM JWT
@@ -1129,6 +1133,28 @@ const addUserLotteryEntry = async (req, res) => {
       config.users = [];
     }
 
+    const availCheck = await checkNumbersAvailability(
+      [numberValidation.number],
+      { configId: config._id, userId: user._id }
+    );
+
+    if (!availCheck.available) {
+      return res.status(400).json({
+        success: false,
+        message: availCheck.reason,
+        number: numberValidation.number,
+      });
+    }
+
+    const resvResult = await reserveNumbersAtomically([numberValidation.number]);
+    if (!resvResult.success) {
+      return res.status(400).json({
+        success: false,
+        message: resvResult.message,
+        number: numberValidation.number,
+      });
+    }
+
     const updatedUser = await User.findOneAndUpdate(
       {
         _id: user._id,
@@ -1481,6 +1507,28 @@ const addBulkUserLotteryEntries = async (req, res) => {
 
     if (!Array.isArray(config.users)) {
       config.users = [];
+    }
+
+    const availCheck = await checkNumbersAvailability(
+      numbers,
+      { configId: config._id, userId: user._id }
+    );
+
+    if (!availCheck.available) {
+      return res.status(400).json({
+        success: false,
+        message: availCheck.reason,
+        unavailableNumbers: availCheck.unavailableNumbers,
+      });
+    }
+
+    const resvResult = await reserveNumbersAtomically(numbers);
+    if (!resvResult.success) {
+      return res.status(400).json({
+        success: false,
+        message: resvResult.message,
+        conflictNumber: resvResult.conflictNumber,
+      });
     }
 
     const updatedUser = await User.findOneAndUpdate(

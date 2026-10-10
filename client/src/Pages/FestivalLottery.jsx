@@ -20,6 +20,7 @@ import DailyNumbersSection from "../Components/DailyNumbersSection";
 import QuickVerifyTicket from "../Components/QuickVerifyTicket";
 import LotteryVideoPlayer from "../Components/LotteryVideoPlayer";
 import NumberSoldNotification from "../Components/NumberSoldNotification";
+import { verifyNumberForBet } from "../reducer/slice/dailyNumberSlice";
 
 // =====================================================
 // REDUX IMPORTS
@@ -541,9 +542,24 @@ const FestivalLottery = () => {
     focusDraft(Math.min(code.length, TICKET_LENGTH - 1));
   };
 
-  const handleRandomDraft = () => {
+  const handleRandomDraft = async () => {
     if (depositLoading) return;
-    updateDraft(randomUniqueCode(tickets.map((t) => t.code)));
+    setManualError("");
+    const usedCodes = tickets.map((t) => t.code);
+    for (let i = 0; i < 15; i++) {
+      const code = randomUniqueCode(usedCodes);
+      try {
+        const avail = await verifyNumberForBet(code);
+        if (avail.canBet) {
+          updateDraft(code);
+          return;
+        }
+      } catch {
+        updateDraft(code);
+        return;
+      }
+    }
+    updateDraft(randomUniqueCode(usedCodes));
   };
 
   const handleClearDraft = () => {
@@ -552,7 +568,7 @@ const FestivalLottery = () => {
     focusDraft(0);
   };
 
-  const handleManualAdd = () => {
+  const handleManualAdd = async () => {
     if (depositLoading) return;
     if (!TICKET_REGEX.test(draft)) {
       setManualError(`Enter full ticket number (e.g. ${TICKET_EXAMPLE})`);
@@ -565,6 +581,19 @@ const FestivalLottery = () => {
     if (tickets.length >= MAX_TICKETS) {
       setManualError(`Maximum ${MAX_TICKETS} tickets allowed`);
       return;
+    }
+
+    try {
+      const avail = await verifyNumberForBet(draft);
+      if (!avail.canBet) {
+        setManualError(
+          avail.message ||
+            "This number has already been sold. Please choose another number.",
+        );
+        return;
+      }
+    } catch (e) {
+      // Backend createDeposit will still enforce
     }
 
     setTickets((prev) => [
@@ -652,6 +681,25 @@ const FestivalLottery = () => {
       if (duplicates.length > 0) {
         setManualError("Two tickets cannot have the same number.");
         return;
+      }
+
+      // Pre-purchase verification: verify availability of all tickets
+      setLocalSuccess("Checking ticket availability...");
+      try {
+        const checks = await Promise.all(
+          lotteryNumbers.map((num) => verifyNumberForBet(num)),
+        );
+        const soldTicket = checks.find((c) => !c?.canBet);
+        if (soldTicket) {
+          setLocalSuccess("");
+          setManualError(
+            soldTicket.message ||
+              "One or more tickets have already been sold. Please choose another number.",
+          );
+          return;
+        }
+      } catch (availErr) {
+        // Backend check will still strictly enforce
       }
 
       const totalPayable = calcFestivalAmount(setPriceAmount, tickets.length);

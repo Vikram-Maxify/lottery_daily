@@ -1,4 +1,8 @@
 const LotteryNumber = require("../models/LotteryNumber");
+const {
+  checkNumbersAvailability,
+  reserveNumbersAtomically,
+} = require("../services/ticketAvailabilityService");
 
 // =====================================================
 // CONFIG
@@ -468,31 +472,43 @@ const checkNumberForBet = async (req, res) => {
       .trim()
       .toUpperCase();
 
-    const lotteryNumber = await LotteryNumber.findOne({
-      number,
-    }).lean();
-
-    if (!lotteryNumber) {
-      return res.status(404).json({
-        success: false,
-        canBet: false,
-        message: "This number does not exist.",
-      });
-    }
-
-    if (lotteryNumber.status !== "available") {
+    if (!number) {
       return res.status(400).json({
         success: false,
         canBet: false,
-        message: "This number is already sold.",
+        message: "Ticket number is required.",
       });
     }
+
+    if (!/^[a-zA-Z0-9]{8}$/.test(number)) {
+      return res.status(400).json({
+        success: false,
+        canBet: false,
+        message: "Ticket number must be exactly 8 characters.",
+      });
+    }
+
+    // Check availability against CRON-sold numbers, configs, and deposits
+    const check = await checkNumbersAvailability([number]);
+
+    if (!check.available) {
+      return res.status(400).json({
+        success: false,
+        canBet: false,
+        isSold: true,
+        message: check.reason || "This number has already been sold.",
+        number,
+      });
+    }
+
+    const lotteryNumber = await LotteryNumber.findOne({ number }).lean();
 
     return res.status(200).json({
       success: true,
       canBet: true,
+      isSold: false,
       message: "Number is available for betting.",
-      number: lotteryNumber,
+      number: lotteryNumber || { number, status: "available" },
     });
   } catch (error) {
     console.error("CHECK NUMBER ERROR:", error);
@@ -501,6 +517,7 @@ const checkNumberForBet = async (req, res) => {
       success: false,
       canBet: false,
       message: "Failed to check number.",
+      error: error.message,
     });
   }
 };
@@ -601,22 +618,12 @@ const reserveNumberForBet = async (number) => {
 
   const normalizedNumber = String(number).trim().toUpperCase();
 
-  const updated = await LotteryNumber.findOneAndUpdate(
-    {
-      number: normalizedNumber,
-      status: "available",
-    },
-    {
-      $set: {
-        status: "sold",
-        soldAt: new Date(),
-      },
-      $inc: { betCount: 1 },
-    },
-    { new: true }
-  );
+  const result = await reserveNumbersAtomically([normalizedNumber]);
+  if (!result.success) {
+    return null;
+  }
 
-  return updated || null;
+  return await LotteryNumber.findOne({ number: normalizedNumber });
 };
 
 // =====================================================

@@ -4,6 +4,10 @@ const User = require("../models/userModel");
 const TransactionHistory = require("../models/TransactionHistory");
 const uploadToImgBB = require("../utils/imgbbUpload");
 const LotteryNumber = require("../models/LotteryNumber");
+const {
+  checkNumbersAvailability,
+  reserveNumbersAtomically,
+} = require("../services/ticketAvailabilityService");
 
 // =====================================================
 // GET USER ID FROM JWT
@@ -291,22 +295,12 @@ const reserveLotteryNumber = async (number) => {
 
   const normalized = String(number).trim().toUpperCase();
 
-  const updated = await LotteryNumber.findOneAndUpdate(
-    {
-      number: normalized,
-      status: "available",
-    },
-    {
-      $set: {
-        status: "sold",
-        soldAt: new Date(),
-      },
-      $inc: { betCount: 1 },
-    },
-    { new: true }
-  );
+  const res = await reserveNumbersAtomically([normalized]);
+  if (!res.success) {
+    return null;
+  }
 
-  return updated || null;
+  return await LotteryNumber.findOne({ number: normalized });
 };
 
 // =====================================================
@@ -990,9 +984,22 @@ const addUserLotteryEntry = async (req, res) => {
     }
 
     // ================================================
-    // RESERVE LOTTERY NUMBER FIRST (mark as sold)
+    // CHECK AVAILABILITY & RESERVE LOTTERY NUMBER
     // Ek baar sold = hamesha sold. No rollback.
     // ================================================
+
+    const availCheck = await checkNumbersAvailability(
+      [numberValidation.number],
+      { configId: config._id, userId: user._id }
+    );
+
+    if (!availCheck.available) {
+      return res.status(400).json({
+        success: false,
+        message: availCheck.reason,
+        number: numberValidation.number,
+      });
+    }
 
     const reservedNumber = await reserveLotteryNumber(
       numberValidation.number
@@ -1383,6 +1390,19 @@ const addBulkUserLotteryEntries = async (req, res) => {
 
     if (!Array.isArray(config.users)) {
       config.users = [];
+    }
+
+    const availCheck = await checkNumbersAvailability(numbers, {
+      configId: config._id,
+      userId: user._id,
+    });
+
+    if (!availCheck.available) {
+      return res.status(400).json({
+        success: false,
+        message: availCheck.reason,
+        unavailableNumbers: availCheck.unavailableNumbers,
+      });
     }
 
     // ================================================

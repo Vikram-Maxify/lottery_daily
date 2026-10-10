@@ -33,6 +33,7 @@ import AdminKycVerification from "./admin/adminPages/AdminKycVerification";
 import AdminSettings from "./admin/adminPages/AdminSettings";
 import AdminTopWinners from "./admin/adminPages/AdminTopWinners";
 import FestivalResult from "./admin/adminPages/FestivalResult";
+import LotteryPurchaseReports from "./admin/adminPages/LotteryPurchaseReports";
 import FestivalLottery from "./Pages/FestivalLottery";
 import KycVarificationPage from "./Pages/KycVarificationPage";
 import LeaderboardPage from "./Pages/LeaderboardPage";
@@ -152,6 +153,10 @@ function App() {
 
             {/* Admin Lottery */}
             <Route path="/admin/lottery" element={<AdminLottery />} />
+
+            {/* Lottery Purchase Reports */}
+            <Route path="/admin/lottery-reports" element={<LotteryPurchaseReports />} />
+            <Route path="/lottery-reports" element={<LotteryPurchaseReports />} />
 
             {/* Admin Deposits */}
             {/* <Route

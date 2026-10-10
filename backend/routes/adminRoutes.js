@@ -48,6 +48,10 @@ const {
   deleteResult,
 } = require("../controllers/adminResultController");
 
+const {
+  getLotteryPurchaseReports,
+} = require("../controllers/adminLotteryReportsController");
+
 // =====================================================
 // MIDDLEWARE
 // =====================================================
@@ -245,6 +249,24 @@ router.delete(
   authMiddleware,
   adminMiddleware,
   deleteResult
+);
+
+// =====================================================
+// LOTTERY PURCHASE REPORTS
+// =====================================================
+
+router.get(
+  "/lottery-reports",
+  authMiddleware,
+  adminMiddleware,
+  getLotteryPurchaseReports
+);
+
+router.get(
+  "/admin/lottery-reports",
+  authMiddleware,
+  adminMiddleware,
+  getLotteryPurchaseReports
 );
 
 module.exports = router;
