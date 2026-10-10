@@ -37,10 +37,10 @@ import LotteryPurchaseReports from "./admin/adminPages/LotteryPurchaseReports";
 import FestivalLottery from "./Pages/FestivalLottery";
 import KycVarificationPage from "./Pages/KycVarificationPage";
 import LeaderboardPage from "./Pages/LeaderboardPage";
-import LiveTickets from "./pages/LiveTickets";
+import LiveTickets from "./Pages/LiveTickets";
+import ReferralPage from "./Pages/ReferralPage";
 import VarifyTicket from "./Pages/VarifyTicket";
 import WithdrawHistory from "./Pages/WithdrawHistory";
-import ReferralPage from "./Pages/ReferralPage";
 
 // ==========================================================
 // HOME ROUTE
@@ -155,8 +155,14 @@ function App() {
             <Route path="/admin/lottery" element={<AdminLottery />} />
 
             {/* Lottery Purchase Reports */}
-            <Route path="/admin/lottery-reports" element={<LotteryPurchaseReports />} />
-            <Route path="/lottery-reports" element={<LotteryPurchaseReports />} />
+            <Route
+              path="/admin/lottery-reports"
+              element={<LotteryPurchaseReports />}
+            />
+            <Route
+              path="/lottery-reports"
+              element={<LotteryPurchaseReports />}
+            />
 
             {/* Admin Deposits */}
             {/* <Route
