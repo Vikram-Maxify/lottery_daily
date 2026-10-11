@@ -1123,6 +1123,8 @@ const addUserLotteryEntry = async (req, res) => {
 
         lotteryId: config._id,
 
+        lotteryType: "daily",
+
         marketName: config.marketName,
 
         month: config.month,
@@ -1549,6 +1551,8 @@ const addBulkUserLotteryEntries = async (req, res) => {
         configId: config._id,
 
         lotteryId: config._id,
+
+        lotteryType: "daily",
 
         marketName: config.marketName,
 

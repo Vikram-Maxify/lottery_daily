@@ -209,13 +209,42 @@ const createDeposit = async (req, res) => {
           });
         }
 
-        let lotteryConfig = await LotteryConfig.findById(configId);
+        const requestedLotteryType = String(
+          req.body?.lotteryType || ""
+        ).trim().toLowerCase();
+
+        let lotteryConfig = null;
         let isFestivalConfig = false;
 
-        if (!lotteryConfig) {
+        if (requestedLotteryType === "festival") {
           lotteryConfig = await Festival.findById(configId);
           if (lotteryConfig) {
             isFestivalConfig = true;
+          } else {
+            return res.status(404).json({
+              success: false,
+              message: "Festival lottery configuration not found",
+            });
+          }
+        } else if (requestedLotteryType === "daily") {
+          lotteryConfig = await LotteryConfig.findById(configId);
+          if (lotteryConfig) {
+            isFestivalConfig = false;
+          } else {
+            return res.status(404).json({
+              success: false,
+              message: "Daily lottery configuration not found",
+            });
+          }
+        } else {
+          lotteryConfig = await LotteryConfig.findById(configId);
+          if (lotteryConfig) {
+            isFestivalConfig = false;
+          } else {
+            lotteryConfig = await Festival.findById(configId);
+            if (lotteryConfig) {
+              isFestivalConfig = true;
+            }
           }
         }
 
@@ -305,6 +334,18 @@ const createDeposit = async (req, res) => {
 
       const orderId = `DEP${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
+      const resolvedLotteryType =
+        normalizedLotteryNumbers.length > 0
+          ? isFestivalConfig
+            ? "festival"
+            : "daily"
+          : "";
+      const resolvedMarketName =
+        normalizedLotteryNumbers.length > 0 && lotteryConfig
+          ? lotteryConfig.marketName ||
+            (isFestivalConfig ? "Festival Lottery" : "Daily Lottery")
+          : "";
+
       const deposit = await Deposit.create({
         userId: user._id,
         gatewayId: null,
@@ -324,6 +365,8 @@ const createDeposit = async (req, res) => {
         status: STATUS.PENDING,
 
         configId: configId || null,
+        lotteryType: resolvedLotteryType,
+        marketName: resolvedMarketName,
         lotteryNumbers: normalizedLotteryNumbers,
         number:
           normalizedLotteryNumbers.length === 1
@@ -449,6 +492,8 @@ const createDeposit = async (req, res) => {
             depositId: deposit._id,
             amount: money,
             status: "pending",
+            lotteryType: deposit.lotteryType || (isFestivalConfig ? "festival" : "daily"),
+            marketName: deposit.marketName || (lotteryConfig?.marketName || ""),
             lotteryNumbers: normalizedLotteryNumbers,
             deposit,
             gatewayResponse,
@@ -719,6 +764,8 @@ const processLotteryEntries = async (deposit, user, session = null) => {
         $set: {
           lotteryProcessed: true,
           lotteryProcessedAt: new Date(),
+          lotteryType: ConfigModel === Festival ? "festival" : "daily",
+          marketName: lotteryConfig.marketName || (ConfigModel === Festival ? "Festival Lottery" : "Daily Lottery"),
         },
       },
       { session }

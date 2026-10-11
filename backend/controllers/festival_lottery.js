@@ -1250,6 +1250,8 @@ const addUserLotteryEntry = async (req, res) => {
 
         lotteryId: config._id,
 
+        lotteryType: "festival",
+
         marketName: config.marketName,
 
         imageUrl: config.imageUrl, // 👈 KEPT
@@ -1640,6 +1642,8 @@ const addBulkUserLotteryEntries = async (req, res) => {
         configId: config._id,
 
         lotteryId: config._id,
+
+        lotteryType: "festival",
 
         marketName: config.marketName,
 

@@ -37,6 +37,9 @@ import {
   clearLotteryConfigError,
   clearLotteryConfigSuccess,
   getActiveLotteryConfig,
+  getAllLotteryConfigs,
+  selectLotteryConfigs,
+  selectActiveLotteryConfig,
 } from "../reducer/slice/lotteryConfigSlice";
 
 import {
@@ -407,7 +410,20 @@ const BuyTicket = () => {
       },
   );
 
-  const lotteryConfig = activeConfig;
+  const allDailyConfigs = useSelector(selectLotteryConfigs);
+  const activeDailyConfig = useSelector(selectActiveLotteryConfig);
+
+  const lotteryConfig = useMemo(() => {
+    if (activeDailyConfig && activeDailyConfig._id) {
+      return activeDailyConfig;
+    }
+    if (activeConfig && activeConfig._id) {
+      return activeConfig;
+    }
+    const list = Array.isArray(allDailyConfigs) ? allDailyConfigs : [];
+    return list.find((c) => c?.isActive) || list[0] || null;
+  }, [activeDailyConfig, activeConfig, allDailyConfigs]);
+
   const allFestivalConfigs = useSelector(selectFestivalConfigs);
   const activeFestivalConfig = useSelector(selectActiveFestivalLottery);
   const availableDailyNumbers = useSelector(selectAvailableDailyNumbers);
@@ -487,6 +503,12 @@ const BuyTicket = () => {
 
   const [localSuccess, setLocalSuccess] = useState("");
 
+  // ✅ Numbers jo backend ne "sold" bataye (dobara random/purchase nahi honge)
+  const [soldNumbers, setSoldNumbers] = useState([]);
+
+  // ✅ Purchase se pehle availability check chal raha hai (double click guard)
+  const [isChecking, setIsChecking] = useState(false);
+
   const [selectedDate, setSelectedDate] = useState(0);
 
   const [showAllDates, setShowAllDates] = useState(false);
@@ -514,10 +536,23 @@ const BuyTicket = () => {
   const isKycApproved = kycStatus === "approved";
 
   // ===================================================
-  // FESTIVAL LOTTERY SELECTION & PRIZES
+  // FESTIVAL VS DAILY MODE RESOLUTION
+  // BuyTicket.jsx defaults to DAILY LOTTERY.
+  // It only enters festival mode when explicit festival params are passed.
   // ===================================================
+  const isFestivalMode = useMemo(() => {
+    const type = String(searchParams.get("type") || "").toLowerCase();
+    if (type === "festival") return true;
+    if (type === "daily") return false;
+    if (searchParams.get("festivalId") || searchParams.get("festival")) {
+      return true;
+    }
+    return false;
+  }, [searchParams]);
 
   const selectedFestivalLottery = useMemo(() => {
+    if (!isFestivalMode) return null;
+
     const list = Array.isArray(allFestivalConfigs) ? allFestivalConfigs : [];
     const fid = searchParams.get("festivalId") || searchParams.get("id");
     const fname =
@@ -546,9 +581,13 @@ const BuyTicket = () => {
       return activeFestivalConfig;
     }
     return list.find((c) => c?.isActive) || list[0] || null;
-  }, [allFestivalConfigs, activeFestivalConfig, searchParams]);
+  }, [isFestivalMode, allFestivalConfigs, activeFestivalConfig, searchParams]);
 
-  const displayLottery = selectedFestivalLottery || lotteryConfig;
+  const displayLottery = isFestivalMode
+    ? (selectedFestivalLottery || activeFestivalConfig)
+    : lotteryConfig;
+
+  const currentLotteryType = isFestivalMode ? "festival" : "daily";
 
   // Prizes from selected lottery
   const lotteryPrizes = displayLottery?.prizes || {};
@@ -573,6 +612,7 @@ const BuyTicket = () => {
 
   useEffect(() => {
     dispatch(getActiveLotteryConfig());
+    dispatch(getAllLotteryConfigs());
     dispatch(getActiveFestivalConfig());
     dispatch(getAllFestivalConfigs());
     dispatch(getAmount());
@@ -667,6 +707,7 @@ const BuyTicket = () => {
 
   const totalTickets = quantity;
   const isTicketValid = TICKET_REGEX.test(ticketCode);
+  const hasKnownSold = soldNumbers.includes(ticketCode);
   const totalTicketPrice =
     Math.round(((SET_PRICE * quantity) / PRICE_SET_SIZE) * 100) / 100;
 
@@ -719,7 +760,7 @@ const BuyTicket = () => {
   // ===================================================
 
   const handleBoxChange = (index, event) => {
-    if (depositLoading || isBetClosed) return;
+    if (depositLoading || isChecking || isBetClosed) return;
 
     const raw = event.target.value;
 
@@ -788,7 +829,7 @@ const BuyTicket = () => {
   const handleBoxPaste = (event) => {
     event.preventDefault();
 
-    if (depositLoading || isBetClosed) return;
+    if (depositLoading || isChecking || isBetClosed) return;
 
     const code = sanitizeCode(event.clipboardData.getData("text"));
 
@@ -803,25 +844,33 @@ const BuyTicket = () => {
   // ===================================================
 
   const handleRandomTicket = async () => {
-    if (depositLoading) return;
+    if (depositLoading || isChecking) return;
     setLocalError("");
     setLocalSuccess("");
 
     if (selectedFestivalLottery) {
+      // Jo numbers sold nikle ya try ho chuke, unko dobara nahi chunenge
+      const usedCodes = [ticketCode, ...soldNumbers].filter(Boolean);
+
       for (let i = 0; i < 15; i++) {
-        const candidate = randomCode();
+        const candidate = randomUniqueCode(usedCodes);
         try {
           const check = await verifyNumberForBet(candidate);
-          if (check.canBet) {
+          if (check?.canBet) {
             setTicketCode(candidate);
             return;
           }
+          // sold nikla to yaad rakho
+          usedCodes.push(candidate);
+          setSoldNumbers((prev) =>
+            prev.includes(candidate) ? prev : [...prev, candidate],
+          );
         } catch {
           setTicketCode(candidate);
           return;
         }
       }
-      setTicketCode(randomCode());
+      setTicketCode(randomUniqueCode(usedCodes));
       return;
     }
 
@@ -868,7 +917,7 @@ const BuyTicket = () => {
   // ===================================================
 
   const handleClearTicket = () => {
-    if (depositLoading || isBetClosed) return;
+    if (depositLoading || isChecking || isBetClosed) return;
     setTicketCode("");
     focusBox(0);
     setLocalError("");
@@ -880,7 +929,7 @@ const BuyTicket = () => {
   // ===================================================
 
   const handleIncrease = () => {
-    if (depositLoading || isBetClosed) return;
+    if (depositLoading || isChecking || isBetClosed) return;
     setQuantity((q) =>
       Math.min(MAX_TICKETS, (Math.floor(q / TICKET_STEP) + 1) * TICKET_STEP),
     );
@@ -889,7 +938,7 @@ const BuyTicket = () => {
   };
 
   const handleDecrease = () => {
-    if (depositLoading || isBetClosed) return;
+    if (depositLoading || isChecking || isBetClosed) return;
     setQuantity((q) =>
       Math.max(MIN_TICKETS, (Math.ceil(q / TICKET_STEP) - 1) * TICKET_STEP),
     );
@@ -898,7 +947,7 @@ const BuyTicket = () => {
   };
 
   const handleQuickSelect = (count) => {
-    if (depositLoading || isBetClosed) return;
+    if (depositLoading || isChecking || isBetClosed) return;
     setQuantity(count);
     setLocalError("");
     setLocalSuccess("");
@@ -909,7 +958,7 @@ const BuyTicket = () => {
   // ===================================================
 
   const handlePurchase = async () => {
-    if (depositLoading) return;
+    if (depositLoading || isChecking) return;
 
     try {
       setLocalError("");
@@ -965,7 +1014,7 @@ const BuyTicket = () => {
       // LOTTERY CONFIG
       // -------------------------------------------------
 
-      const activePurchaseConfig = selectedFestivalLottery || lotteryConfig;
+      const activePurchaseConfig = displayLottery;
 
       if (!activePurchaseConfig?._id) {
         return setLocalError("Active lottery configuration not found");
@@ -1009,16 +1058,27 @@ const BuyTicket = () => {
         return setLocalError(`Minimum ${MIN_TICKETS} tickets are required`);
       }
 
+      // Pehle hi sold bata chuka number to dobara API hit karne ki zaroorat nahi
+      if (soldNumbers.includes(ticketCode)) {
+        return setLocalError(
+          "This number has already been sold. Please choose another number.",
+        );
+      }
+
       // -------------------------------------------------
       // CHECK NUMBER AVAILABILITY (checkNumberForBet)
       // -------------------------------------------------
+      setIsChecking(true);
       setLocalSuccess("Checking ticket availability...");
       const availabilityCheck = await verifyNumberForBet(ticketCode);
 
-      if (!availabilityCheck.canBet) {
+      if (!availabilityCheck?.canBet) {
+        setSoldNumbers((prev) =>
+          prev.includes(ticketCode) ? prev : [...prev, ticketCode],
+        );
         setLocalSuccess("");
         return setLocalError(
-          availabilityCheck.message ||
+          availabilityCheck?.message ||
             "This number has already been sold. Please choose another number.",
         );
       }
@@ -1048,6 +1108,7 @@ const BuyTicket = () => {
           amount: totalAmount,
           configId: activePurchaseConfig._id,
           lotteryNumbers,
+          lotteryType: currentLotteryType,
         }),
       ).unwrap();
 
@@ -1087,6 +1148,8 @@ const BuyTicket = () => {
               purchaseError?.payload ||
               "Could not buy tickets",
       );
+    } finally {
+      setIsChecking(false);
     }
   };
 
@@ -1099,10 +1162,12 @@ const BuyTicket = () => {
   const isPurchaseDisabled =
     activeLoading ||
     depositLoading ||
+    isChecking ||
     !lotteryConfig?._id ||
     !lotteryConfig?.isActive ||
     !hasApiPrice ||
     !isTicketValid ||
+    hasKnownSold ||
     quantity < MIN_TICKETS ||
     isBetClosed;
 
@@ -1413,7 +1478,10 @@ const BuyTicket = () => {
                 type="button"
                 onClick={handleDecrease}
                 disabled={
-                  totalTickets <= MIN_TICKETS || depositLoading || isBetClosed
+                  totalTickets <= MIN_TICKETS ||
+                  depositLoading ||
+                  isChecking ||
+                  isBetClosed
                 }
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e9eef7] text-[22px] font-bold text-[#173e70] disabled:opacity-50"
               >
@@ -1426,7 +1494,10 @@ const BuyTicket = () => {
                 type="button"
                 onClick={handleIncrease}
                 disabled={
-                  totalTickets >= MAX_TICKETS || depositLoading || isBetClosed
+                  totalTickets >= MAX_TICKETS ||
+                  depositLoading ||
+                  isChecking ||
+                  isBetClosed
                 }
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e9eef7] text-[22px] font-bold text-[#173e70] disabled:opacity-50"
               >
@@ -1468,7 +1539,7 @@ const BuyTicket = () => {
                     key={count}
                     type="button"
                     onClick={() => handleQuickSelect(count)}
-                    disabled={depositLoading || isBetClosed}
+                    disabled={depositLoading || isChecking || isBetClosed}
                     className={`relative min-w-0 rounded-lg border px-0.5 py-2 text-center transition active:scale-95 disabled:opacity-60 ${
                       active
                         ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
@@ -1530,7 +1601,9 @@ const BuyTicket = () => {
               <button
                 type="button"
                 onClick={handleClearTicket}
-                disabled={!ticketCode || depositLoading || isBetClosed}
+                disabled={
+                  !ticketCode || depositLoading || isChecking || isBetClosed
+                }
                 className="text-[12px] font-medium text-[#3d4468] underline underline-offset-2 disabled:opacity-40"
               >
                 Clear
@@ -1538,7 +1611,7 @@ const BuyTicket = () => {
               <button
                 type="button"
                 onClick={handleRandomTicket}
-                disabled={depositLoading || isBetClosed}
+                disabled={depositLoading || isChecking || isBetClosed}
                 className="flex items-center gap-1 rounded-lg border border-[#c9d3e3] bg-white px-3 py-1.5 text-[12px] font-bold text-[#173e70] disabled:opacity-50"
               >
                 <Shuffle size={13} /> Random
@@ -1566,7 +1639,7 @@ const BuyTicket = () => {
                   onKeyDown={(event) => handleBoxKeyDown(i, event)}
                   onPaste={handleBoxPaste}
                   onFocus={(event) => event.target.select()}
-                  disabled={depositLoading || isBetClosed}
+                  disabled={depositLoading || isChecking || isBetClosed}
                   inputMode={isLetter ? "text" : "numeric"}
                   autoCapitalize="characters"
                   autoComplete="off"
@@ -1591,19 +1664,27 @@ const BuyTicket = () => {
             <div className="flex min-w-0 items-center gap-1.5 text-[11px]">
               <span
                 className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                  isTicketValid ? "bg-emerald-500" : "bg-[#f08a25]"
+                  hasKnownSold
+                    ? "bg-red-500"
+                    : isTicketValid
+                      ? "bg-emerald-500"
+                      : "bg-[#f08a25]"
                 }`}
               />
               <span
                 className={`truncate ${
-                  isTicketValid
-                    ? "font-bold text-emerald-700"
-                    : "text-[#4b5563]"
+                  hasKnownSold
+                    ? "font-bold text-red-600"
+                    : isTicketValid
+                      ? "font-bold text-emerald-700"
+                      : "text-[#4b5563]"
                 }`}
               >
-                {isTicketValid
-                  ? `Ticket Number Ready: ${ticketCode}`
-                  : `Enter ${TICKET_LENGTH} characters (${ticketCode.length}/${TICKET_LENGTH})`}
+                {hasKnownSold
+                  ? `Number ${ticketCode} is already sold`
+                  : isTicketValid
+                    ? `Ticket Number Ready: ${ticketCode}`
+                    : `Enter ${TICKET_LENGTH} characters (${ticketCode.length}/${TICKET_LENGTH})`}
               </span>
             </div>
             <span className="shrink-0 rounded-full border border-[#ed1d43]/30 bg-[#fff0f2] px-2.5 py-1 text-[11px] font-extrabold text-[#ed1d43]">
@@ -1631,7 +1712,7 @@ const BuyTicket = () => {
           mode="buyTicket"
           selectedNumber={ticketCode}
           onSelectNumber={(code) => {
-            if (isBetClosed) return;
+            if (isBetClosed || isChecking) return;
             setTicketCode(code);
           }}
         />
@@ -1837,14 +1918,16 @@ const BuyTicket = () => {
             className="flex h-[44px] w-auto min-w-[108px] shrink-0 items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-[#ff1744] to-[#e0102f] px-2.5 text-[12px] font-extrabold text-white shadow-[0_8px_25px_rgba(255,20,67,0.45)] transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none sm:h-[48px] sm:min-w-[125px] sm:text-[14px]"
           >
             <span className="truncate">
-              {depositLoading
-                ? "Creating..."
-                : isBetClosed
-                  ? "Betting Closed"
-                  : "Purchase Now"}
+              {isChecking
+                ? "Checking..."
+                : depositLoading
+                  ? "Creating..."
+                  : isBetClosed
+                    ? "Betting Closed"
+                    : "Purchase Now"}
             </span>
 
-            {!depositLoading && !isBetClosed && (
+            {!depositLoading && !isChecking && !isBetClosed && (
               <ArrowRight size={16} className="shrink-0" />
             )}
           </button>

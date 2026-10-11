@@ -25,6 +25,20 @@ const depositSchema = new mongoose.Schema(
       index: true,
     },
 
+    // "daily" or "festival"
+    lotteryType: {
+      type: String,
+      enum: ["daily", "festival", ""],
+      default: "",
+      index: true,
+    },
+
+    marketName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     entryId: {
       type: mongoose.Schema.Types.ObjectId,
       default: null,

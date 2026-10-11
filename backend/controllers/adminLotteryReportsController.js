@@ -79,14 +79,48 @@ const getLotteryPurchaseReports = async (req, res) => {
     };
 
     if (type === "festival") {
-      baseMatch.configId = { $in: festivalIds };
+      baseMatch.$and = [
+        {
+          $or: [
+            { lotteryType: "festival" },
+            {
+              $and: [
+                {
+                  $or: [
+                    { lotteryType: { $exists: false } },
+                    { lotteryType: null },
+                    { lotteryType: "" },
+                  ],
+                },
+                { configId: { $in: festivalIds } },
+              ],
+            },
+          ],
+        },
+      ];
     } else {
       // Daily lottery
       baseMatch.$and = [
         {
           $or: [
-            { configId: { $in: dailyIds } },
-            { configId: { $nin: festivalIds, $ne: null } },
+            { lotteryType: "daily" },
+            {
+              $and: [
+                {
+                  $or: [
+                    { lotteryType: { $exists: false } },
+                    { lotteryType: null },
+                    { lotteryType: "" },
+                  ],
+                },
+                {
+                  $or: [
+                    { configId: { $in: dailyIds } },
+                    { configId: { $nin: festivalIds, $ne: null } },
+                  ],
+                },
+              ],
+            },
           ],
         },
       ];
@@ -204,10 +238,18 @@ const getLotteryPurchaseReports = async (req, res) => {
 
     // 5. Transform records for detailed response
     const records = rawDeposits.map((dep) => {
-      const isFestival = type === "festival";
-      const config = isFestival
-        ? festivalMap.get(String(dep.configId))
-        : dailyMap.get(String(dep.configId));
+      const isFestival =
+        dep.lotteryType === "festival"
+          ? true
+          : dep.lotteryType === "daily"
+          ? false
+          : type === "festival";
+      const config =
+        (isFestival
+          ? festivalMap.get(String(dep.configId))
+          : dailyMap.get(String(dep.configId))) ||
+        dailyMap.get(String(dep.configId)) ||
+        festivalMap.get(String(dep.configId));
 
       const ticketNumbers =
         Array.isArray(dep.lotteryNumbers) && dep.lotteryNumbers.length > 0
@@ -253,8 +295,9 @@ const getLotteryPurchaseReports = async (req, res) => {
         mobile: dep.userId?.mobile || dep.phone || "-",
         lotteryType: isFestival ? "Festival Lottery" : "Daily Lottery",
         marketName:
+          dep.marketName ||
           config?.marketName ||
-          (isFestival ? "Festival Lottery" : "Daily Lottery"),
+          (isFestival ? "Festival Lottery" : "Daily"),
         drawDate: config?.drawDate || null,
         drawTime: config?.drawTime || null,
         ticketNumbers,
