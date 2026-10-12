@@ -1,14 +1,19 @@
 import {
+  AlertCircle,
+  ArrowLeft,
+  Calendar,
   CheckCircle2,
   ChevronDown,
+  ChevronUp,
   Clock3,
   Copy,
   Crown,
+  Sparkles,
   Ticket,
 } from "lucide-react";
-
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 
 import {
   clearLotteryConfigError,
@@ -16,59 +21,61 @@ import {
 } from "../reducer/slice/createLotteryConfigSlice";
 
 // =====================================================
-// HINDI MONTHS
+// CONSTANTS - EXACT COLORS FROM SCREENSHOT
 // =====================================================
+const COLORS = {
+  red: "#D32F2F",
+  redSoft: "#E57373",
+  navy: "#0F1F3D",
+  navyLight: "#1A2C4E",
+  grayBg: "#F5F5F5",
+  grayBorder: "#E0E0E0",
+  grayText: "#6B7280",
+  gold: "#F5C542",
+  goldDark: "#B8860B",
+};
 
-const MONTH_NAMES_HI = [
-  "जनवरी",
-  "फरवरी",
-  "मार्च",
-  "अप्रैल",
-  "मई",
-  "जून",
-  "जुलाई",
-  "अगस्त",
-  "सितंबर",
-  "अक्टूबर",
-  "नवंबर",
-  "दिसंबर",
+// =====================================================
+// ENGLISH MONTH NAMES
+// =====================================================
+const MONTH_NAMES_EN = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 // =====================================================
-// IST DATE FORMATTER
+// DATE FORMATTER
 // =====================================================
-
 const formatDate = (value) => {
   if (!value) return "—";
-
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "—";
-  }
-
-  return date.toLocaleDateString("hi-IN", {
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-IN", {
     timeZone: "Asia/Kolkata",
     day: "2-digit",
-    month: "long",
+    month: "short",
     year: "numeric",
   });
 };
 
 // =====================================================
-// IST TIME FORMATTER
+// TIME FORMATTER
 // =====================================================
-
 const formatTime = (value) => {
   if (!value) return "—";
-
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "—";
-  }
-
-  return date.toLocaleTimeString("hi-IN", {
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleTimeString("en-IN", {
     timeZone: "Asia/Kolkata",
     hour: "2-digit",
     minute: "2-digit",
@@ -77,16 +84,26 @@ const formatTime = (value) => {
 };
 
 // =====================================================
+// TIME STRING FORMATTER
+// =====================================================
+const formatTimeStr = (str) => {
+  if (!str) return "06:30 PM";
+  const parts = String(str).trim().split(":");
+  if (parts.length < 2) return String(str);
+  let h = parseInt(parts[0], 10);
+  const m = parts[1].padStart(2, "0");
+  if (Number.isNaN(h)) return String(str);
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return `${String(h).padStart(2, "0")}:${m} ${ampm}`;
+};
+
+// =====================================================
 // AMOUNT FORMATTER
 // =====================================================
-
 const formatAmount = (value) => {
   const amount = Number(value);
-
-  if (!Number.isFinite(amount)) {
-    return "₹0";
-  }
-
+  if (!Number.isFinite(amount)) return "₹0";
   return `₹${amount.toLocaleString("en-IN", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
@@ -94,205 +111,174 @@ const formatAmount = (value) => {
 };
 
 // =====================================================
-// DRAW DATE
-//
-// API structure:
-// {
-//   "drawDate": "2026-10-11T00:00:00.000Z",
-//   "month": 10,
-//   "year": 2026
-// }
+// DRAW DATE FORMATTER
 // =====================================================
-
 const formatDrawDate = (item) => {
-  // Priority 1: drawDate ISO string
   const drawDateValue = item?.drawDate;
-
   if (drawDateValue) {
     const date = new Date(drawDateValue);
-
     if (!Number.isNaN(date.getTime())) {
       const day = date.toLocaleDateString("en-IN", {
         timeZone: "Asia/Kolkata",
         day: "2-digit",
       });
-
-      const month = date.toLocaleDateString("hi-IN", {
+      const month = date.toLocaleDateString("en-IN", {
         timeZone: "Asia/Kolkata",
-        month: "long",
+        month: "short",
       });
-
       const year = date.toLocaleDateString("en-IN", {
         timeZone: "Asia/Kolkata",
         year: "numeric",
       });
-
-      return { day, month, year };
+      return { day, month, year, full: `${day} ${month} ${year}` };
     }
   }
-
-  // Fallback: month + year from API
   const m = item?.month;
   const y = item?.year;
-
   if (m && y) {
-    return {
-      day: "—",
-      month: MONTH_NAMES_HI[Number(m) - 1] || "",
-      year: String(y),
-    };
+    const month = MONTH_NAMES_EN[Number(m) - 1] || "";
+    return { day: "—", month, year: String(y), full: `${month} ${y}` };
   }
+  return { day: "—", month: "", year: "", full: "—" };
+};
 
-  return { day: "—", month: "", year: "" };
+// =====================================================
+// PRIZE FORMAT HELPER
+// =====================================================
+const formatPrize = (value) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return "₹0";
+  if (amount >= 10000000) {
+    return `₹${(amount / 10000000).toFixed(2).replace(/\.00$/, "")} Cr`;
+  }
+  if (amount >= 100000) {
+    return `₹${(amount / 100000).toFixed(2).replace(/\.00$/, "")} Lakh`;
+  }
+  return `₹${amount.toLocaleString("en-IN")}`;
 };
 
 // =====================================================
 // STATUS NORMALIZER
 // =====================================================
-
 const normalizeStatus = (status) => {
-  const value = String(status || "").toLowerCase().trim();
-
-  if (value === "win" || value === "winner" || value === "won") {
-    return "active";
-  }
-
-  if (value === "lost" || value === "loss") {
-    return "lost";
-  }
-
-  return "pending";
+  const value = String(status || "")
+    .toLowerCase()
+    .trim();
+  if (value === "win" || value === "winner" || value === "won") return "won";
+  if (value === "lost" || value === "loss") return "lost";
+  if (value === "cancelled" || value === "canceled") return "cancelled";
+  if (value === "pending") return "pending";
+  return "confirmed";
 };
 
 // =====================================================
-// MAIN COMPONENT
+// MAIN COMPONENT: MY TICKETS
 // =====================================================
-
 const MyTickets = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState("all");
-
-  // ===================================================
-  // REDUX
-  // ===================================================
+  const [copiedId, setCopiedId] = useState(null);
 
   const {
     myEntries = [],
-    totalEntries = 0,
     myEntriesLoading = false,
     error = null,
-    activeConfig = null,
   } = useSelector((state) => state.createLotteryConfig || {});
-
-  // ===================================================
-  // FETCH MY TICKETS
-  // ===================================================
 
   useEffect(() => {
     dispatch(getMyLotteryEntries());
-
     return () => {
       dispatch(clearLotteryConfigError());
     };
   }, [dispatch]);
 
-  // ===================================================
-  // MARKET NAME
-  // ===================================================
-
-  const marketName = useMemo(() => {
-    const name =
-      activeConfig?.marketName ||
-      myEntries?.[0]?.marketName ||
-      myEntries?.[0]?.entry?.marketName ||
-      "Market";
-
-    return String(name)
-      .trim()
-      .replace(/\s+/g, " ")
-      .replace(/\b\w/g, (char) => char.toUpperCase());
-  }, [activeConfig, myEntries]);
-
-  // ===================================================
-  // NORMALIZE TICKETS
-  // ===================================================
-
-  const tickets = useMemo(() => {
+  const rawTickets = useMemo(() => {
     const entries = Array.isArray(myEntries) ? myEntries : [];
-
     return entries.map((item, index) => {
-      // =================================================
-      // API ENTRY
-      // =================================================
-
       const entry = item?.entry || item;
+      const lotteryType = String(
+        item?.lotteryType || (item?.isFestival ? "festival" : "daily"),
+      ).toLowerCase();
+      const isFestival = lotteryType === "festival";
+      const lotteryTypeLabel = isFestival
+        ? "Festival Lottery"
+        : "Daily Lottery";
 
-      // =================================================
-      // NUMBER
-      // =================================================
+      const marketName =
+        String(
+          item?.marketName ||
+            entry?.marketName ||
+            (isFestival ? "Festival Lottery" : "Daily Lottery"),
+        )
+          .trim()
+          .replace(/\s+/g, " ") || "Lottery";
 
-      const number = String(entry?.number ?? "").padStart(6, "0");
+      const rawNumbers =
+        Array.isArray(item?.ticketNumbers) && item.ticketNumbers.length > 0
+          ? item.ticketNumbers
+          : Array.isArray(entry?.lotteryNumbers) &&
+              entry.lotteryNumbers.length > 0
+            ? entry.lotteryNumbers
+            : item?.number
+              ? [String(item.number)]
+              : entry?.number
+                ? [String(entry.number)]
+                : [];
 
-      // =================================================
-      // STATUS
-      // =================================================
-
-      const status = normalizeStatus(entry?.status);
-
-      // =================================================
-      // TICKET ID
-      // =================================================
+      const ticketNumbers = rawNumbers
+        .map((n) => String(n).trim())
+        .filter(Boolean);
+      const primaryNumber = String(ticketNumbers[0] || "").trim();
+      const status = normalizeStatus(entry?.status ?? item?.status);
 
       const id =
+        item?.orderId ||
         item?.entryId ||
         entry?._id ||
         entry?.id ||
-        `ticket-${index}`;
-
-      // =================================================
-      // DRAW DATE (from item.drawDate)
-      // =================================================
+        item?._id ||
+        `TCK-${index}`;
 
       const drawDate = formatDrawDate(item);
+      const drawTime = item?.drawTime
+        ? formatTimeStr(item.drawTime)
+        : "06:30 PM";
+      const prizes = item?.prizes || entry?.prizes || {};
+      const purchaseDate = formatDate(entry?.createdAt ?? item?.createdAt);
+      const purchaseTime = formatTime(entry?.createdAt ?? item?.createdAt);
+      const amount = Number(entry?.amount ?? item?.amount ?? item?.price ?? 0);
 
-      // =================================================
-      // PRIZES (from item.prizes — the configured prize)
-      // =================================================
+      const paymentStatusCode =
+        item?.paymentStatusCode ??
+        (item?.paymentStatus === "Success" ? 1 : entry?.status === 1 ? 1 : 0);
 
-      const prizes = item?.prizes || {};
-
-      // =================================================
-      // PURCHASE DATE (from entry.createdAt)
-      // =================================================
-
-      const purchaseDate = formatDate(entry?.createdAt);
-      const purchaseTime = formatTime(entry?.createdAt);
-
-      // =================================================
-      // FINAL TICKET OBJECT
-      // =================================================
+      const isSuccessful =
+        item?.isSuccessful === true ||
+        item?.paymentStatus === "Success" ||
+        paymentStatusCode === 1;
 
       return {
         id,
-        number: number.slice(0, 6).split(""),
+        orderId: item?.orderId || null,
+        lotteryType,
+        lotteryTypeLabel,
+        isFestival,
+        marketName,
+        ticketNumbers,
+        primaryNumber,
+        digits: primaryNumber ? primaryNumber.split("") : [],
+        ticketCount: ticketNumbers.length || 1,
         status,
-        statusText:
-          status === "active"
-            ? "विजेता"
-            : status === "lost"
-              ? "हार गया"
-              : "पेंडिंग",
+        paymentStatusCode,
+        isSuccessful,
         drawDate,
-        price: formatAmount(entry?.amount),
+        drawTime,
+        price: formatAmount(amount),
+        rawAmount: amount,
         purchaseDate,
         purchaseTime,
-        message:
-          status === "active"
-            ? "बधाई हो! आपका टिकट विजेता है"
-            : status === "lost"
-              ? "अगली बार किस्मत आजमाएं"
-              : "भाग्य का नया अवसर",
         prizes: {
           first: Number(prizes?.first) || 0,
           second: Number(prizes?.second) || 0,
@@ -302,84 +288,132 @@ const MyTickets = () => {
     });
   }, [myEntries]);
 
-  // ===================================================
-  // TABS
-  // ===================================================
+  const successfulTickets = useMemo(() => {
+    return rawTickets.filter((t) => {
+      return (
+        t.isSuccessful &&
+        t.paymentStatusCode === 1 &&
+        t.status !== "pending" &&
+        t.status !== "cancelled"
+      );
+    });
+  }, [rawTickets]);
+
+  const dailyCount = useMemo(
+    () => successfulTickets.filter((t) => t.lotteryType === "daily").length,
+    [successfulTickets],
+  );
+  const festivalCount = useMemo(
+    () => successfulTickets.filter((t) => t.lotteryType === "festival").length,
+    [successfulTickets],
+  );
+  const winnerCount = useMemo(
+    () =>
+      successfulTickets.filter((t) => t.status === "won" || t.status === "win")
+        .length,
+    [successfulTickets],
+  );
 
   const tabs = [
-    { key: "all", label: "सभी", count: tickets.length },
-    {
-      key: "pending",
-      label: "पेंडिंग",
-      count: tickets.filter((t) => t.status === "pending").length,
-    },
-    {
-      key: "active",
-      label: "विजेता",
-      count: tickets.filter((t) => t.status === "active").length,
-    },
-    {
-      key: "lost",
-      label: "हार गए",
-      count: tickets.filter((t) => t.status === "lost").length,
-    },
+    { key: "all", label: "All", count: successfulTickets.length },
+    { key: "daily", label: "Daily Lottery", count: dailyCount },
+    { key: "festival", label: "Festival Lottery", count: festivalCount },
+    { key: "won", label: "Winners", count: winnerCount },
   ];
 
-  // ===================================================
-  // FILTER
-  // ===================================================
-
-  const filteredTickets =
-    activeTab === "all"
-      ? tickets
-      : tickets.filter((t) => t.status === activeTab);
-
-  // ===================================================
-  // COPY TICKET ID
-  // ===================================================
+  const filteredTickets = useMemo(() => {
+    if (activeTab === "all") return successfulTickets;
+    if (activeTab === "daily")
+      return successfulTickets.filter((t) => t.lotteryType === "daily");
+    if (activeTab === "festival")
+      return successfulTickets.filter((t) => t.lotteryType === "festival");
+    if (activeTab === "won")
+      return successfulTickets.filter(
+        (t) => t.status === "won" || t.status === "win",
+      );
+    return successfulTickets;
+  }, [successfulTickets, activeTab]);
 
   const copyId = async (id) => {
     try {
-      await navigator.clipboard.writeText(id);
+      await navigator.clipboard.writeText(String(id));
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 1800);
     } catch {}
   };
 
-  // ===================================================
-  // UI
-  // ===================================================
-
   return (
-    <div className="w-full bg-[#030404] text-white">
-      <main className="w-full max-w-[680px] mx-auto px-[12px] sm:px-[18px] pt-[22px] pb-[35px]">
-        {/* HEADER */}
-        <div className="relative flex items-center justify-between gap-[10px]">
-          <div className="flex items-center gap-[10px] min-w-0">
-            <Ticket
-              size={42}
-              strokeWidth={1.8}
-              className="text-[#f5c542] rotate-[-18deg] drop-shadow-[0_0_10px_rgba(245,197,66,0.35)] shrink-0"
-            />
+    <div
+      className="w-full min-h-screen pt-6 pb-[96px] px-3 sm:px-4"
+      style={{ backgroundColor: "#FFFFFF" }}
+    >
+      <main className="w-full max-w-[490px] mx-auto">
+        {/* ============================================ */}
+        {/* HEADER - Navy & Gold like screenshot */}
+        {/* ============================================ */}
+        <div
+          className="flex items-center justify-between gap-3 border-b pb-3"
+          style={{ borderColor: COLORS.grayBorder }}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="h-9 w-9 shrink-0 rounded-xl flex items-center justify-center transition active:scale-95 shadow-sm"
+              style={{
+                backgroundColor: COLORS.grayBg,
+                border: `1px solid ${COLORS.grayBorder}`,
+                color: COLORS.navy,
+              }}
+              aria-label="Go back"
+            >
+              <ArrowLeft size={18} />
+            </button>
             <div className="min-w-0">
-              <h1 className="text-[25px] sm:text-[30px] leading-none font-extrabold tracking-tight">
-                मेरे टिकट
-              </h1>
-              <p className="mt-[5px] text-[13px] leading-[1.15] text-[#d1d1d1]">
-                आपके द्वारा खरीदे गए सभी टिकट यहाँ दिखेंगे
+              <div className="flex items-center gap-1.5">
+                <Ticket
+                  size={20}
+                  strokeWidth={2}
+                  className="rotate-[-15deg] shrink-0"
+                  style={{ color: COLORS.gold }}
+                />
+                <h1
+                  className="text-lg sm:text-xl font-black tracking-tight truncate"
+                  style={{ color: COLORS.navy }}
+                >
+                  My Tickets
+                </h1>
+              </div>
+              <p
+                className="text-[11px] truncate"
+                style={{ color: COLORS.grayText }}
+              >
+                Confirmed Daily & Festival lottery purchases
               </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            className="shrink-0 w-[112px] sm:w-[135px] h-[45px] rounded-[11px] border border-[#a38b35] bg-[#080a09] px-[11px] flex items-center justify-between text-white"
+          <div
+            className="shrink-0 px-2.5 py-1 rounded-lg text-right"
+            style={{
+              backgroundColor: "#FEF3C7",
+              border: `1px solid ${COLORS.gold}`,
+            }}
           >
-            <span className="text-[13px] font-medium">सभी टिकट</span>
-            <ChevronDown size={19} strokeWidth={2.3} />
-          </button>
+            <span
+              className="text-xs font-black"
+              style={{ color: COLORS.goldDark }}
+            >
+              {successfulTickets.length}{" "}
+              {successfulTickets.length === 1 ? "Ticket" : "Tickets"}
+            </span>
+          </div>
         </div>
 
-        {/* TABS */}
-        <div className="grid grid-cols-4 gap-[6px] mt-[22px]">
+        {/* ============================================ */}
+        {/* TABS - Exact style from screenshot */}
+        {/* ============================================ */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar mt-3 pb-1">
           {tabs.map((tab) => {
             const active = activeTab === tab.key;
             return (
@@ -387,53 +421,159 @@ const MyTickets = () => {
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
-                className={`h-[47px] rounded-[10px] border flex items-center justify-center whitespace-nowrap transition-all ${
+                className="px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0"
+                style={
                   active
-                    ? "border-[#ffe27a] text-black font-extrabold bg-gradient-to-b from-[#ffe77b] via-[#f5c542] to-[#e9b528] shadow-[0_3px_12px_rgba(245,197,66,0.22)]"
-                    : "border-[#353938] bg-[#101212] text-[#eeeeee] font-semibold"
-                }`}
+                    ? {
+                        backgroundColor: COLORS.navy,
+                        color: "#FFFFFF",
+                        border: `1px solid ${COLORS.navy}`,
+                        boxShadow: "0 2px 6px rgba(15, 31, 61, 0.25)",
+                      }
+                    : {
+                        backgroundColor: COLORS.grayBg,
+                        color: COLORS.grayText,
+                        border: `1px solid ${COLORS.grayBorder}`,
+                      }
+                }
               >
-                <span className="text-[12px] sm:text-[14px]">
-                  {tab.label} ({tab.count})
+                <span>{tab.label}</span>
+                <span
+                  className="text-[10px] px-1.5 py-0.2 rounded-full font-black"
+                  style={
+                    active
+                      ? {
+                          backgroundColor: "rgba(255,255,255,0.2)",
+                          color: "#FFFFFF",
+                        }
+                      : { backgroundColor: "#E5E7EB", color: COLORS.grayText }
+                  }
+                >
+                  {tab.count}
                 </span>
               </button>
             );
           })}
         </div>
 
-        {/* LOADING */}
+        {/* ============================================ */}
+        {/* LOADING STATE */}
+        {/* ============================================ */}
         {myEntriesLoading ? (
-          <div className="h-[160px] rounded-[16px] border border-[#282b29] bg-[#090b0b] flex flex-col items-center justify-center">
-            <Ticket size={40} className="text-[#f5c542] animate-pulse" />
-            <p className="mt-3 text-[13px] text-white/60">
-              आपके टिकट लोड हो रहे हैं...
+          <div
+            className="mt-6 h-[160px] rounded-xl flex flex-col items-center justify-center"
+            style={{
+              backgroundColor: COLORS.grayBg,
+              border: `1px solid ${COLORS.grayBorder}`,
+            }}
+          >
+            <Ticket
+              size={32}
+              className="animate-pulse"
+              style={{ color: COLORS.gold }}
+            />
+            <p
+              className="mt-2 text-xs font-semibold"
+              style={{ color: COLORS.grayText }}
+            >
+              Loading your tickets...
             </p>
           </div>
-        ) : error && !tickets.length ? (
-          <div className="h-[160px] rounded-[16px] border border-red-500/30 bg-[#090b0b] flex flex-col items-center justify-center px-4 text-center">
-            <p className="text-[13px] text-red-300">{error}</p>
+        ) : error && !successfulTickets.length ? (
+          <div
+            className="mt-6 rounded-xl p-4 flex flex-col items-center text-center"
+            style={{
+              backgroundColor: "#FEF2F2",
+              border: "1px solid #FECACA",
+            }}
+          >
+            <AlertCircle size={28} style={{ color: COLORS.red }} />
+            <p
+              className="mt-1.5 text-xs font-medium"
+              style={{ color: COLORS.red }}
+            >
+              {error}
+            </p>
+            <button
+              type="button"
+              onClick={() => dispatch(getMyLotteryEntries())}
+              className="mt-2.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition"
+              style={{
+                backgroundColor: COLORS.navy,
+                color: "#FFFFFF",
+              }}
+            >
+              Retry
+            </button>
           </div>
         ) : null}
 
-        {/* TICKETS */}
-        <div className="mt-[25px] space-y-[22px]">
-          {filteredTickets.length ? (
+        {/* ============================================ */}
+        {/* TICKETS LIST */}
+        {/* ============================================ */}
+        <div className="mt-3.5 space-y-3">
+          {filteredTickets.length > 0 ? (
             filteredTickets.map((ticket) => (
-              <LotteryTicket
+              <TicketCard
                 key={ticket.id}
                 ticket={ticket}
                 copyId={copyId}
-                marketName={marketName}
+                isCopied={copiedId === ticket.id}
               />
             ))
-          ) : (
-            <div className="h-[160px] rounded-[16px] border border-[#282b29] bg-[#090b0b] flex flex-col items-center justify-center">
-              <Ticket size={40} className="text-[#f5c542]" />
-              <p className="mt-3 text-[13px] text-white/60">
-                इस श्रेणी में कोई टिकट नहीं है
+          ) : !myEntriesLoading ? (
+            <div
+              className="mt-6 rounded-xl p-6 flex flex-col items-center text-center"
+              style={{
+                backgroundColor: COLORS.grayBg,
+                border: `1px solid ${COLORS.grayBorder}`,
+              }}
+            >
+              <div
+                className="h-12 w-12 rounded-xl flex items-center justify-center"
+                style={{
+                  backgroundColor: "#FEF3C7",
+                  border: `1px solid ${COLORS.gold}`,
+                }}
+              >
+                <Ticket size={24} style={{ color: COLORS.goldDark }} />
+              </div>
+              <h3
+                className="mt-2.5 text-sm font-bold"
+                style={{ color: COLORS.navy }}
+              >
+                No Confirmed Tickets Found
+              </h3>
+              <p
+                className="mt-1 text-xs max-w-[260px]"
+                style={{ color: COLORS.grayText }}
+              >
+                {activeTab === "all"
+                  ? "You have not purchased any tickets yet. Pick your lucky numbers today!"
+                  : `No confirmed tickets found in ${activeTab} category.`}
               </p>
+              <div className="mt-3.5 flex items-center gap-2">
+                {/* Daily Lottery - RED button like screenshot */}
+                <button
+                  type="button"
+                  onClick={() => navigate("/buy-ticket")}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-black text-white shadow transition active:scale-95"
+                  style={{ backgroundColor: COLORS.red }}
+                >
+                  Daily Lottery
+                </button>
+                {/* Festival Lottery - NAVY button like screenshot */}
+                <button
+                  type="button"
+                  onClick={() => navigate("/festival")}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-black text-white shadow transition active:scale-95"
+                  style={{ backgroundColor: COLORS.navy }}
+                >
+                  Festival Lottery
+                </button>
+              </div>
             </div>
-          )}
+          ) : null}
         </div>
       </main>
     </div>
@@ -441,269 +581,266 @@ const MyTickets = () => {
 };
 
 // =====================================================
-// LOTTERY TICKET
+// TICKET CARD COMPONENT
 // =====================================================
-
-const LotteryTicket = ({ ticket, copyId, marketName }) => {
-  const pending = ticket.status === "pending";
+const TicketCard = ({ ticket, copyId, isCopied }) => {
+  const [showAllTickets, setShowAllTickets] = useState(false);
+  const isWinner = ticket.status === "won" || ticket.status === "win";
+  const isFestival = ticket.isFestival;
 
   return (
-    <div className="relative w-full h-[236px] rounded-[15px] overflow-hidden bg-[#f4dda0] shadow-[0_5px_22px_rgba(0,0,0,0.4)]">
-      {/* BORDER */}
-      <div className="absolute inset-[4px] rounded-[12px] border border-[#f1d276]/70 pointer-events-none z-[30]" />
-
-      {/* LEFT */}
-      <div className="absolute left-0 top-0 bottom-0 w-[24%] flex flex-col items-center text-center px-[6px] py-[17px] overflow-hidden bg-gradient-to-b from-[#d82b2d] via-[#b8171b] to-[#820b10] border-r border-[#e4b844]">
-        <Crown
-          size={43}
-          strokeWidth={1.5}
-          fill="#f7d24d"
-          className="text-[#f7d24d] drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)]"
-        />
-        <h2 className="mt-[6px] text-[17px] leading-none font-extrabold text-white">
-          {marketName}
-        </h2>
-        <h2 className="mt-[3px] text-[17px] leading-none font-extrabold text-white">
-          Ticket
-        </h2>
-        <div className="w-[65%] h-px bg-[#f5c542]/60 mt-[15px]" />
-        <p className="mt-[16px] text-[11px] leading-[1.35] font-semibold text-white">
-          {ticket.message}
-        </p>
-        <div className="mt-auto">
-          <svg
-            width="38"
-            height="34"
-            viewBox="0 0 52 45"
-            fill="none"
-            stroke="#f7d24d"
-            strokeWidth="2"
+    <div
+      className="relative w-full rounded-xl overflow-hidden shadow-md"
+      style={{
+        backgroundColor: "#FFFFFF",
+        border: `1px solid ${COLORS.grayBorder}`,
+      }}
+    >
+      {/* ============================================ */}
+      {/* TOP HEADER BAR - Navy like screenshot */}
+      {/* ============================================ */}
+      <div
+        className="relative z-[20] flex items-center justify-between gap-2 px-3 py-2"
+        style={{
+          backgroundColor: COLORS.navy,
+          borderBottom: `1px solid ${COLORS.navyLight}`,
+        }}
+      >
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span
+            className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider text-white"
+            style={{
+              backgroundColor: isFestival ? COLORS.goldDark : COLORS.red,
+            }}
           >
-            <path d="M26 42C17 36 16 29 26 21C36 29 35 36 26 42Z" />
-            <path d="M26 41C17 38 8 31 10 23C18 25 24 31 26 41Z" />
-            <path d="M26 41C35 38 44 31 42 23C34 25 28 31 26 41Z" />
-            <path d="M26 37C22 28 23 19 26 11C29 19 30 28 26 37Z" />
-          </svg>
+            {ticket.lotteryTypeLabel}
+          </span>
+          <span className="text-xs font-black text-white truncate">
+            {ticket.marketName}
+          </span>
         </div>
-        <p className="mt-[3px] text-[10px] font-semibold text-white">
-          खेलो विश्वास
-        </p>
-        <p className="text-[10px] font-semibold text-white">के साथ</p>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-black" style={{ color: COLORS.gold }}>
+            {ticket.price}
+          </span>
+          <span
+            className="px-1.5 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1"
+            style={
+              isWinner
+                ? {
+                    backgroundColor: "rgba(16, 185, 129, 0.2)",
+                    color: "#6EE7B7",
+                    border: "1px solid rgba(16, 185, 129, 0.4)",
+                  }
+                : {
+                    backgroundColor: "rgba(96, 165, 250, 0.2)",
+                    color: "#93C5FD",
+                    border: "1px solid rgba(96, 165, 250, 0.4)",
+                  }
+            }
+          >
+            {isWinner ? (
+              <>
+                <Sparkles size={10} style={{ color: "#6EE7B7" }} />
+                Winner
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={10} style={{ color: "#93C5FD" }} />
+                Confirmed
+              </>
+            )}
+          </span>
+        </div>
       </div>
 
-      {/* CENTER */}
-      <div className="absolute left-[24%] right-[24%] top-0 bottom-0 px-[8px] py-[13px] text-[#19140c] bg-gradient-to-b from-[#fff1c4] via-[#f8e4ad] to-[#efd394]">
-        <div className="flex items-center justify-center gap-[4px]">
-          <span className="text-[#c49a3d] text-[10px]">❧</span>
-          <div className="px-[8px] py-[4px] rounded-full border border-[#d1ad55] bg-[#f9e9b9]">
-            <p className="text-[11px] font-extrabold whitespace-nowrap">
-              भारत की भरोसेमंद लॉटरी
-            </p>
-          </div>
-          <span className="text-[#c49a3d] text-[10px]">❧</span>
-        </div>
-
-        <p className="text-center text-[12px] font-semibold mt-[11px]">
-          आपका चुना हुआ नंबर
-        </p>
-
-        {/* NUMBER */}
-        <div className="grid grid-cols-6 gap-[3px] mt-[7px]">
-          {ticket.number.map((digit, index) => (
-            <div
-              key={index}
-              className="h-[37px] rounded-[6px] border border-[#bd8b2d] bg-[#fff0c3] flex items-center justify-center"
+      {/* ============================================ */}
+      {/* BODY */}
+      {/* ============================================ */}
+      <div className="relative z-[20] p-2.5 sm:p-3 space-y-2">
+        {/* TICKET NUMBER STRIP */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span
+              className="text-[10px] font-bold uppercase tracking-wider"
+              style={{ color: COLORS.grayText }}
             >
-              <span className="text-[19px] font-extrabold">{digit}</span>
-            </div>
-          ))}
+              Ticket Number
+            </span>
+            {ticket.ticketCount > 1 && (
+              <span
+                className="text-[9px] font-extrabold px-1.5 py-0.2 rounded text-white"
+                style={{ backgroundColor: COLORS.red }}
+              >
+                {ticket.ticketCount} Tickets
+              </span>
+            )}
+          </div>
+
+          {/* 8-CHARACTER HORIZONTAL STRIP */}
+          <div className="flex items-center gap-1 sm:gap-1.5 flex-nowrap overflow-x-auto no-scrollbar">
+            {ticket.digits.map((char, idx) => (
+              <div
+                key={idx}
+                className="h-8 w-7 sm:h-8.5 sm:w-7.5 shrink-0 rounded-md flex items-center justify-center text-sm sm:text-base font-black font-mono select-all"
+                style={{
+                  backgroundColor: COLORS.grayBg,
+                  border: `1px solid ${COLORS.grayBorder}`,
+                  color: COLORS.navy,
+                }}
+              >
+                {char}
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* PRIZES */}
-        <div className="grid grid-cols-3 gap-[4px] mt-[11px]">
-          <MiniPrize
-            title="प्रथम पुरस्कार"
-            amount={formatPrize(ticket.prizes.first)}
-            subtitle="(6 अंक मिलने पर)"
-          />
-          <MiniPrize
-            title="द्वितीय पुरस्कार"
-            amount={formatPrize(ticket.prizes.second)}
-            subtitle="(5 अंक मिलने पर)"
-          />
-          <MiniPrize
-            title="तृतीय पुरस्कार"
-            amount={formatPrize(ticket.prizes.third)}
-            subtitle="(4 अंक मिलने पर)"
-          />
-        </div>
+        {/* BULK EXPANDABLE TICKETS */}
+        {ticket.ticketCount > 1 && (
+          <div
+            className="pt-1"
+            style={{ borderTop: `1px solid ${COLORS.grayBorder}` }}
+          >
+            <button
+              type="button"
+              onClick={() => setShowAllTickets((prev) => !prev)}
+              className="text-[11px] font-bold flex items-center gap-1 hover:underline"
+              style={{ color: COLORS.red }}
+            >
+              <span>
+                {showAllTickets
+                  ? "Hide all tickets"
+                  : `View all ${ticket.ticketCount} ticket numbers`}
+              </span>
+              {showAllTickets ? (
+                <ChevronUp size={12} />
+              ) : (
+                <ChevronDown size={12} />
+              )}
+            </button>
 
-        <div className="h-px bg-[#c9a85c] mt-[10px]" />
+            {showAllTickets && (
+              <div className="mt-1.5 flex flex-wrap gap-1 max-h-28 overflow-y-auto pr-1">
+                {ticket.ticketNumbers.map((num, i) => (
+                  <span
+                    key={i}
+                    onClick={() => copyId(num)}
+                    className="cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-black transition active:scale-95"
+                    style={{
+                      backgroundColor: COLORS.grayBg,
+                      border: `1px solid ${COLORS.grayBorder}`,
+                      color: COLORS.navy,
+                    }}
+                    title="Click to copy"
+                  >
+                    {num}
+                    <Copy size={9} style={{ color: COLORS.grayText }} />
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-        <div className="flex items-center justify-center gap-[3px] mt-[6px]">
-          <span className="text-[#c09232] text-[9px]">✧</span>
-          <p className="text-[9px] font-semibold text-center leading-[1.15]">
-            छोटी सी राशि, बड़ी खुशियों की शुरुआत
-          </p>
-          <span className="text-[#c09232] text-[9px]">✧</span>
-        </div>
-      </div>
-
-      {/* RIGHT */}
-      <div className="absolute right-0 top-0 bottom-0 w-[24%] px-[7px] py-[11px] text-[#21180d] bg-gradient-to-b from-[#fff1c7] via-[#f7e2a8] to-[#edd28f] border-l border-[#c39b43]">
-        {/* STATUS */}
+        {/* DETAILS ROW */}
         <div
-          className={`w-full h-[30px] rounded-[8px] flex items-center justify-center gap-[3px] text-white font-bold ${
-            pending
-              ? "bg-gradient-to-b from-[#ed4d4a] to-[#c82729]"
-              : "bg-gradient-to-b from-[#42c45b] to-[#209d3c]"
-          }`}
+          className="grid grid-cols-2 gap-2 rounded-lg px-2.5 py-1.5 text-[11px]"
+          style={{
+            backgroundColor: COLORS.grayBg,
+            border: `1px solid ${COLORS.grayBorder}`,
+          }}
         >
-          {pending ? (
-            <Clock3 size={14} strokeWidth={2} />
-          ) : (
-            <CheckCircle2 size={14} strokeWidth={2} />
-          )}
-          <span className="text-[10px]">{ticket.statusText}</span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Calendar
+              size={12}
+              style={{ color: COLORS.navy }}
+              className="shrink-0"
+            />
+            <div className="min-w-0">
+              <span
+                className="block text-[9px] uppercase font-bold leading-none"
+                style={{ color: COLORS.grayText }}
+              >
+                Draw Date & Time
+              </span>
+              <span
+                className="font-extrabold truncate block mt-0.5"
+                style={{ color: COLORS.navy }}
+              >
+                {ticket.drawDate.full} • {ticket.drawTime}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Clock3
+              size={12}
+              style={{ color: COLORS.navy }}
+              className="shrink-0"
+            />
+            <div className="min-w-0">
+              <span
+                className="block text-[9px] uppercase font-bold leading-none"
+                style={{ color: COLORS.grayText }}
+              >
+                Purchased On
+              </span>
+              <span
+                className="font-semibold truncate block mt-0.5"
+                style={{ color: COLORS.navy }}
+              >
+                {ticket.purchaseDate}, {ticket.purchaseTime}
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* DRAW DATE */}
-        <SideInfo
-          label="ड्रॉ दिनांक"
-          value={
-            <>
-              <span>{ticket.drawDate.day}</span>{" "}
-              <span>{ticket.drawDate.month}</span>{" "}
-              <span>{ticket.drawDate.year}</span>
-            </>
-          }
-        />
-
-        {/* PRICE */}
-        <SideInfo
-          label="टिकट मूल्य"
-          value={ticket.price}
-          valueClass="text-[#9d2020] text-[15px] font-extrabold"
-        />
-
-        {/* PURCHASE DATE */}
-        <div className="mt-[12px]">
-          <p className="text-[9px] text-[#6a5533]">खरीद की तारीख</p>
-          <p className="text-[10px] font-bold leading-[1.2] mt-[3px]">
-            {ticket.purchaseDate}
-          </p>
-          <p className="text-[9px] mt-[2px]">{ticket.purchaseTime}</p>
-        </div>
-
-        {/* TICKET ID */}
-        <div className="mt-[12px]">
-          <p className="text-[9px] text-[#6a5533]">टिकट आईडी</p>
-          <div className="flex items-start gap-[3px] mt-[3px]">
-            <span className="text-[9px] font-bold break-all leading-[1.1]">
+        {/* FOOTER ROW */}
+        <div
+          className="pt-1 flex items-center justify-between text-[10px]"
+          style={{ borderTop: `1px solid ${COLORS.grayBorder}` }}
+        >
+          <div className="flex items-center gap-1 min-w-0 truncate">
+            <span style={{ color: COLORS.grayText }}>Order:</span>
+            <span
+              className="font-mono font-bold truncate"
+              style={{ color: COLORS.navy }}
+            >
               {ticket.id}
             </span>
             <button
               type="button"
               onClick={() => copyId(ticket.id)}
-              className="shrink-0"
+              className="p-0.5 transition shrink-0"
+              style={{ color: COLORS.grayText }}
+              title="Copy Order ID"
             >
-              <Copy size={12} strokeWidth={1.8} />
+              {isCopied ? (
+                <span
+                  className="text-[9px] font-bold"
+                  style={{ color: "#059669" }}
+                >
+                  Copied!
+                </span>
+              ) : (
+                <Copy size={10} />
+              )}
             </button>
           </div>
+
+          {ticket.prizes?.first > 0 && (
+            <div
+              className="flex items-center gap-1 text-[10px] font-black shrink-0"
+              style={{ color: COLORS.goldDark }}
+            >
+              <Crown size={11} style={{ color: COLORS.goldDark }} />
+              <span>1st Prize: {formatPrize(ticket.prizes.first)}</span>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* NOTCHES */}
-      <TicketNotches />
     </div>
-  );
-};
-
-// =====================================================
-// PRIZE FORMAT
-// =====================================================
-
-const formatPrize = (value) => {
-  const amount = Number(value);
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return "₹0";
-  }
-
-  if (amount >= 10000000) {
-    return `₹${(amount / 10000000).toFixed(2).replace(/\.00$/, "")} करोड़`;
-  }
-
-  if (amount >= 100000) {
-    return `₹${(amount / 100000).toFixed(2).replace(/\.00$/, "")} लाख`;
-  }
-
-  return `₹${amount.toLocaleString("en-IN")}`;
-};
-
-// =====================================================
-// SIDE INFO
-// =====================================================
-
-const SideInfo = ({ label, value, valueClass = "" }) => (
-  <div className="mt-[10px]">
-    <p className="text-[9px] text-[#6a5533]">{label}</p>
-    <div
-      className={`text-[11px] font-semibold leading-[1.2] mt-[3px] ${valueClass}`}
-    >
-      {value}
-    </div>
-  </div>
-);
-
-// =====================================================
-// MINI PRIZE
-// =====================================================
-
-const MiniPrize = ({ title, amount, subtitle }) => (
-  <div className="min-w-0 rounded-[7px] border border-[#c79b3d] bg-[#f8e8b4] py-[5px] px-[1px] text-center">
-    <p className="text-[7px] font-bold leading-[1.1]">{title}</p>
-    <p className="mt-[4px] text-[12px] leading-none font-extrabold text-[#9e2922] whitespace-nowrap">
-      {amount}
-    </p>
-    <p className="mt-[3px] text-[6px] leading-[1.1]">{subtitle}</p>
-  </div>
-);
-
-// =====================================================
-// TICKET NOTCHES
-// =====================================================
-
-const TicketNotches = () => {
-  const positions = [
-    "top-[8px]",
-    "top-[29px]",
-    "top-[50px]",
-    "top-[71px]",
-    "top-[92px]",
-    "top-[113px]",
-    "top-[134px]",
-    "top-[155px]",
-    "top-[176px]",
-    "top-[197px]",
-    "top-[218px]",
-  ];
-
-  return (
-    <>
-      {positions.map((position, index) => (
-        <span
-          key={`left-notch-${index}`}
-          className={`absolute left-[-7px] ${position} w-[14px] h-[14px] rounded-full bg-[#030404] z-[50] pointer-events-none`}
-        />
-      ))}
-      {positions.map((position, index) => (
-        <span
-          key={`right-notch-${index}`}
-          className={`absolute right-[-7px] ${position} w-[14px] h-[14px] rounded-full bg-[#030404] z-[50] pointer-events-none`}
-        />
-      ))}
-    </>
   );
 };
 

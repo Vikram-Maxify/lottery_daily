@@ -1,6 +1,3 @@
-import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
 import {
   BarChart3,
   ChevronRight,
@@ -14,6 +11,9 @@ import {
   Wallet,
   X,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useSelector } from "react-redux";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 // ==========================================================
 // MENU
@@ -21,8 +21,24 @@ import {
 
 const MENU_ITEMS = [
   { label: "Home", icon: Home, path: "/", tone: "bg-[#ed1d43]" },
-  { label: "Daily Lottery", icon: Ticket, path: "/daily-lottery", tone: "bg-[#2e7dd7]" },
-  { label: "Festival Lottery", icon: Crown, path: "/festival-lottery", tone: "bg-[#f08a25]" },
+  {
+    label: "Daily Lottery",
+    icon: Ticket,
+    path: "/daily-lottery",
+    tone: "bg-[#2e7dd7]",
+  },
+  {
+    label: "Festival Lottery",
+    icon: Crown,
+    path: "/festival-lottery",
+    tone: "bg-[#f08a25]",
+  },
+  {
+    label: "My Tickets",
+    icon: Ticket,
+    path: "/my-tickets",
+    tone: "bg-[#e11d48]",
+  },
   { label: "Results", icon: BarChart3, path: "/results", tone: "bg-[#20a66a]" },
   { label: "Profile", icon: User, path: "/profile", tone: "bg-[#8c4bd6]" },
 ];
@@ -39,7 +55,11 @@ const Header = () => {
   const isLoggedIn = Boolean(user);
 
   const walletAmount = Number(
-    user?.balance ?? user?.walletBalance ?? user?.wallet ?? user?.walletAmount ?? 0
+    user?.balance ??
+      user?.walletBalance ??
+      user?.wallet ??
+      user?.walletAmount ??
+      0,
   );
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -78,52 +98,15 @@ const Header = () => {
       <header className="fixed left-1/2 top-0 z-[9999] w-[490px] max-w-full -translate-x-1/2 border-b border-white/5 bg-[#061b3d]/95 backdrop-blur-md">
         <div className="flex h-[70px] items-center justify-between px-3 sm:px-4">
           {/* ---------- LOGO ---------- */}
-          <Link to="/" className="flex items-center gap-1.5">
-            <svg
-              width="42"
-              height="34"
-              viewBox="0 0 38 30"
-              fill="none"
-              className="drop-shadow-[0_0_8px_rgba(255,201,60,0.5)]"
-            >
-              <defs>
-                <linearGradient id="crownGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#FFE47A" />
-                  <stop offset="50%" stopColor="#f5c542" />
-                  <stop offset="100%" stopColor="#d4a017" />
-                </linearGradient>
-              </defs>
 
-              <path
-                d="M2 8L9 16L19 3L29 16L36 8L33 26H5L2 8Z"
-                fill="url(#crownGrad)"
-                stroke="#d4a017"
-                strokeWidth="1.2"
-                strokeLinejoin="round"
-              />d
-              <circle cx="2" cy="8" r="2.5" fill="url(#crownGrad)" />
-              <circle cx="19" cy="3" r="2.5" fill="url(#crownGrad)" />
-              <circle cx="36" cy="8" r="2.5" fill="url(#crownGrad)" />
-              <rect x="5" y="26" width="28" height="3" fill="url(#crownGrad)" rx="1" />
-            </svg>
-
-            <div className="flex flex-col leading-none">
-              <h1
-                className="text-[27px] font-black tracking-wide"
-                style={{
-                  background:
-                    "linear-gradient(180deg, #FFE08A 0%, #f5c542 55%, #d4a017 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}
-              >
-                DEAR
-              </h1>
-
-              <p className="mt-0.5 text-[8px] font-semibold tracking-[5px] text-white/90">
-                LOTTERY
-              </p>
-            </div>
+          <Link to="/" className="flex shrink-0 items-center">
+            <img
+              src="https://i.ibb.co/1GHKxfrG/Dear-Lottery-Logo-1.png"
+              alt="Dear Lottery"
+              loading="lazy"
+              className="h-16 w-auto max-w-[150px] object-contain"
+              draggable={false}
+            />
           </Link>
 
           {/* ---------- ACTIONS ---------- */}
@@ -219,11 +202,17 @@ const Header = () => {
                   className="relative mt-1 flex w-full items-center gap-3 text-left"
                 >
                   <span className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-full border-[3px] border-[#ffd34e] bg-white/10 shadow-[0_0_20px_rgba(255,209,90,0.25)]">
-                    <UserRound size={28} className="text-[#ffd34e]" strokeWidth={1.5} />
+                    <UserRound
+                      size={28}
+                      className="text-[#ffd34e]"
+                      strokeWidth={1.5}
+                    />
                   </span>
 
                   <span className="min-w-0">
-                    <span className="block text-[12px] text-white/70">Hello,</span>
+                    <span className="block text-[12px] text-white/70">
+                      Hello,
+                    </span>
                     <span className="block break-words bg-gradient-to-b from-[#fff1a8] to-[#e0a11b] bg-clip-text font-serif text-[22px] font-black leading-tight text-transparent">
                       {user?.name || "User"}
                     </span>
@@ -269,7 +258,9 @@ const Header = () => {
                 >
                   <span className="flex items-center gap-2">
                     <Wallet size={20} className="text-[#ffd34e]" />
-                    <span className="text-[12px] text-white/80">Wallet Balance</span>
+                    <span className="text-[12px] text-white/80">
+                      Wallet Balance
+                    </span>
                   </span>
                   <span className="text-[18px] font-black text-[#ffd34e]">
                     ₹{walletAmount.toLocaleString("en-IN")}

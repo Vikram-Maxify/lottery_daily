@@ -31,7 +31,6 @@ const router = express.Router();
 router.post(
   "/deposit",
   authMiddleware,
-  requireVerifiedKYC,
   uploadDeposit.fields([
     {
       name: "image",

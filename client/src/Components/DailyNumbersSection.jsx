@@ -11,7 +11,6 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
-  Sparkles,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -322,11 +321,6 @@ const DailyNumbersSection = ({
                   ? "Festival Lucky Numbers"
                   : "Today's Lucky Numbers"}
               </h3>
-
-              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-[#f59e0b]/40 bg-[#fef3c7] px-2 py-0.5 text-[9.5px] font-extrabold text-[#b45309]">
-                <Sparkles size={10} />
-                Live
-              </span>
             </div>
 
             <p className="mt-0.5 truncate text-[11px] font-medium text-[#64748b]">

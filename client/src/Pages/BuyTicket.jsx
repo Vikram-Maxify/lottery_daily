@@ -1,10 +1,11 @@
 import {
   ArrowRight,
-  BookOpen,
+  Banknote,
   CalendarDays,
   ChevronDown,
   Clock,
   Info,
+  ScrollText,
   Shuffle,
   Ticket,
   Trophy,
@@ -527,7 +528,9 @@ const BuyTicket = () => {
     const activeMarketMap = new Map();
     const candidates = [
       ...(Array.isArray(activeDailyConfigsList) ? activeDailyConfigsList : []),
-      ...(activeDailyConfig && activeDailyConfig._id ? [activeDailyConfig] : []),
+      ...(activeDailyConfig && activeDailyConfig._id
+        ? [activeDailyConfig]
+        : []),
       ...(activeConfig && activeConfig._id ? [activeConfig] : []),
       ...(Array.isArray(allDailyConfigs)
         ? allDailyConfigs.filter((c) => c?.isActive)
@@ -558,14 +561,23 @@ const BuyTicket = () => {
         market: matchedMarket,
       };
     });
-  }, [activeDailyConfigsList, activeDailyConfig, activeConfig, allDailyConfigs]);
+  }, [
+    activeDailyConfigsList,
+    activeDailyConfig,
+    activeConfig,
+    allDailyConfigs,
+  ]);
 
   const selectedChip = dateChips[selectedDate] || dateChips[0];
   const selectedDailyMarket = selectedChip?.market || null;
 
   // Auto-select first active market date if today has no market and user has not picked a date yet
   useEffect(() => {
-    if (dateChips.length > 0 && selectedDate === 0 && !dateChips[0]?.hasMarket) {
+    if (
+      dateChips.length > 0 &&
+      selectedDate === 0 &&
+      !dateChips[0]?.hasMarket
+    ) {
       const firstActiveIndex = dateChips.findIndex((c) => c.hasMarket);
       if (firstActiveIndex !== -1) {
         setSelectedDate(firstActiveIndex);
@@ -1024,34 +1036,6 @@ const BuyTicket = () => {
       }
 
       // -------------------------------------------------
-      // KYC
-      // -------------------------------------------------
-
-      if (!isKycApproved) {
-        if (kycStatus === "pending") {
-          return setLocalError(
-            "Your KYC is pending approval. Please wait for admin verification.",
-          );
-        }
-
-        if (kycStatus === "rejected") {
-          setLocalError("Your KYC was rejected. Redirecting to KYC page...");
-
-          setTimeout(() => navigate("/kyc"), 1500);
-
-          return;
-        }
-
-        setLocalError(
-          "Please complete your KYC first. Redirecting to KYC page...",
-        );
-
-        setTimeout(() => navigate("/kyc"), 1500);
-
-        return;
-      }
-
-      // -------------------------------------------------
       // LOTTERY CONFIG
       // -------------------------------------------------
 
@@ -1299,70 +1283,6 @@ const BuyTicket = () => {
       </section>
 
       <main className="relative -mt-4 space-y-3 px-2">
-        {/* =================================================
-            KYC STATUS
-        ================================================= */}
-
-        {!kycLoading && kycStatus !== "approved" && (
-          <div
-            className={`rounded-xl border px-4 py-3 text-sm font-medium ${
-              kycStatus === "pending"
-                ? "border-amber-200 bg-amber-50 text-amber-800"
-                : kycStatus === "rejected"
-                  ? "border-red-200 bg-red-50 text-red-700"
-                  : "border-blue-200 bg-blue-50 text-blue-700"
-            }`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                {kycStatus === "pending" && (
-                  <>
-                    <p className="font-bold">KYC Verification Pending</p>
-
-                    <p className="mt-0.5 text-xs">
-                      Your KYC is under review. You cannot purchase tickets
-                      until approved.
-                    </p>
-                  </>
-                )}
-
-                {kycStatus === "rejected" && (
-                  <>
-                    <p className="font-bold">KYC Rejected</p>
-
-                    <p className="mt-0.5 text-xs">
-                      Your KYC was rejected. Please re-submit your documents.
-                    </p>
-                  </>
-                )}
-
-                {kycStatus === "not_submitted" && (
-                  <>
-                    <p className="font-bold">KYC Required</p>
-
-                    <p className="mt-0.5 text-xs">
-                      Please complete your KYC to purchase lottery tickets.
-                    </p>
-                  </>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => navigate("/kyc")}
-                className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-bold shadow-sm"
-              >
-                {kycStatus === "rejected" ? "Re-submit" : "Complete KYC"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {kycLoading && (
-          <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
-            Checking KYC status...
-          </div>
-        )}
 
         {/* =================================================
             BETTING CLOSED BANNER
@@ -1388,7 +1308,10 @@ const BuyTicket = () => {
             <p className="font-bold">No Active Market for Selected Date</p>
 
             <p className="mt-0.5 text-xs">
-              Daily Lottery market for {selectedChip?.day} {selectedChip?.month} has not been created or activated yet. Markets are created daily on scheduled draw dates. Please select an active draw date to purchase tickets.
+              Daily Lottery market for {selectedChip?.day} {selectedChip?.month}{" "}
+              has not been created or activated yet. Markets are created daily
+              on scheduled draw dates. Please select an active draw date to
+              purchase tickets.
             </p>
           </div>
         )}
@@ -1452,50 +1375,121 @@ const BuyTicket = () => {
         </Card>
 
         {/* =================================================
-            DAILY LOTTERY TICKET
+            DAILY LOTTERY TICKET (PREMIUM)
         ================================================= */}
 
-        <section className="relative overflow-hidden rounded-[16px] border border-[#f1d9a0] bg-gradient-to-r from-[#fff0c9] via-[#fff8e8] to-[#ffe7b8] p-3 shadow-sm">
-          <div className="grid grid-cols-[auto_1fr] items-center gap-3">
-            <div className="w-[104px]">
-              <TicketMock
-                small
-                prize={firstPrizeAmount}
-                price={priceText}
-                number={HERO_TICKET_NUMBER}
-              />
-            </div>
+        <section className="relative overflow-hidden rounded-[16px] border border-[#f1d9a0] bg-white shadow-sm">
+          {/* TOP: ticket + title + price */}
+          <div className="bg-gradient-to-r from-[#fff0c9] via-[#fff8e8] to-[#ffe7b8] px-3 py-3">
+            <div className="grid grid-cols-[auto_1fr] items-center gap-3">
+              <div className="w-[96px]">
+                <TicketMock
+                  small
+                  prize={firstPrizeAmount}
+                  price={priceText}
+                  number={HERO_TICKET_NUMBER}
+                />
+              </div>
 
-            <div className="min-w-0">
-              <div className="flex items-start justify-between gap-2">
-                <h2 className="font-serif text-[17px] font-black leading-tight text-[#173e70]">
+              <div className="min-w-0">
+                <h2 className="font-serif text-[18px] font-black leading-tight text-[#173e70]">
                   Daily Lottery Ticket
                 </h2>
 
-                <span className="shrink-0 rounded-md bg-[#ed1d43] px-2 py-1.5 text-[11px] font-extrabold text-white">
-                  {priceText}{" "}
-                  <span className="text-[8px] font-medium">per ticket</span>
-                </span>
+                <p className="mt-0.5 text-[10px] font-medium text-[#8a4b12]">
+                  Small Ticket, Big Opportunities
+                </p>
+
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-[#ed1d43] px-2.5 py-1 text-[13px] font-extrabold text-white shadow-sm">
+                    {priceText}{" "}
+                    <span className="text-[8px] font-medium">per ticket</span>
+                  </span>
+
+                  <span className="text-[10px] font-semibold text-[#8a4b12]">
+                    Max {MAX_TICKETS} / order
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 p-3">
+            {/* PRIZE HIGHLIGHT */}
+            <div className="flex items-center gap-3 rounded-xl border border-[#e6c97c] bg-gradient-to-r from-[#fff6df] to-[#fffdf5] px-3 py-2.5">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#ffe58a] to-[#f0b429] text-[#6b3a06] shadow-sm">
+                <Trophy size={24} />
+              </span>
+
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#8a4b12]">
+                  Total First Prize
+                </p>
+
+                <p className="truncate text-[28px] font-black uppercase leading-tight text-[#d7193f]">
+                  {firstPrizeAmount}
+                </p>
               </div>
 
-              <div className="mt-2 grid grid-cols-3 gap-1">
-                <InfoItem
-                  icon={<Trophy size={20} className="text-[#8a4b12]" />}
-                  title={firstPrizeAmount}
-                  sub="Total First Prize"
-                />
+              <div className="shrink-0 rounded-lg bg-white/80 px-2 py-1 text-center">
+                <p className="text-[8px] font-medium text-[#4b5563]">
+                  {RULE_TICKETS} Winners
+                </p>
 
-                <InfoItem
-                  icon={<Users size={20} className="text-[#8a4b12]" />}
-                  title={`${MAX_TICKETS} Tickets`}
-                  sub="Max per Order"
-                />
+                <p className="text-[11px] font-extrabold text-[#173e70]">
+                  {firstPrizePerTicket}
+                </p>
 
-                <InfoItem
-                  icon={<Clock size={20} className="text-[#8a4b12]" />}
-                  title={drawTimeText}
-                  sub={countdownText}
-                />
+                <p className="text-[8px] font-medium text-[#4b5563]">each</p>
+              </div>
+            </div>
+
+            {/* DRAW DATE | DRAW TIME | BETS CLOSE IN */}
+            <div className="grid grid-cols-3 divide-x divide-[#dfe5f0] rounded-xl bg-[#f3f6fb] py-2.5">
+              <div className="flex min-w-0 flex-col items-center px-1.5 text-center">
+                <CalendarDays size={16} className="text-[#ed1d43]" />
+
+                <p className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-[#4b5563]">
+                  Draw Date
+                </p>
+
+                <p className="w-full truncate text-[12px] font-black text-[#173e70]">
+                  {drawDateText}
+                </p>
+              </div>
+
+              <div className="flex min-w-0 flex-col items-center px-1.5 text-center">
+                <Clock size={16} className="text-[#ed1d43]" />
+
+                <p className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-[#4b5563]">
+                  Draw Time
+                </p>
+
+                <p className="w-full truncate text-[12px] font-black text-[#173e70]">
+                  {drawTimeText}
+                </p>
+              </div>
+
+              <div className="flex min-w-0 flex-col items-center px-1.5 text-center">
+                <span className="relative flex h-4 items-center">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      isBetClosed ? "bg-red-500" : "animate-pulse bg-[#14a06a]"
+                    }`}
+                  />
+                </span>
+
+                <p className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-[#4b5563]">
+                  {isBetClosed ? "Betting" : "Bets Close In"}
+                </p>
+
+                <p
+                  className={`w-full truncate font-mono text-[12px] font-black ${
+                    isBetClosed ? "text-red-600" : "text-[#14a06a]"
+                  }`}
+                >
+                  {countdownText}
+                </p>
               </div>
             </div>
           </div>
@@ -1508,11 +1502,7 @@ const BuyTicket = () => {
         <Card>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Ticket
-                size={26}
-                className="-rotate-[30deg] text-[#173e70]"
-                fill="#173e70"
-              />
+              <Ticket size={26} className="-rotate-[30deg] text-[#173e70]" />
               <h2 className="text-[16px] font-extrabold text-[#173e70]">
                 How Many Tickets?
               </h2>
@@ -1805,7 +1795,7 @@ const BuyTicket = () => {
         <section className="overflow-hidden rounded-[18px] bg-gradient-to-br from-[#3a0b17] via-[#2b0a16] to-[#1a0710] p-2.5 shadow-lg">
           <div className="flex flex-wrap items-center justify-between gap-2 px-1">
             <div className="flex min-w-0 items-center gap-2">
-              <BookOpen size={26} className="shrink-0 text-[#ffd34e]" />
+              <ScrollText size={26} className="shrink-0 text-[#ffd34e]" />
 
               <h2 className="text-[15px] font-extrabold leading-tight text-white">
                 {displayLottery?.marketName
@@ -1839,11 +1829,7 @@ const BuyTicket = () => {
             </div>
 
             <div className="flex min-w-0 items-center gap-1.5 rounded-xl border border-[#ffd34e]/30 bg-white/5 px-2.5 py-2">
-              <Trophy
-                size={30}
-                className="shrink-0 text-[#ffd34e]"
-                fill="#ffd34e"
-              />
+              <Banknote size={30} className="shrink-0 text-[#ffd34e]" />
 
               <div className="min-w-0">
                 <p className="text-[10px] text-white/80">Total First Prize</p>
@@ -1991,7 +1977,8 @@ const BuyTicket = () => {
                   ? "Creating..."
                   : isBetClosed
                     ? "Betting Closed"
-                    : !isFestivalMode && (!selectedChip || !selectedChip.hasMarket)
+                    : !isFestivalMode &&
+                        (!selectedChip || !selectedChip.hasMarket)
                       ? "No Market"
                       : "Purchase Now"}
             </span>

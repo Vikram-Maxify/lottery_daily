@@ -1,35 +1,30 @@
-import {
-  NavLink,
-  Outlet,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
-import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import {
-  LayoutDashboard,
-  Users,
-  FileText,
-  Ticket,
-  PartyPopper,
-  Wallet,
-  Cog,
-  IdCard,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  Search,
   Bell,
   Calendar,
-  Crown,
   ChevronDown,
   ChevronRight,
-  Sparkles,
-  Trophy,
+  Cog,
+  Crown,
+  FileText,
+  IdCard,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  PartyPopper,
+  Search,
+  Settings,
   ShoppingBag,
+  Sparkles,
+  Ticket,
+  Trophy,
+  Users,
+  Wallet,
+  X,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 
 import { adminLogout } from "../../reducer/slice/adminAuthReducer";
 
@@ -47,8 +42,7 @@ import { adminLogout } from "../../reducer/slice/adminAuthReducer";
    danger      #D93025
 ========================================================= */
 
-const GOLD_BG =
-  "bg-gradient-to-b from-[#FFD83D] via-[#F7B500] to-[#E39A00]";
+const GOLD_BG = "bg-gradient-to-b from-[#FFD83D] via-[#F7B500] to-[#E39A00]";
 
 const AdminLayout = () => {
   const dispatch = useDispatch();
@@ -91,14 +85,22 @@ const AdminLayout = () => {
   const NAV_ITEMS = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { to: "/admin/lottery", label: "Daily Lottery", icon: Ticket },
-    { to: "/admin/festival_lottery", label: "Festival Lottery", icon: PartyPopper },
-    { to: "/admin/lottery-reports", label: "Lottery Reports", icon: ShoppingBag },
+    {
+      to: "/admin/festival_lottery",
+      label: "Festival Lottery",
+      icon: PartyPopper,
+    },
+    {
+      to: "/admin/lottery-reports",
+      label: "Lottery Reports",
+      icon: ShoppingBag,
+    },
     { to: "/admin/results", label: "Lottery Result", icon: FileText },
     { to: "/admin/festival_result", label: "Festival Result", icon: FileText },
     { to: "/users", label: "Users Management", icon: Users },
     { to: "/adminkyc", label: "KYC Verification", icon: IdCard },
     { to: "/admin/withdrawals", label: "Withdrawals", icon: Wallet },
-    { to: "/amount", label: "Amount", icon: Cog },
+    // { to: "/amount", label: "Amount", icon: Cog },
     { to: "/home_banner", label: "Home Banner", icon: Cog },
     { to: "/admin/top-winners", label: "Top Winners", icon: Trophy },
     { to: "/settings", label: "Settings", icon: Settings },
@@ -261,7 +263,9 @@ const AdminLayout = () => {
                           : "text-[#B8860B] group-hover:text-[#9A5B00]"
                       }`}
                     />
-                    <span className="relative flex-1 truncate">{item.label}</span>
+                    <span className="relative flex-1 truncate">
+                      {item.label}
+                    </span>
                     <ChevronRight
                       size={15}
                       className={`relative shrink-0 transition-transform group-hover:translate-x-0.5 ${

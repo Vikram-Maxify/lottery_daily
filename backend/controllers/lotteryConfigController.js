@@ -1,5 +1,7 @@
 const mongoose = require("mongoose");
 const LotteryConfig = require("../models/LotteryConfig");
+const Festival = require("../models/Festival");
+const Deposit = require("../models/Deposit");
 const User = require("../models/userModel");
 const TransactionHistory = require("../models/TransactionHistory");
 const uploadToImgBB = require("../utils/imgbbUpload");
@@ -331,58 +333,8 @@ const getISTDayRange = (dateString) => {
 const validateDailyLotteryForPurchase = async ({ configId, drawDate }) => {
   let targetConfig = null;
 
-  // 1. If explicit drawDate is requested, find the exact Daily market for that IST day
-  if (drawDate) {
-    const requestedDateStr = getISTDateString(drawDate);
-    if (!requestedDateStr) {
-      return {
-        valid: false,
-        status: 400,
-        message: "Invalid draw date format",
-      };
-    }
-
-    const range = getISTDayRange(requestedDateStr);
-    if (!range) {
-      return {
-        valid: false,
-        status: 400,
-        message: "Invalid draw date",
-      };
-    }
-
-    // Must find an existing Daily Lottery market for that exact calendar day
-    const marketForDate = await LotteryConfig.findOne({
-      drawDate: { $gte: range.startUtc, $lte: range.endUtc },
-    });
-
-    if (!marketForDate) {
-      return {
-        valid: false,
-        status: 404,
-        message: "Daily lottery market for the requested draw date does not exist",
-      };
-    }
-
-    if (!marketForDate.isActive) {
-      return {
-        valid: false,
-        status: 400,
-        message: "Daily lottery market for the requested draw date is not active",
-      };
-    }
-
-    // If configId was also provided, it must match this market exactly
-    if (configId && String(marketForDate._id) !== String(configId)) {
-      return {
-        valid: false,
-        status: 400,
-        message: "Requested draw date does not match the specified lottery configuration",
-      };
-    }
-
-    targetConfig = marketForDate;
-  } else if (configId) {
+  // 1. If configId is provided, look up the target configuration directly
+  if (configId) {
     if (!mongoose.Types.ObjectId.isValid(configId)) {
       return {
         valid: false,
@@ -405,7 +357,75 @@ const validateDailyLotteryForPurchase = async ({ configId, drawDate }) => {
       return {
         valid: false,
         status: 400,
-        message: "This lottery market is not active",
+        message: "Daily lottery market for the requested draw date is not active",
+      };
+    }
+
+    // If drawDate was also provided, it must match targetConfig's IST draw date
+    if (drawDate) {
+      const requestedDateStr = getISTDateString(drawDate);
+      const configDateStr = getISTDateString(targetConfig.drawDate);
+      if (!requestedDateStr) {
+        return {
+          valid: false,
+          status: 400,
+          message: "Invalid draw date format",
+        };
+      }
+      if (requestedDateStr !== configDateStr) {
+        return {
+          valid: false,
+          status: 400,
+          message: "Requested draw date does not match the specified lottery configuration",
+        };
+      }
+    }
+  } else if (drawDate) {
+    // 2. If only drawDate is provided (no configId)
+    const requestedDateStr = getISTDateString(drawDate);
+    if (!requestedDateStr) {
+      return {
+        valid: false,
+        status: 400,
+        message: "Invalid draw date format",
+      };
+    }
+
+    const range = getISTDayRange(requestedDateStr);
+    if (!range) {
+      return {
+        valid: false,
+        status: 400,
+        message: "Invalid draw date",
+      };
+    }
+
+    // First look for an ACTIVE market for that exact IST day
+    const activeMarketForDate = await LotteryConfig.findOne({
+      drawDate: { $gte: range.startUtc, $lte: range.endUtc },
+      isActive: true,
+    }).sort({ createdAt: -1 });
+
+    if (activeMarketForDate) {
+      targetConfig = activeMarketForDate;
+    } else {
+      // Check if an inactive market exists for that date
+      const anyMarket = await LotteryConfig.findOne({
+        drawDate: { $gte: range.startUtc, $lte: range.endUtc },
+      });
+
+      if (anyMarket) {
+        return {
+          valid: false,
+          status: 400,
+          message: "Daily lottery market for the requested draw date is not active",
+        };
+      }
+
+      return {
+        valid: false,
+        status: 404,
+        message: "Daily lottery market for the requested draw date does not exist",
       };
     }
   } else {
@@ -1653,7 +1673,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
 const getMyLotteryEntries = async (req, res) => {
   try {
     const userId = getUserId(req);
-    console.log("STEP 0 userId:", userId);
 
     if (!userId) {
       return res.status(401).json({
@@ -1671,11 +1690,6 @@ const getMyLotteryEntries = async (req, res) => {
       ],
     }).lean();
 
-    console.log(
-      "STEP 1 user:",
-      user ? { _id: user._id, uuid: user.uuid } : null
-    );
-
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -1689,52 +1703,210 @@ const getMyLotteryEntries = async (req, res) => {
       String(userId),
     ];
     const uniqueIdentifiers = [...new Set(identifiers)];
-    console.log("STEP 2 identifiers:", uniqueIdentifiers);
 
-    const configs = await LotteryConfig.find({
-      "users.userId": { $in: uniqueIdentifiers },
+    // 1. Fetch configs to resolve drawDate, drawTime, marketName, prizes
+    const [dailyConfigs, festivalConfigs] = await Promise.all([
+      LotteryConfig.find().lean(),
+      Festival.find().lean(),
+    ]);
+
+    const dailyMap = new Map(dailyConfigs.map((c) => [String(c._id), c]));
+    const festivalMap = new Map(festivalConfigs.map((f) => [String(f._id), f]));
+
+    // 2. Fetch all user deposits that are lottery purchases (exclude failed status=2)
+    const userDeposits = await Deposit.find({
+      $or: [
+        { userId: { $in: [user._id, ...(isObjectId ? [userId] : [])] } },
+        { uid: { $in: uniqueIdentifiers } },
+      ],
+      $and: [
+        {
+          $or: [
+            { "lotteryNumbers.0": { $exists: true } },
+            { number: { $ne: null } },
+            { lotteryType: { $in: ["daily", "festival"] } },
+          ],
+        },
+        { status: 1 }, // Only confirmed successful purchases (STATUS.SUCCESS = 1)
+      ],
     })
-      .sort({ drawDate: -1 })
+      .sort({ createdAt: -1 })
       .lean();
 
-    console.log("STEP 3 configs count:", configs.length);
-
     const entries = [];
+    const processedTicketKeys = new Set();
 
-    for (const config of configs) {
+    // 3. Transform user deposits into standardized ticket entries
+    for (const dep of userDeposits) {
+      const isFestival =
+        dep.lotteryType === "festival" ||
+        festivalMap.has(String(dep.configId));
+
+      const config =
+        (isFestival
+          ? festivalMap.get(String(dep.configId))
+          : dailyMap.get(String(dep.configId))) ||
+        dailyMap.get(String(dep.configId)) ||
+        festivalMap.get(String(dep.configId));
+
+      const ticketNumbers =
+        Array.isArray(dep.lotteryNumbers) && dep.lotteryNumbers.length > 0
+          ? dep.lotteryNumbers.map((n) => String(n).trim()).filter(Boolean)
+          : dep.number
+            ? [String(dep.number).trim()]
+            : [];
+
+      if (ticketNumbers.length === 0) continue;
+
+      // Track tickets to avoid duplicating direct config.users entries
+      const configKeyPrefix = String(dep.configId || dep.marketName || "");
+      ticketNumbers.forEach((t) => {
+        processedTicketKeys.add(`${configKeyPrefix}_${t}`);
+        if (dep.entryId) {
+          processedTicketKeys.add(String(dep.entryId));
+        }
+      });
+
+      // Determine ticket draw outcome (Confirmed / Won / Lost)
+      let ticketStatus = "confirmed";
+      if (config && Array.isArray(config.users)) {
+        const depUserId = String(dep.userId);
+        const matched = config.users.filter(
+          (u) =>
+            (uniqueIdentifiers.includes(String(u.userId)) ||
+              String(u.userId) === depUserId) &&
+            ticketNumbers.includes(String(u.number))
+        );
+        if (matched.some((e) => e.status === "win" || e.status === "won")) {
+          ticketStatus = "won";
+        } else if (
+          matched.length > 0 &&
+          matched.every((e) => e.status === "lost")
+        ) {
+          ticketStatus = "lost";
+        } else {
+          ticketStatus = "confirmed";
+        }
+      }
+
+      const marketName =
+        dep.marketName ||
+        config?.marketName ||
+        (isFestival ? "Festival Lottery" : "Daily Lottery");
+
+      const drawDate = config?.drawDate || dep.createdAt;
+      const drawTime = config?.drawTime || "18:30";
+
+      entries.push({
+        _id: dep._id,
+        entryId: dep.entryId || dep._id,
+        orderId: dep.orderId || null,
+        configId: dep.configId || null,
+        lotteryType: isFestival ? "festival" : "daily",
+        lotteryTypeLabel: isFestival ? "Festival Lottery" : "Daily Lottery",
+        marketName,
+        imageUrl: config?.imageUrl || "",
+        month: config?.month,
+        year: config?.year,
+        drawDate,
+        drawTime,
+        ticketNumbers,
+        number: ticketNumbers[0] || "",
+        ticketCount: ticketNumbers.length,
+        amount: Number(dep.amount) || 0,
+        price: Number(dep.amount) || 0,
+        status: ticketStatus,
+        paymentStatus: "Success",
+        paymentStatusCode: 1,
+        isSuccessful: true,
+        prizes: config?.prizes || {},
+        isActive: Boolean(config?.isActive),
+        createdAt: dep.createdAt,
+      });
+    }
+
+    // 4. Also include direct entries from Daily Lottery Configs not already covered
+    for (const config of dailyConfigs) {
       const userEntries = (config.users || []).filter((u) =>
         uniqueIdentifiers.includes(String(u.userId))
       );
 
       for (const u of userEntries) {
+        const key = `${String(config._id)}_${String(u.number)}`;
+        if (processedTicketKeys.has(key) || processedTicketKeys.has(String(u._id))) {
+          continue;
+        }
+
         entries.push({
+          _id: u._id,
+          entryId: u._id,
+          orderId: null,
           configId: config._id,
-          marketName: config.marketName,
-          imageUrl: config.imageUrl,
+          lotteryType: "daily",
+          lotteryTypeLabel: "Daily Lottery",
+          marketName: config.marketName || "Daily Lottery",
+          imageUrl: config.imageUrl || "",
           month: config.month,
           year: config.year,
           drawDate: config.drawDate,
-          drawTime: config.drawTime,
-          prizes: config.prizes,
-          isActive: config.isActive,
-          entryId: u._id,
-          userId: u.userId,
-          entryDate: u.entryDate,
-          number: u.number,
-          amount: u.amount,
-          isBuy: u.isBuy,
-          prize: u.prize,
-          prizeType: u.prizeType,
-          status: u.status,
-          createdAt: u.createdAt,
-          updatedAt: u.updatedAt,
+          drawTime: config.drawTime || "18:30",
+          ticketNumbers: [String(u.number)],
+          number: String(u.number),
+          ticketCount: 1,
+          amount: Number(u.amount) || 0,
+          price: Number(u.amount) || 0,
+          status: u.status || "pending",
+          paymentStatus: "Success",
+          paymentStatusCode: 1,
+          prizes: config.prizes || {},
+          isActive: Boolean(config.isActive),
+          createdAt: u.createdAt || config.createdAt,
         });
       }
     }
 
-    console.log("STEP 5 total entries:", entries.length);
+    // 5. Also include direct entries from Festival Lottery Configs not already covered
+    for (const config of festivalConfigs) {
+      const userEntries = (config.users || []).filter((u) =>
+        uniqueIdentifiers.includes(String(u.userId))
+      );
 
-    entries.sort((a, b) => new Date(b.drawDate) - new Date(a.drawDate));
+      for (const u of userEntries) {
+        const key = `${String(config._id)}_${String(u.number)}`;
+        if (processedTicketKeys.has(key) || processedTicketKeys.has(String(u._id))) {
+          continue;
+        }
+
+        entries.push({
+          _id: u._id,
+          entryId: u._id,
+          orderId: null,
+          configId: config._id,
+          lotteryType: "festival",
+          lotteryTypeLabel: "Festival Lottery",
+          marketName: config.marketName || "Festival Lottery",
+          imageUrl: config.imageUrl || "",
+          month: config.month,
+          year: config.year,
+          drawDate: config.drawDate,
+          drawTime: config.drawTime || "18:30",
+          ticketNumbers: [String(u.number)],
+          number: String(u.number),
+          ticketCount: 1,
+          amount: Number(u.amount) || 0,
+          price: Number(u.amount) || 0,
+          status: u.status || "pending",
+          paymentStatus: "Success",
+          paymentStatusCode: 1,
+          prizes: config.prizes || {},
+          isActive: Boolean(config.isActive),
+          createdAt: u.createdAt || config.createdAt,
+        });
+      }
+    }
+
+    // 6. Sort all entries descending by purchase/created date
+    entries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return res.status(200).json({
       success: true,

@@ -416,7 +416,7 @@ const ProfilePage = () => {
         <div className="grid grid-cols-2 gap-2.5 px-3.5 mt-3">
           {/* Total Tickets */}
           <div
-            onClick={() => navigate("/results")}
+            onClick={() => navigate("/my-tickets")}
             className="cursor-pointer group rounded-[22px] bg-white p-4 border border-[#E2E8F0] shadow-sm transition duration-200 hover:shadow-md hover:border-[#CBD5E1] active:scale-[0.98]"
           >
             <div className="flex items-center justify-between">
@@ -520,6 +520,15 @@ const ProfilePage = () => {
             </p>
 
             <div className="rounded-[24px] bg-white border border-[#E2E8F0] shadow-sm overflow-hidden divide-y divide-[#F1F5F9]">
+              <MenuRowLight
+                icon={<Ticket size={19} className="text-[#ED1D43]" />}
+                iconBg="bg-rose-50"
+                title="My Purchased Tickets"
+                subtitle="All your Daily & Festival lottery tickets"
+                onClick={() => navigate("/my-tickets")}
+                badge={totalTickets ? `${totalTickets} Tickets` : null}
+              />
+
               <MenuRowLight
                 icon={<Gift size={19} className="text-[#ED1D43]" />}
                 iconBg="bg-rose-50"

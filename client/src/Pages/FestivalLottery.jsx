@@ -1,10 +1,11 @@
 import {
   ArrowRight,
-  BookOpen,
+  Banknote,
   CalendarDays,
   Check,
   ChevronDown,
   Gift,
+  ScrollText,
   ShieldCheck,
   Shuffle,
   Sparkles,
@@ -568,25 +569,6 @@ const FestivalLottery = () => {
         return;
       }
 
-      if (!isKycApproved) {
-        if (kycStatus === "pending") {
-          setManualError(
-            "Your KYC is pending approval. Please wait for admin verification.",
-          );
-          return;
-        }
-        if (kycStatus === "rejected") {
-          setManualError("Your KYC was rejected. Redirecting to KYC page...");
-          setTimeout(() => navigate("/kyc"), 1500);
-          return;
-        }
-        setManualError(
-          "Please complete your KYC first. Redirecting to KYC page...",
-        );
-        setTimeout(() => navigate("/kyc"), 1500);
-        return;
-      }
-
       if (!purchaseConfig?._id) {
         setManualError(
           "No active lottery configuration found. Please try again later.",
@@ -842,62 +824,6 @@ const FestivalLottery = () => {
             </div>
           )}
 
-          {/* KYC STATUS BANNER */}
-          {!kycLoading && kycStatus !== "approved" && (
-            <div
-              className={`rounded-xl border px-4 py-3 text-sm font-medium ${
-                kycStatus === "pending"
-                  ? "border-amber-200 bg-amber-50 text-amber-800"
-                  : kycStatus === "rejected"
-                    ? "border-red-200 bg-red-50 text-red-700"
-                    : "border-blue-200 bg-blue-50 text-blue-700"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  {kycStatus === "pending" && (
-                    <>
-                      <p className="font-bold">KYC Verification Pending</p>
-                      <p className="mt-0.5 text-xs">
-                        Your KYC is under review. You cannot purchase tickets
-                        until approved.
-                      </p>
-                    </>
-                  )}
-                  {kycStatus === "rejected" && (
-                    <>
-                      <p className="font-bold">KYC Rejected</p>
-                      <p className="mt-0.5 text-xs">
-                        Your KYC was rejected. Please re-submit your documents.
-                      </p>
-                    </>
-                  )}
-                  {kycStatus === "not_submitted" && (
-                    <>
-                      <p className="font-bold">KYC Required</p>
-                      <p className="mt-0.5 text-xs">
-                        Please complete your KYC to purchase lottery tickets.
-                      </p>
-                    </>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigate("/kyc")}
-                  className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-bold shadow-sm"
-                >
-                  {kycStatus === "rejected" ? "Re-submit" : "Complete KYC"}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {kycLoading && (
-            <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
-              Checking KYC status...
-            </div>
-          )}
-
           {/* ================= FESTIVAL INFO ================= */}
           <section className="relative overflow-hidden rounded-[16px] border border-[#f1d9a0] bg-gradient-to-r from-[#fff0c9] via-[#fff8e8] to-[#ffe7b8] p-3 shadow-sm">
             <div className="grid grid-cols-[auto_1fr] items-center gap-3">
@@ -952,11 +878,7 @@ const FestivalLottery = () => {
           <section className="rounded-[16px] bg-white p-3 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Ticket
-                  size={26}
-                  className="-rotate-[30deg] text-[#173e70]"
-                  fill="#173e70"
-                />
+                <Ticket size={26} className="-rotate-[30deg] text-[#173e70]" />
                 <h2 className="text-[16px] font-extrabold text-[#173e70]">
                   How Many Tickets?
                 </h2>
@@ -1207,7 +1129,7 @@ const FestivalLottery = () => {
           <section className="overflow-hidden rounded-[18px] bg-gradient-to-br from-[#3a0b17] via-[#2b0a16] to-[#1a0710] p-2.5 shadow-lg">
             <div className="flex flex-wrap items-center justify-between gap-2 px-1">
               <div className="flex min-w-0 items-center gap-2">
-                <BookOpen size={26} className="shrink-0 text-[#ffd34e]" />
+                <ScrollText size={26} className="shrink-0 text-[#ffd34e]" />
                 <h2 className="text-[15px] font-extrabold leading-tight text-white">
                   {festival?.name || marketName} Festival Lottery Winning Rules
                 </h2>
@@ -1230,11 +1152,7 @@ const FestivalLottery = () => {
                 </span>
               </div>
               <div className="flex min-w-0 items-center gap-1.5 rounded-xl border border-[#ffd34e]/30 bg-white/5 px-2.5 py-2">
-                <Trophy
-                  size={30}
-                  className="shrink-0 text-[#ffd34e]"
-                  fill="#ffd34e"
-                />
+                <Banknote size={30} className="shrink-0 text-[#ffd34e]" />
                 <div className="min-w-0">
                   <p className="text-[10px] text-white/80">Total First Prize</p>
                   <p className="whitespace-nowrap text-[20px] font-black leading-none text-[#ffd34e]">

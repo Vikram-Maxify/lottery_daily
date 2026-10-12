@@ -629,7 +629,7 @@ const HomeLotterySection = () => {
                 </p>
 
                 <p className="px-2 py-1.5 text-[17px] font-black tracking-[2px] text-[#d7193f]">
-                  10FD <span className="text-[#173e70]">8057</span>
+                  10F <span className="text-[#173e70]">38057</span>
                 </p>
               </div>
             </div>

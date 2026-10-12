@@ -154,6 +154,7 @@ const TopWinnersToast = ({ winners = [] }) => {
               <img
                 src={winner.image}
                 alt={winner.name}
+                loading="lazy"
                 className="h-12 w-12 rounded-full border-2 border-[#ffd34e] object-cover shadow-md"
                 onError={(e) => {
                   e.target.src =
@@ -171,9 +172,9 @@ const TopWinnersToast = ({ winners = [] }) => {
                 <h4 className="truncate text-[13.5px] font-extrabold text-white">
                   {winner.name}
                 </h4>
-                <span className="text-[10px] font-semibold text-white/70">
+                {/* <span className="text-[10px] font-semibold text-white/70">
                   just won
-                </span>
+                </span> */}
               </div>
 
               <div className="mt-0.5 flex items-baseline gap-1">
@@ -210,23 +211,7 @@ const TopWinnersToast = ({ winners = [] }) => {
         </div>
 
         {/* Floating Mini Controls (Dots & Quick Nav) */}
-        <div className="mt-1.5 flex items-center justify-between px-1">
-          <div className="flex items-center gap-1">
-            {winners.map((_, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setCurrentIndex(idx)}
-                aria-label={`Go to winner ${idx + 1}`}
-                className={`h-1.5 rounded-full transition-all ${
-                  idx === currentIndex
-                    ? "w-4 bg-[#173e70]"
-                    : "w-1.5 bg-[#cbd5e1] hover:bg-[#94a3b8]"
-                }`}
-              />
-            ))}
-          </div>
-
+        <div className="mt-1.5 flex items-center justify-end px-1">
           <div className="flex items-center gap-1">
             <button
               type="button"

@@ -41,6 +41,7 @@ import LiveTickets from "./Pages/LiveTickets";
 import ReferralPage from "./Pages/ReferralPage";
 import VarifyTicket from "./Pages/VarifyTicket";
 import WithdrawHistory from "./Pages/WithdrawHistory";
+import MyTickets from "./Pages/MyTickets";
 
 // ==========================================================
 // HOME ROUTE
@@ -93,10 +94,7 @@ function App() {
             <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/referral" element={<ReferralPage />} />
 
-            {/* <Route
-              path="/my-tickets"
-              element={<MyTickets />}
-            /> */}
+            <Route path="/my-tickets" element={<MyTickets />} />
 
             {/* Withdraw */}
             <Route path="/user/withdraw" element={<WithdrawalRequest />} />
