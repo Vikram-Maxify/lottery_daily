@@ -185,7 +185,7 @@ export const getMyLotteryEntries = createAsyncThunk(
 export const addUserLotteryEntry = createAsyncThunk(
   "createLotteryConfig/addUserLotteryEntry",
   async (
-    { configId, number, amount },
+    { configId, number, amount, drawDate },
     { rejectWithValue }
   ) => {
     try {
@@ -272,6 +272,7 @@ export const addUserLotteryEntry = createAsyncThunk(
           configId: lotteryConfigId,
           number: lotteryNumber,
           amount: lotteryAmount,
+          ...(drawDate ? { drawDate } : {}),
         }
       );
 
@@ -312,7 +313,7 @@ export const addUserLotteryEntry = createAsyncThunk(
 export const addBulkUserLotteryEntries = createAsyncThunk(
   "createLotteryConfig/addBulkUserLotteryEntries",
   async (
-    { configId, entries },
+    { configId, entries, drawDate },
     { rejectWithValue }
   ) => {
     try {
@@ -404,6 +405,7 @@ export const addBulkUserLotteryEntries = createAsyncThunk(
         {
           configId: lotteryConfigId,
           entries: normalizedEntries,
+          ...(drawDate ? { drawDate } : {}),
         }
       );
 

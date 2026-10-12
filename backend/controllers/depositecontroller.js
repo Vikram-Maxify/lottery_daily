@@ -14,6 +14,9 @@ const {
   rollbackBatchReservations,
   markNumbersAsSold,
 } = require("../services/ticketAvailabilityService");
+const {
+  validateDailyLotteryForPurchase,
+} = require("./lotteryConfigController");
 
 // =====================================================
 // STATUS CONSTANTS
@@ -200,6 +203,8 @@ const createDeposit = async (req, res) => {
       // =====================================================
 
       let normalizedLotteryNumbers = [];
+      let lotteryConfig = null;
+      let isFestivalConfig = false;
 
       if (Array.isArray(lotteryNumbers) && lotteryNumbers.length > 0) {
         if (!configId || !mongoose.Types.ObjectId.isValid(configId)) {
@@ -213,8 +218,9 @@ const createDeposit = async (req, res) => {
           req.body?.lotteryType || ""
         ).trim().toLowerCase();
 
-        let lotteryConfig = null;
-        let isFestivalConfig = false;
+        // lotteryConfig / isFestivalConfig are declared in the outer scope
+        lotteryConfig = null;
+        isFestivalConfig = false;
 
         if (requestedLotteryType === "festival") {
           lotteryConfig = await Festival.findById(configId);
@@ -227,23 +233,52 @@ const createDeposit = async (req, res) => {
             });
           }
         } else if (requestedLotteryType === "daily") {
-          lotteryConfig = await LotteryConfig.findById(configId);
-          if (lotteryConfig) {
-            isFestivalConfig = false;
-          } else {
-            return res.status(404).json({
+          const dailyCheck = await validateDailyLotteryForPurchase({
+            configId,
+            drawDate: req.body?.drawDate,
+          });
+          if (!dailyCheck.valid) {
+            return res.status(dailyCheck.status || 400).json({
               success: false,
-              message: "Daily lottery configuration not found",
+              message: dailyCheck.message,
             });
           }
+          lotteryConfig = dailyCheck.config;
+          isFestivalConfig = false;
         } else {
-          lotteryConfig = await LotteryConfig.findById(configId);
-          if (lotteryConfig) {
+          // If drawDate is specified, it must be validated as daily lottery
+          if (req.body?.drawDate) {
+            const dailyCheck = await validateDailyLotteryForPurchase({
+              configId,
+              drawDate: req.body?.drawDate,
+            });
+            if (!dailyCheck.valid) {
+              return res.status(dailyCheck.status || 400).json({
+                success: false,
+                message: dailyCheck.message,
+              });
+            }
+            lotteryConfig = dailyCheck.config;
             isFestivalConfig = false;
           } else {
-            lotteryConfig = await Festival.findById(configId);
-            if (lotteryConfig) {
-              isFestivalConfig = true;
+            const dailyExists = await LotteryConfig.findById(configId);
+            if (dailyExists) {
+              const dailyCheck = await validateDailyLotteryForPurchase({
+                configId,
+              });
+              if (!dailyCheck.valid) {
+                return res.status(dailyCheck.status || 400).json({
+                  success: false,
+                  message: dailyCheck.message,
+                });
+              }
+              lotteryConfig = dailyCheck.config;
+              isFestivalConfig = false;
+            } else {
+              lotteryConfig = await Festival.findById(configId);
+              if (lotteryConfig) {
+                isFestivalConfig = true;
+              }
             }
           }
         }
@@ -364,7 +399,7 @@ const createDeposit = async (req, res) => {
         paymentUrl: "",
         status: STATUS.PENDING,
 
-        configId: configId || null,
+        configId: lotteryConfig ? lotteryConfig._id : (configId || null),
         lotteryType: resolvedLotteryType,
         marketName: resolvedMarketName,
         lotteryNumbers: normalizedLotteryNumbers,

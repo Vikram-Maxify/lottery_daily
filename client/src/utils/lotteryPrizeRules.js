@@ -40,10 +40,26 @@ export const formatDrawDate = (dateValue) => {
   const date = new Date(dateValue);
   if (Number.isNaN(date.getTime())) return "Draw date soon";
   return date.toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
+};
+
+/**
+ * Returns YYYY-MM-DD formatted date in Asia/Kolkata timezone
+ */
+export const getISTDateString = (dateValue) => {
+  if (!dateValue) return "";
+  const d = new Date(dateValue);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 };
 
 /**

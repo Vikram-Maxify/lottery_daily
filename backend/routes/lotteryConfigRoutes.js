@@ -9,6 +9,7 @@ const {
   getMyLotteryEntries,
   getAllLotteryConfigs,
   getActiveLotteryConfig,
+  getActiveLotteryConfigs,
   getLotteryConfigById,
   activateLotteryConfig,
   updateEntryStatus,
@@ -48,6 +49,13 @@ const upload = multer({
 router.get(
   "/active",
   getActiveLotteryConfig
+);
+
+// GET active lotteries list (today and future)
+// GET /api/lottery-config/active-list
+router.get(
+  "/active-list",
+  getActiveLotteryConfigs
 );
 
 // =====================================================

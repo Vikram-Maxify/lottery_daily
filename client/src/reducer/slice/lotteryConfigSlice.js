@@ -8,6 +8,7 @@ import api from "../api";
 const initialState = {
   configs: [],
   activeConfig: null,
+  activeConfigs: [],
   selectedConfig: null,
 
   loading: false,
@@ -119,6 +120,29 @@ export const getActiveLotteryConfig = createAsyncThunk(
         message:
           error.response?.data?.message ||
           "Failed to fetch active lottery configuration",
+      });
+    }
+  },
+);
+
+// =====================================================
+// GET ACTIVE LOTTERY CONFIGS LIST
+// GET /api/lottery/active-list
+// =====================================================
+
+export const getActiveLotteryConfigs = createAsyncThunk(
+  "lotteryConfig/getActiveLotteryConfigs",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get("/lottery/active-list");
+
+      return response.data;
+    } catch (error) {
+      return rejectWithValue({
+        status: error.response?.status,
+        message:
+          error.response?.data?.message ||
+          "Failed to fetch active lottery configurations",
       });
     }
   },
@@ -392,6 +416,28 @@ const lotteryConfigSlice = createSlice({
       });
 
     // ===================================================
+    // GET ACTIVE LIST
+    // ===================================================
+
+    builder
+      .addCase(getActiveLotteryConfigs.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+
+      .addCase(getActiveLotteryConfigs.fulfilled, (state, action) => {
+        state.loading = false;
+        state.activeConfigs = Array.isArray(action.payload?.data)
+          ? action.payload.data
+          : [];
+      })
+
+      .addCase(getActiveLotteryConfigs.rejected, (state, action) => {
+        state.loading = false;
+        state.activeConfigs = [];
+      });
+
+    // ===================================================
     // GET BY ID
     // ===================================================
 
@@ -635,6 +681,9 @@ export const selectLotteryConfigs = (state) => state.lotteryConfig.configs;
 
 export const selectActiveLotteryConfig = (state) =>
   state.lotteryConfig.activeConfig;
+
+export const selectActiveLotteryConfigs = (state) =>
+  state.lotteryConfig?.activeConfigs || [];
 
 export const selectSelectedLotteryConfig = (state) =>
   state.lotteryConfig.selectedConfig;

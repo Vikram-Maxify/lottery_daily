@@ -46,6 +46,10 @@ export const createDeposit = createAsyncThunk(
         formData.append("configId", depositData.configId);
       }
 
+      if (depositData.drawDate) {
+        formData.append("drawDate", depositData.drawDate);
+      }
+
       if (depositData.lotteryType) {
         formData.append("lotteryType", depositData.lotteryType);
       }

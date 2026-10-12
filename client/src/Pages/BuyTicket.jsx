@@ -36,8 +36,10 @@ import {
   clearLotteryConfigError,
   clearLotteryConfigSuccess,
   getActiveLotteryConfig,
+  getActiveLotteryConfigs,
   getAllLotteryConfigs,
   selectActiveLotteryConfig,
+  selectActiveLotteryConfigs,
   selectLotteryConfigs,
 } from "../reducer/slice/lotteryConfigSlice";
 
@@ -53,6 +55,7 @@ import {
   formatDrawTime,
   formatINR,
   getFestivalWinningRules,
+  getISTDateString,
 } from "../utils/lotteryPrizeRules";
 
 import { getAmount } from "../reducer/slice/amountReducer";
@@ -297,11 +300,23 @@ const getDrawTimestamp = (lotteryConfig) => {
     return null;
   }
 
-  // Draw time in UTC ms
+  // drawDate is stored as IST midnight (previous day 18:30 UTC), so read the
+  // calendar day in Asia/Kolkata (UTC accessors would give the previous day).
+  const [istYear, istMonth, istDay] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(drawDate)
+    .split("-")
+    .map(Number);
+
+  // Draw time (IST) in UTC ms
   const drawTimeUtcMs = Date.UTC(
-    drawDate.getUTCFullYear(),
-    drawDate.getUTCMonth(),
-    drawDate.getUTCDate(),
+    istYear,
+    istMonth - 1,
+    istDay,
     hours - 5,
     minutes - 30,
     0,
@@ -411,17 +426,7 @@ const BuyTicket = () => {
 
   const allDailyConfigs = useSelector(selectLotteryConfigs);
   const activeDailyConfig = useSelector(selectActiveLotteryConfig);
-
-  const lotteryConfig = useMemo(() => {
-    if (activeDailyConfig && activeDailyConfig._id) {
-      return activeDailyConfig;
-    }
-    if (activeConfig && activeConfig._id) {
-      return activeConfig;
-    }
-    const list = Array.isArray(allDailyConfigs) ? allDailyConfigs : [];
-    return list.find((c) => c?.isActive) || list[0] || null;
-  }, [activeDailyConfig, activeConfig, allDailyConfigs]);
+  const activeDailyConfigsList = useSelector(selectActiveLotteryConfigs);
 
   const allFestivalConfigs = useSelector(selectFestivalConfigs);
   const activeFestivalConfig = useSelector(selectActiveFestivalLottery);
@@ -511,6 +516,64 @@ const BuyTicket = () => {
   const [selectedDate, setSelectedDate] = useState(0);
 
   const [showAllDates, setShowAllDates] = useState(false);
+
+  // ===================================================
+  // DATE CHIPS & MARKET RESOLUTION
+  // Daily Lottery market is ONLY valid if an active market exists
+  // for that exact draw date in Asia/Kolkata timezone.
+  // ===================================================
+
+  const dateChips = useMemo(() => {
+    const activeMarketMap = new Map();
+    const candidates = [
+      ...(Array.isArray(activeDailyConfigsList) ? activeDailyConfigsList : []),
+      ...(activeDailyConfig && activeDailyConfig._id ? [activeDailyConfig] : []),
+      ...(activeConfig && activeConfig._id ? [activeConfig] : []),
+      ...(Array.isArray(allDailyConfigs)
+        ? allDailyConfigs.filter((c) => c?.isActive)
+        : []),
+    ];
+
+    candidates.forEach((cfg) => {
+      if (!cfg || !cfg.drawDate) return;
+      const istStr = getISTDateString(cfg.drawDate);
+      if (istStr && !activeMarketMap.has(istStr)) {
+        activeMarketMap.set(istStr, cfg);
+      }
+    });
+
+    return Array.from({ length: ALL_DATES_COUNT }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      const dateString = getISTDateString(d);
+      const matchedMarket = activeMarketMap.get(dateString) || null;
+
+      return {
+        index: i,
+        day: d.getDate(),
+        month: d.toLocaleString("en-US", { month: "short" }),
+        weekday: d.toLocaleString("en-US", { weekday: "short" }).toUpperCase(),
+        dateString,
+        hasMarket: Boolean(matchedMarket && matchedMarket.isActive),
+        market: matchedMarket,
+      };
+    });
+  }, [activeDailyConfigsList, activeDailyConfig, activeConfig, allDailyConfigs]);
+
+  const selectedChip = dateChips[selectedDate] || dateChips[0];
+  const selectedDailyMarket = selectedChip?.market || null;
+
+  // Auto-select first active market date if today has no market and user has not picked a date yet
+  useEffect(() => {
+    if (dateChips.length > 0 && selectedDate === 0 && !dateChips[0]?.hasMarket) {
+      const firstActiveIndex = dateChips.findIndex((c) => c.hasMarket);
+      if (firstActiveIndex !== -1) {
+        setSelectedDate(firstActiveIndex);
+      }
+    }
+  }, [dateChips, selectedDate]);
+
+  const lotteryConfig = selectedDailyMarket;
 
   const inputRefs = useRef({});
 
@@ -611,6 +674,7 @@ const BuyTicket = () => {
 
   useEffect(() => {
     dispatch(getActiveLotteryConfig());
+    dispatch(getActiveLotteryConfigs());
     dispatch(getAllLotteryConfigs());
     dispatch(getActiveFestivalConfig());
     dispatch(getAllFestivalConfigs());
@@ -658,46 +722,24 @@ const BuyTicket = () => {
   }, [displayLottery?.drawDate, displayLottery?.drawTime]);
 
   // ===================================================
-  // DATE CHIPS
-  // ===================================================
-
-  const dateChips = useMemo(
-    () =>
-      Array.from(
-        {
-          length: ALL_DATES_COUNT,
-        },
-        (_, i) => {
-          const d = new Date();
-
-          d.setDate(d.getDate() + i);
-
-          return {
-            day: d.getDate(),
-            month: d.toLocaleString("en-US", {
-              month: "short",
-            }),
-            weekday: d
-              .toLocaleString("en-US", {
-                weekday: "short",
-              })
-              .toUpperCase(),
-          };
-        },
-      ),
-    [],
-  );
-
-  // ===================================================
   // DRAW DATE
   // ===================================================
 
   const drawDateText = useMemo(() => {
-    return formatDrawDate(displayLottery?.drawDate);
-  }, [displayLottery?.drawDate]);
+    if (displayLottery?.drawDate) {
+      return formatDrawDate(displayLottery.drawDate);
+    }
+    if (selectedChip?.dateString) {
+      return formatDrawDate(selectedChip.dateString);
+    }
+    return "Draw date soon";
+  }, [displayLottery?.drawDate, selectedChip?.dateString]);
 
   const drawTimeText = useMemo(() => {
-    return formatDrawTime(displayLottery?.drawTime);
+    if (displayLottery?.drawTime) {
+      return formatDrawTime(displayLottery.drawTime);
+    }
+    return "--:--";
   }, [displayLottery?.drawTime]);
 
   // ===================================================
@@ -1016,11 +1058,21 @@ const BuyTicket = () => {
       const activePurchaseConfig = displayLottery;
 
       if (!activePurchaseConfig?._id) {
-        return setLocalError("Active lottery configuration not found");
+        return setLocalError(
+          !isFestivalMode
+            ? `Daily lottery market for ${selectedChip?.day} ${selectedChip?.month} has not been created yet.`
+            : "Active lottery configuration not found",
+        );
       }
 
       if (!activePurchaseConfig?.isActive) {
         return setLocalError("Lottery is not active right now");
+      }
+
+      if (!isFestivalMode && (!selectedChip || !selectedChip.hasMarket)) {
+        return setLocalError(
+          `Daily lottery market for ${selectedChip?.day} ${selectedChip?.month} is not active or available.`,
+        );
       }
 
       // -------------------------------------------------
@@ -1108,6 +1160,7 @@ const BuyTicket = () => {
           configId: activePurchaseConfig._id,
           lotteryNumbers,
           lotteryType: currentLotteryType,
+          drawDate: !isFestivalMode ? selectedChip?.dateString : undefined,
         }),
       ).unwrap();
 
@@ -1162,13 +1215,14 @@ const BuyTicket = () => {
     activeLoading ||
     depositLoading ||
     isChecking ||
-    !lotteryConfig?._id ||
-    !lotteryConfig?.isActive ||
+    !displayLottery?._id ||
+    !displayLottery?.isActive ||
     !hasApiPrice ||
     !isTicketValid ||
     hasKnownSold ||
     quantity < MIN_TICKETS ||
-    isBetClosed;
+    isBetClosed ||
+    (!isFestivalMode && (!selectedChip || !selectedChip.hasMarket));
 
   const visibleDateChips = showAllDates ? dateChips : dateChips.slice(0, 7);
 
@@ -1321,6 +1375,20 @@ const BuyTicket = () => {
             <p className="mt-0.5 text-xs">
               Betting for this draw closed 1 hour before the draw time. Please
               wait for the next draw.
+            </p>
+          </div>
+        )}
+
+        {/* =================================================
+            NO ACTIVE MARKET BANNER
+        ================================================= */}
+
+        {!isFestivalMode && (!selectedChip || !selectedChip.hasMarket) && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            <p className="font-bold">No Active Market for Selected Date</p>
+
+            <p className="mt-0.5 text-xs">
+              Daily Lottery market for {selectedChip?.day} {selectedChip?.month} has not been created or activated yet. Markets are created daily on scheduled draw dates. Please select an active draw date to purchase tickets.
             </p>
           </div>
         )}
@@ -1923,12 +1991,17 @@ const BuyTicket = () => {
                   ? "Creating..."
                   : isBetClosed
                     ? "Betting Closed"
-                    : "Purchase Now"}
+                    : !isFestivalMode && (!selectedChip || !selectedChip.hasMarket)
+                      ? "No Market"
+                      : "Purchase Now"}
             </span>
 
-            {!depositLoading && !isChecking && !isBetClosed && (
-              <ArrowRight size={16} className="shrink-0" />
-            )}
+            {!depositLoading &&
+              !isChecking &&
+              !isBetClosed &&
+              (isFestivalMode || (selectedChip && selectedChip.hasMarket)) && (
+                <ArrowRight size={16} className="shrink-0" />
+              )}
           </button>
         </div>
       </div>
@@ -1950,43 +2023,67 @@ const Card = ({ children }) => (
 // DATE CHIP
 // =====================================================
 
-const DateChip = ({ chip, today, active, onClick, fluid = false }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={`relative flex h-[66px] ${
-      fluid ? "w-full" : "w-[64px] shrink-0"
-    } flex-col items-center justify-center rounded-xl border text-center transition active:scale-95 ${
-      active
-        ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
-        : "border-transparent bg-[#e3e9f3]"
-    }`}
-  >
-    {today && (
-      <span className="text-[10px] font-semibold text-[#ed1d43]">Today</span>
-    )}
+const DateChip = ({ chip, today, active, onClick, fluid = false }) => {
+  const hasMarket = Boolean(chip?.hasMarket);
 
-    <span
-      className={`whitespace-nowrap text-[13px] font-extrabold ${
-        active ? "text-[#ed1d43]" : "text-[#26354b]"
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`relative flex h-[66px] ${
+        fluid ? "w-full" : "w-[64px] shrink-0"
+      } flex-col items-center justify-center rounded-xl border text-center transition active:scale-95 ${
+        active
+          ? "border-2 border-[#ed1d43] bg-[#fff0f2]"
+          : hasMarket
+            ? "border-transparent bg-[#e3e9f3] hover:bg-[#d9e2ef]"
+            : "border-dashed border-gray-300 bg-gray-100 opacity-60"
       }`}
     >
-      {chip.day} {chip.month}
-    </span>
+      {today && (
+        <span className="text-[10px] font-semibold text-[#ed1d43]">Today</span>
+      )}
 
-    <span
-      className={`text-[10px] ${active ? "text-[#ed1d43]" : "text-[#6b7280]"}`}
-    >
-      {chip.weekday}
-    </span>
+      <span
+        className={`whitespace-nowrap text-[13px] font-extrabold ${
+          active
+            ? "text-[#ed1d43]"
+            : hasMarket
+              ? "text-[#26354b]"
+              : "text-gray-500"
+        }`}
+      >
+        {chip.day} {chip.month}
+      </span>
 
-    <span
-      className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
-        active ? "bg-[#ed1d43]" : "bg-[#20a66a]"
-      }`}
-    />
-  </button>
-);
+      <span
+        className={`text-[10px] ${
+          active
+            ? "text-[#ed1d43]"
+            : hasMarket
+              ? "text-[#6b7280]"
+              : "text-gray-400"
+        }`}
+      >
+        {chip.weekday}
+      </span>
+
+      {hasMarket ? (
+        <span
+          className={`absolute bottom-1 h-1.5 w-1.5 rounded-full ${
+            active ? "bg-[#ed1d43]" : "bg-[#20a66a]"
+          }`}
+          title="Market Active"
+        />
+      ) : (
+        <span
+          className="absolute bottom-1 h-1 w-1 rounded-full bg-gray-400"
+          title="No Active Market"
+        />
+      )}
+    </button>
+  );
+};
 
 // =====================================================
 // HERO FEATURE

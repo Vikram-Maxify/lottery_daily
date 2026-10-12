@@ -269,9 +269,29 @@ const validateStatus = (status) => {
   };
 };
 
+// Promise chain used to serialize Daily market activation
+let activationQueue = Promise.resolve();
+
 // =====================================================
 // GET BET CLOSING TIME (1 hour before draw time)
 // =====================================================
+
+// drawDate is stored as IST midnight (= previous day 18:30 UTC), so the
+// real draw calendar day must be read in Asia/Kolkata, not via UTC.
+const getISTDateString = (date) => {
+  const d = new Date(date);
+
+  if (Number.isNaN(d.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+};
 
 const getBetClosingTime = (dateString, drawTime) => {
   const drawDateTime = new Date(`${dateString}T${drawTime}:00+05:30`);
@@ -282,6 +302,166 @@ const getBetClosingTime = (dateString, drawTime) => {
 
   // 1 hour before draw
   return new Date(drawDateTime.getTime() - 60 * 60 * 1000);
+};
+
+// =====================================================
+// HELPER: GET IST DAY RANGE (UTC start and end of IST day)
+// =====================================================
+const getISTDayRange = (dateString) => {
+  if (!dateString || typeof dateString !== "string") return null;
+  const parts = dateString.split("-").map(Number);
+  if (parts.length !== 3 || parts.some(isNaN)) return null;
+  const [year, month, day] = parts;
+  if (year < 2000 || month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  // Start: YYYY-MM-DD 00:00:00.000 IST -> UTC is (hour - 5, min - 30)
+  const startUtc = new Date(Date.UTC(year, month - 1, day, 0 - 5, 0 - 30, 0, 0));
+  // End: YYYY-MM-DD 23:59:59.999 IST
+  const endUtc = new Date(Date.UTC(year, month - 1, day, 23 - 5, 59 - 30, 59, 999));
+  return { startUtc, endUtc };
+};
+
+// =====================================================
+// VALIDATE DAILY LOTTERY FOR PURCHASE
+// Enforces:
+// 1. Market for exact draw date must exist in database
+// 2. Market must be active
+// 3. Market must still be open for purchases (closing time check)
+// =====================================================
+const validateDailyLotteryForPurchase = async ({ configId, drawDate }) => {
+  let targetConfig = null;
+
+  // 1. If explicit drawDate is requested, find the exact Daily market for that IST day
+  if (drawDate) {
+    const requestedDateStr = getISTDateString(drawDate);
+    if (!requestedDateStr) {
+      return {
+        valid: false,
+        status: 400,
+        message: "Invalid draw date format",
+      };
+    }
+
+    const range = getISTDayRange(requestedDateStr);
+    if (!range) {
+      return {
+        valid: false,
+        status: 400,
+        message: "Invalid draw date",
+      };
+    }
+
+    // Must find an existing Daily Lottery market for that exact calendar day
+    const marketForDate = await LotteryConfig.findOne({
+      drawDate: { $gte: range.startUtc, $lte: range.endUtc },
+    });
+
+    if (!marketForDate) {
+      return {
+        valid: false,
+        status: 404,
+        message: "Daily lottery market for the requested draw date does not exist",
+      };
+    }
+
+    if (!marketForDate.isActive) {
+      return {
+        valid: false,
+        status: 400,
+        message: "Daily lottery market for the requested draw date is not active",
+      };
+    }
+
+    // If configId was also provided, it must match this market exactly
+    if (configId && String(marketForDate._id) !== String(configId)) {
+      return {
+        valid: false,
+        status: 400,
+        message: "Requested draw date does not match the specified lottery configuration",
+      };
+    }
+
+    targetConfig = marketForDate;
+  } else if (configId) {
+    if (!mongoose.Types.ObjectId.isValid(configId)) {
+      return {
+        valid: false,
+        status: 400,
+        message: "Invalid lottery configuration ID",
+      };
+    }
+
+    targetConfig = await LotteryConfig.findById(configId);
+
+    if (!targetConfig) {
+      return {
+        valid: false,
+        status: 404,
+        message: "Daily lottery configuration not found",
+      };
+    }
+
+    if (!targetConfig.isActive) {
+      return {
+        valid: false,
+        status: 400,
+        message: "This lottery market is not active",
+      };
+    }
+  } else {
+    return {
+      valid: false,
+      status: 400,
+      message: "configId or drawDate is required for lottery purchase",
+    };
+  }
+
+  // 2. Validate draw date in targetConfig
+  const configDateStr = getISTDateString(targetConfig.drawDate);
+  if (!configDateStr) {
+    return {
+      valid: false,
+      status: 400,
+      message: "Invalid draw date in lottery configuration",
+    };
+  }
+
+  // 3. Validate draw time in targetConfig
+  if (
+    !targetConfig.drawTime ||
+    typeof targetConfig.drawTime !== "string" ||
+    !/^\d{2}:\d{2}$/.test(targetConfig.drawTime)
+  ) {
+    return {
+      valid: false,
+      status: 400,
+      message: "Invalid draw time in lottery configuration",
+    };
+  }
+
+  // 4. Closing Time Validation (Betting closes 1 hour before draw time)
+  const betClosingTime = getBetClosingTime(configDateStr, targetConfig.drawTime);
+  if (!betClosingTime) {
+    return {
+      valid: false,
+      status: 500,
+      message: "Unable to calculate lottery closing time",
+    };
+  }
+
+  const now = new Date();
+  if (now >= betClosingTime) {
+    return {
+      valid: false,
+      status: 400,
+      message: "Lottery ticket sale closed 1 hour before draw time",
+    };
+  }
+
+  return {
+    valid: true,
+    config: targetConfig,
+  };
 };
 
 // =====================================================
@@ -879,78 +1059,25 @@ const addUserLotteryEntry = async (req, res) => {
       });
     }
 
-    const config = await LotteryConfig.findById(configId);
+    const dailyCheck = await validateDailyLotteryForPurchase({
+      configId,
+      drawDate: req.body?.drawDate,
+    });
 
-    if (!config) {
-      return res.status(404).json({
+    if (!dailyCheck.valid) {
+      return res.status(dailyCheck.status || 400).json({
         success: false,
-        message: "Lottery configuration not found",
+        message: dailyCheck.message,
         configId,
       });
     }
 
-    if (!config.isActive) {
-      return res.status(400).json({
-        success: false,
-        message: "This lottery is not active",
-        configId: config._id,
-        marketName: config.marketName,
-      });
-    }
-
-    const getDBDateString = (date) => {
-      if (!date) {
-        return null;
-      }
-
-      const d = new Date(date);
-
-      if (Number.isNaN(d.getTime())) {
-        return null;
-      }
-
-      return d.toISOString().slice(0, 10);
-    };
-
-    const dateString = getDBDateString(config.drawDate);
-
-    if (!dateString) {
-      return res.status(500).json({
-        success: false,
-        message: "Invalid draw date in lottery configuration",
-        configId: config._id,
-      });
-    }
-
-    if (
-      !config.drawTime ||
-      typeof config.drawTime !== "string" ||
-      !/^\d{2}:\d{2}$/.test(config.drawTime)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid draw time in lottery configuration",
-        configId: config._id,
-        drawDate: dateString,
-        drawTime: config.drawTime,
-      });
-    }
-
-    // ✅ Bet closes 1 hour before draw time
-    const betClosingTime = getBetClosingTime(dateString, config.drawTime);
-
-    if (!betClosingTime) {
-      return res.status(500).json({
-        success: false,
-        message: "Unable to calculate lottery bet closing time",
-        configId: config._id,
-      });
-    }
-
+    const config = dailyCheck.config;
+    const dateString = getISTDateString(config.drawDate);
     const drawDateTime = new Date(
       `${dateString}T${config.drawTime}:00+05:30`
     );
-
+    const betClosingTime = getBetClosingTime(dateString, config.drawTime);
     const now = new Date();
 
     console.log("==============================================");
@@ -966,18 +1093,6 @@ const addUserLotteryEntry = async (req, res) => {
     console.log("TICKET AMOUNT   :", amountValidation.amount);
     console.log("NUMBER          :", numberValidation.number);
     console.log("==============================================");
-
-    if (now >= betClosingTime) {
-      return res.status(400).json({
-        success: false,
-        message: "Lottery ticket sale closed 1 hour before draw time",
-        configId: config._id,
-        marketName: config.marketName,
-        drawDate: dateString,
-        drawTime: config.drawTime,
-        betClosingTime: betClosingTime.toISOString(),
-      });
-    }
 
     if (!Array.isArray(config.users)) {
       config.users = [];
@@ -1295,74 +1410,25 @@ const addBulkUserLotteryEntries = async (req, res) => {
       });
     }
 
-    const config = await LotteryConfig.findById(configId);
+    const dailyCheck = await validateDailyLotteryForPurchase({
+      configId,
+      drawDate: req.body?.drawDate,
+    });
 
-    if (!config) {
-      return res.status(404).json({
+    if (!dailyCheck.valid) {
+      return res.status(dailyCheck.status || 400).json({
         success: false,
-        message: "Lottery configuration not found",
+        message: dailyCheck.message,
         configId,
       });
     }
 
-    if (!config.isActive) {
-      return res.status(400).json({
-        success: false,
-        message: "This lottery is not active",
-        configId: config._id,
-        marketName: config.marketName,
-      });
-    }
-
-    const getDBDateString = (date) => {
-      if (!date) return null;
-
-      const d = new Date(date);
-
-      if (Number.isNaN(d.getTime())) return null;
-
-      return d.toISOString().slice(0, 10);
-    };
-
-    const dateString = getDBDateString(config.drawDate);
-
-    if (!dateString) {
-      return res.status(500).json({
-        success: false,
-        message: "Invalid draw date in lottery configuration",
-        configId: config._id,
-      });
-    }
-
-    if (
-      !config.drawTime ||
-      typeof config.drawTime !== "string" ||
-      !/^\d{2}:\d{2}$/.test(config.drawTime)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid draw time in lottery configuration",
-        configId: config._id,
-        drawDate: dateString,
-        drawTime: config.drawTime,
-      });
-    }
-
-    // ✅ Bet closes 1 hour before draw time
-    const betClosingTime = getBetClosingTime(dateString, config.drawTime);
-
-    if (!betClosingTime) {
-      return res.status(500).json({
-        success: false,
-        message: "Unable to calculate lottery bet closing time",
-        configId: config._id,
-      });
-    }
-
+    const config = dailyCheck.config;
+    const dateString = getISTDateString(config.drawDate);
     const drawDateTime = new Date(
       `${dateString}T${config.drawTime}:00+05:30`
     );
-
+    const betClosingTime = getBetClosingTime(dateString, config.drawTime);
     const now = new Date();
 
     console.log("==============================================");
@@ -1377,18 +1443,6 @@ const addBulkUserLotteryEntries = async (req, res) => {
     console.log("TOTAL ENTRIES   :", normalizedEntries.length);
     console.log("NUMBERS         :", numbers.join(", "));
     console.log("==============================================");
-
-    if (now >= betClosingTime) {
-      return res.status(400).json({
-        success: false,
-        message: "Lottery ticket sale closed 1 hour before draw time",
-        configId: config._id,
-        marketName: config.marketName,
-        drawDate: dateString,
-        drawTime: config.drawTime,
-        betClosingTime: betClosingTime.toISOString(),
-      });
-    }
 
     if (!Array.isArray(config.users)) {
       config.users = [];
@@ -1733,15 +1787,14 @@ const getAllLotteryConfigs = async (req, res) => {
 
 const getActiveLotteryConfig = async (req, res) => {
   try {
-    const now = new Date();
+    const todayIST = getISTDateString(new Date());
+    const range = getISTDayRange(todayIST);
+    const filter = { isActive: true };
+    if (range && range.startUtc) {
+      filter.drawDate = { $gte: range.startUtc };
+    }
 
-    const configs = await LotteryConfig.find({
-      isActive: true,
-
-      drawDate: {
-        $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
-      },
-    })
+    const configs = await LotteryConfig.find(filter)
       .sort({ drawDate: 1 })
       .limit(1);
 
@@ -1756,11 +1809,41 @@ const getActiveLotteryConfig = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-
       data: config,
     });
   } catch (error) {
     console.error("Get active lottery config error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// =====================================================
+// GET ACTIVE LOTTERIES LIST (ALL ACTIVE FUTURE / TODAY)
+// =====================================================
+
+const getActiveLotteryConfigs = async (req, res) => {
+  try {
+    const todayIST = getISTDateString(new Date());
+    const range = getISTDayRange(todayIST);
+    const filter = { isActive: true };
+    if (range && range.startUtc) {
+      filter.drawDate = { $gte: range.startUtc };
+    }
+
+    const configs = await LotteryConfig.find(filter).sort({ drawDate: 1 });
+
+    return res.status(200).json({
+      success: true,
+      count: configs.length,
+      data: configs,
+    });
+  } catch (error) {
+    console.error("Get active lottery configs error:", error);
 
     return res.status(500).json({
       success: false,
@@ -1847,26 +1930,30 @@ const activateLotteryConfig = async (req, res) => {
       });
     }
 
-    await LotteryConfig.updateMany(
-      {
-        _id: { $ne: config._id },
-        isActive: true,
-      },
-      {
-        $set: { isActive: false },
-      }
-    );
+    // Serialize activations (single process) so concurrent requests cannot
+    // leave two markets active. Deactivate others first, then activate target.
+    const run = activationQueue.then(async () => {
+      await LotteryConfig.updateMany(
+        { _id: { $ne: config._id }, isActive: true },
+        { $set: { isActive: false } }
+      );
 
-    config.isActive = true;
+      return LotteryConfig.findByIdAndUpdate(
+        config._id,
+        { $set: { isActive: true } },
+        { new: true }
+      );
+    });
+    activationQueue = run.catch(() => {});
 
-    await config.save();
+    const activated = await run;
 
     return res.status(200).json({
       success: true,
 
       message: "Lottery configuration activated successfully",
 
-      data: config,
+      data: activated,
     });
   } catch (error) {
     console.error("Activate lottery config error:", error);
@@ -2603,6 +2690,8 @@ module.exports = {
   createLotteryConfig,
 
   addUserLotteryEntry,
+  getISTDateString,
+  getBetClosingTime,
 
   addBulkUserLotteryEntries,
 
@@ -2627,4 +2716,8 @@ module.exports = {
   updateLotteryConfig,
 
   getNumbersWithoutBets,
+
+  getISTDayRange,
+  validateDailyLotteryForPurchase,
+  getActiveLotteryConfigs,
 };

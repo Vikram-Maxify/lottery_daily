@@ -43,6 +43,7 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
   const startTime = new Date();
 
   const { start: refStart, end: refEnd } = getDayRange(referenceDate);
+  const { end: todayEnd } = getDayRange(new Date());
 
   console.log("==============================================");
   console.log("🕛 LOTTERY CRON JOB STARTED");
@@ -138,13 +139,25 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
         // NEXT DAY DATE CALCULATE KARO (normalized to midnight)
         // =====================================================
 
-        const nextDate = new Date(refLottery.drawDate);
+        // Target day is always (referenceDate + 1), NOT (template.drawDate + 1).
+        // Template may be a latest/future config; using its date caused
+        // markets to be generated further and further ahead on every run.
+        const nextDate = new Date(referenceDate);
         nextDate.setDate(nextDate.getDate() + 1);
         nextDate.setHours(0, 0, 0, 0); // 🔥 normalize — time hata do
 
         const { start: nextStart, end: nextEnd } = getDayRange(nextDate);
 
         const nextDateString = formatDateString(nextDate);
+
+        // Never create markets for future days — only up to today
+        if (nextStart > todayEnd) {
+          console.log(
+            `⏭️ SKIP: ${marketName} - ${nextDateString} (future date, not created in advance)`,
+          );
+          skippedCount++;
+          continue;
+        }
 
         // =====================================================
         // CHECK: NEXT DAY LOTTERY ALREADY EXIST?
@@ -203,6 +216,12 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
           isActive: true, // 🔥 next day lottery is always active by default
         });
 
+        // Only ONE Daily market may be active: the new current-day market wins
+        await LotteryConfig.updateMany(
+          { _id: { $ne: nextLottery._id }, isActive: true },
+          { $set: { isActive: false } },
+        );
+
         console.log(
           `✅ CREATED: ${marketName} - ${nextDateString} (id: ${nextLottery._id}, image: ${imageUrl ? "yes" : "no"})`,
         );
@@ -258,7 +277,10 @@ const startLotteryCron = () => {
   setTimeout(async () => {
     try {
       console.log("🔄 Initializing lottery check & banner repair...");
-      await createNextDayLotteries(new Date());
+      // Pass yesterday so the target day is TODAY (ensure today's market exists)
+      const yesterdayStart = new Date();
+      yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+      await createNextDayLotteries(yesterdayStart);
     } catch (err) {
       console.error("❌ Startup lottery check error:", err.message);
     }
