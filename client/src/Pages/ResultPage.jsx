@@ -1,31 +1,26 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import {
   Calendar,
-  CheckCircle2,
-  ChevronRight,
   Download,
   ExternalLink,
   Eye,
   FileImage,
-  Filter,
   PartyPopper,
   RefreshCw,
-  Search,
   ShieldCheck,
   Sparkles,
   Ticket,
   Trophy,
   X,
-  XCircle,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 
 import {
   getDailyResultImages,
   getFestivalResultImages,
   selectDailyResultImages,
-  selectFestivalResultImages,
   selectDailyResultImagesLoading,
+  selectFestivalResultImages,
   selectFestivalResultImagesLoading,
   selectResultImagesError,
 } from "../reducer/slice/resultImageSlice";
@@ -39,6 +34,25 @@ const BOTTOM_NAV_HEIGHT = 64;
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1605196560547-b2f7281b7355?auto=format&fit=crop&w=1400&q=80";
 
+// Local (IST) date in YYYY-MM-DD — toISOString() UTC deta hai, jo raat 12 se 5:30 AM tak galat din deta hai
+const getLocalDateStr = (d = new Date()) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+// Item ki date nikalo (YYYY-MM-DD). Festival ke liye field name yahan adjust karna ho to karo.
+const getItemDate = (item) => {
+  const raw = item?.festivalDate || item?.resultDate || item?.date;
+  if (!raw) return "";
+  const str = String(raw);
+  // ISO string ho to seedha first 10 chars (backend jo date store karta hai wahi)
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? "" : getLocalDateStr(d);
+};
+
 // ==========================================================
 // COMPONENT
 // ==========================================================
@@ -49,9 +63,12 @@ const ResultPage = () => {
   // Active view tab: "daily" | "festival"
   const [activeTab, setActiveTab] = useState("daily");
 
-  // Date filter for Daily results (empty = all, or YYYY-MM-DD)
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
-  const [selectedDate, setSelectedDate] = useState(""); // "" means all, or specific date
+  // Dono tabs ke liye alag date filter ("" = all, ya YYYY-MM-DD)
+  const todayStr = useMemo(() => getLocalDateStr(), []);
+  const [dailyDate, setDailyDate] = useState("");
+  const [festivalDate, setFestivalDate] = useState("");
+
+  const selectedDate = activeTab === "daily" ? dailyDate : festivalDate;
 
   // Fullscreen zoom modal image
   const [zoomImage, setZoomImage] = useState(null);
@@ -69,23 +86,39 @@ const ResultPage = () => {
     dispatch(getFestivalResultImages());
   }, [dispatch]);
 
-  // When date filter changes, fetch or filter daily results
+  // Date change handler (active tab ke hisaab se)
   const handleDateChange = (date) => {
-    setSelectedDate(date);
-    if (date) {
-      dispatch(getDailyResultImages({ date }));
+    if (activeTab === "daily") {
+      setDailyDate(date);
+      dispatch(getDailyResultImages(date ? { date } : {}));
     } else {
-      dispatch(getDailyResultImages());
+      setFestivalDate(date);
+      dispatch(getFestivalResultImages(date ? { date } : {}));
     }
   };
 
   const handleRefresh = () => {
     if (activeTab === "daily") {
-      dispatch(getDailyResultImages(selectedDate ? { date: selectedDate } : {}));
+      dispatch(getDailyResultImages(dailyDate ? { date: dailyDate } : {}));
     } else {
-      dispatch(getFestivalResultImages());
+      dispatch(
+        getFestivalResultImages(festivalDate ? { date: festivalDate } : {}),
+      );
     }
   };
+
+  // Client-side filter (backend date param ignore kare tab bhi sahi chalega)
+  const filteredDaily = useMemo(() => {
+    const list = Array.isArray(dailyImages) ? dailyImages : [];
+    if (!dailyDate) return list;
+    return list.filter((item) => getItemDate(item) === dailyDate);
+  }, [dailyImages, dailyDate]);
+
+  const filteredFestival = useMemo(() => {
+    const list = Array.isArray(festivalImages) ? festivalImages : [];
+    if (!festivalDate) return list;
+    return list.filter((item) => getItemDate(item) === festivalDate);
+  }, [festivalImages, festivalDate]);
 
   // Helper date formatter
   const formatDate = (value) => {
@@ -119,7 +152,7 @@ const ResultPage = () => {
   };
 
   const isLoading = activeTab === "daily" ? dailyLoading : festivalLoading;
-  const currentList = activeTab === "daily" ? dailyImages : festivalImages;
+  const currentList = activeTab === "daily" ? filteredDaily : filteredFestival;
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#eef3fa] text-[#173e70]">
@@ -148,10 +181,7 @@ const ResultPage = () => {
           <div className="relative flex items-center justify-between px-4 pb-14 pt-6">
             <div className="flex items-center gap-3">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-[#ffd34e] bg-white/10 shadow-[0_0_25px_rgba(255,209,90,0.25)]">
-                <Trophy
-                  className="h-8 w-8 text-[#ffd34e]"
-                  strokeWidth={1.8}
-                />
+                <Trophy className="h-8 w-8 text-[#ffd34e]" strokeWidth={1.8} />
               </div>
 
               <div className="min-w-0">
@@ -174,7 +204,10 @@ const ResultPage = () => {
               className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition active:scale-95 hover:bg-white/20 disabled:opacity-50"
               title="Refresh Results"
             >
-              <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+              <RefreshCw
+                size={16}
+                className={isLoading ? "animate-spin" : ""}
+              />
             </button>
           </div>
         </section>
@@ -192,7 +225,7 @@ const ResultPage = () => {
               }`}
             >
               <Ticket size={16} />
-              <span>Daily Results ({dailyImages.length})</span>
+              <span>Daily Results ({filteredDaily.length})</span>
             </button>
 
             <button
@@ -205,60 +238,60 @@ const ResultPage = () => {
               }`}
             >
               <PartyPopper size={16} />
-              <span>Festival Results ({festivalImages.length})</span>
+              <span>Festival Results ({filteredFestival.length})</span>
             </button>
           </div>
         </section>
 
-        {/* ================= DATE FILTER (FOR DAILY) ================= */}
-        {activeTab === "daily" && (
-          <section className="mt-3 px-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#e2e5f0] bg-white p-2.5 shadow-sm">
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => handleDateChange("")}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
-                    selectedDate === ""
-                      ? "bg-[#173e70] text-white"
-                      : "bg-[#eef3fa] text-[#6b7280] hover:text-[#173e70]"
-                  }`}
-                >
-                  All Dates
-                </button>
+        {/* ================= DATE FILTER (DAILY + FESTIVAL) ================= */}
+        <section className="mt-3 px-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#e2e5f0] bg-white p-2.5 shadow-sm">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => handleDateChange("")}
+                className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                  selectedDate === ""
+                    ? "bg-[#173e70] text-white"
+                    : "bg-[#eef3fa] text-[#6b7280] hover:text-[#173e70]"
+                }`}
+              >
+                All Dates
+              </button>
 
-                <button
-                  type="button"
-                  onClick={() => handleDateChange(todayStr)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
-                    selectedDate === todayStr
-                      ? "bg-[#173e70] text-white"
-                      : "bg-[#eef3fa] text-[#6b7280] hover:text-[#173e70]"
-                  }`}
-                >
-                  Today
-                </button>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <Calendar size={14} className="text-[#9A5B00]" />
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => handleDateChange(e.target.value)}
-                  className="rounded-lg border border-[#e2e5f0] bg-[#f9fbff] px-2 py-0.5 text-xs font-bold text-[#173e70] outline-none"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => handleDateChange(todayStr)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                  selectedDate === todayStr
+                    ? "bg-[#173e70] text-white"
+                    : "bg-[#eef3fa] text-[#6b7280] hover:text-[#173e70]"
+                }`}
+              >
+                Today
+              </button>
             </div>
-          </section>
-        )}
+
+            <div className="flex items-center gap-1.5">
+              <Calendar size={14} className="text-[#9A5B00]" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => handleDateChange(e.target.value)}
+                className="rounded-lg border border-[#e2e5f0] bg-[#f9fbff] px-2 py-0.5 text-xs font-bold text-[#173e70] outline-none"
+              />
+            </div>
+          </div>
+        </section>
 
         {/* ================= CONTENT LIST ================= */}
         <main className="mt-3 space-y-3 px-3">
           {/* Error Message */}
           {error && (
             <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-700 shadow-sm">
-              {typeof error === "string" ? error : "Failed to load result charts."}
+              {typeof error === "string"
+                ? error
+                : "Failed to load result charts."}
             </div>
           )}
 
@@ -283,13 +316,16 @@ const ResultPage = () => {
                   ? selectedDate
                     ? `No result charts published for ${formatDate(selectedDate)}`
                     : "No Daily Results Published Yet"
-                  : "No Festival Results Published Yet"}
+                  : selectedDate
+                    ? `No festival results published for ${formatDate(selectedDate)}`
+                    : "No Festival Results Published Yet"}
               </p>
               <p className="mt-1 max-w-[280px] text-xs leading-relaxed text-[#6b7280]">
-                Official draw result charts are updated as soon as the winning numbers are announced.
+                Official draw result charts are updated as soon as the winning
+                numbers are announced.
               </p>
 
-              {selectedDate && activeTab === "daily" && (
+              {selectedDate && (
                 <button
                   type="button"
                   onClick={() => handleDateChange("")}
@@ -302,7 +338,8 @@ const ResultPage = () => {
           ) : (
             /* Result Cards */
             currentList.map((item, index) => {
-              const displayImg = item.imageUrl || item.displayUrl || item.thumbUrl;
+              const displayImg =
+                item.imageUrl || item.displayUrl || item.thumbUrl;
 
               return (
                 <div
@@ -332,6 +369,12 @@ const ResultPage = () => {
                         {item.type === "FESTIVAL" && item.festivalName && (
                           <span className="text-xs font-bold text-purple-900">
                             {item.festivalName}
+                          </span>
+                        )}
+
+                        {item.type === "FESTIVAL" && getItemDate(item) && (
+                          <span className="text-[11px] font-bold text-[#6b7280]">
+                            • {formatDate(getItemDate(item))}
                           </span>
                         )}
                       </div>
@@ -382,7 +425,12 @@ const ResultPage = () => {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => handleDownload(displayImg, item.title || item.festivalName)}
+                        onClick={() =>
+                          handleDownload(
+                            displayImg,
+                            item.title || item.festivalName,
+                          )
+                        }
                         className="inline-flex items-center gap-1 font-bold text-[#173e70] hover:text-[#0c2444]"
                       >
                         <Download size={13} />
@@ -436,7 +484,10 @@ const ResultPage = () => {
             <div className="flex items-center justify-between border-b border-gray-100 bg-[#FFFDF7] px-4 py-3">
               <div className="min-w-0 pr-2">
                 <h3 className="truncate text-sm font-black text-[#173e70]">
-                  {zoomImage.title || (zoomImage.type === "DAILY" ? "Daily Result Chart" : zoomImage.festivalName || "Festival Result")}
+                  {zoomImage.title ||
+                    (zoomImage.type === "DAILY"
+                      ? "Daily Result Chart"
+                      : zoomImage.festivalName || "Festival Result")}
                 </h3>
                 <p className="text-[11px] text-[#6b7280]">
                   {zoomImage.type === "DAILY"
@@ -451,7 +502,7 @@ const ResultPage = () => {
                   onClick={() =>
                     handleDownload(
                       zoomImage.imageUrl || zoomImage.displayUrl,
-                      zoomImage.title || zoomImage.festivalName
+                      zoomImage.title || zoomImage.festivalName,
                     )
                   }
                   className="flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 text-[#173e70] hover:bg-gray-100"

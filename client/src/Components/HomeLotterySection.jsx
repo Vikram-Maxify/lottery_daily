@@ -11,7 +11,6 @@ import {
   Sparkles,
   Target,
   Ticket,
-  Trophy,
   User,
   Users,
   Zap,
@@ -48,10 +47,12 @@ import {
   selectActiveTopWinners,
 } from "../reducer/slice/topWinnerSlice";
 
+import {
+  formatPrize,
+  getFestivalWinningRules,
+} from "../utils/lotteryPrizeRules";
 import QuickVerifyTicket from "./QuickVerifyTicket";
 import TopWinnersToast from "./TopWinnersToast";
-import LotteryVideoPlayer from "./LotteryVideoPlayer";
-import { getFestivalWinningRules, formatPrize } from "../utils/lotteryPrizeRules";
 
 // =====================================================
 // HELPERS
@@ -399,7 +400,10 @@ const HomeLotterySection = () => {
   }, [activeConfig?.prizes]);
 
   const festivalRules = useMemo(() => {
-    if (festivalConfig?.prizes && Object.keys(festivalConfig.prizes).length > 0) {
+    if (
+      festivalConfig?.prizes &&
+      Object.keys(festivalConfig.prizes).length > 0
+    ) {
       return getFestivalWinningRules(festivalConfig.prizes, "10B3123", 10);
     }
     return FESTIVAL_RULES;
@@ -597,16 +601,9 @@ const HomeLotterySection = () => {
         </section>
 
         {/* =====================================================
-            DAILY / LUCKY NUMBERS SECTION
-        ====================================================== */}
-        {/* <section className="px-2.5 pt-1">
-          <DailyNumbersSection mode="home" />
-        </section> */}
-
-        {/* =====================================================
             VIDEO TUTORIAL PLAYER
         ====================================================== */}
-        <LotteryVideoPlayer containerClassName="px-2.5 pt-3" />
+        {/* <LotteryVideoPlayer containerClassName="px-2.5 pt-3" /> */}
 
         {/* =====================================================
             WINNING RULES
@@ -692,7 +689,10 @@ const HomeLotterySection = () => {
                 </div>
 
                 {activeRules.map((rule) => (
-                  <RuleRow key={`${rulesTab}-${rule.n || rule.number}`} {...rule} />
+                  <RuleRow
+                    key={`${rulesTab}-${rule.n || rule.number}`}
+                    {...rule}
+                  />
                 ))}
               </div>
             </div>

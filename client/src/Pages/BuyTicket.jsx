@@ -14,7 +14,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import DailyNumbersSection from "../Components/DailyNumbersSection";
-import LotteryVideoPlayer from "../Components/LotteryVideoPlayer";
 import NumberSoldNotification from "../Components/NumberSoldNotification";
 import QuickVerifyTicket from "../Components/QuickVerifyTicket";
 import {
@@ -38,8 +37,8 @@ import {
   clearLotteryConfigSuccess,
   getActiveLotteryConfig,
   getAllLotteryConfigs,
-  selectLotteryConfigs,
   selectActiveLotteryConfig,
+  selectLotteryConfigs,
 } from "../reducer/slice/lotteryConfigSlice";
 
 import {
@@ -584,7 +583,7 @@ const BuyTicket = () => {
   }, [isFestivalMode, allFestivalConfigs, activeFestivalConfig, searchParams]);
 
   const displayLottery = isFestivalMode
-    ? (selectedFestivalLottery || activeFestivalConfig)
+    ? selectedFestivalLottery || activeFestivalConfig
     : lotteryConfig;
 
   const currentLotteryType = isFestivalMode ? "festival" : "daily";
@@ -1729,7 +1728,7 @@ const BuyTicket = () => {
         {/* =================================================
             HOW TO PLAY VIDEO TUTORIAL
         ================================================= */}
-        <LotteryVideoPlayer />
+        {/* <LotteryVideoPlayer /> */}
 
         {/* =================================================
             WINNING RULES

@@ -1,12 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import {
-  Trophy,
-  Crown,
-  Clock,
-  Sparkles,
-  ChevronRight,
-  ChevronLeft,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Crown, Trophy } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 const DURATION_MS = 4000; // 4 seconds per winner
 
@@ -199,7 +192,7 @@ const TopWinnersToast = ({ winners = [] }) => {
 
             {/* Right Badge / Trophy */}
             <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl border border-[#ffd34e]/30 bg-gradient-to-br from-[#ffd34e]/20 to-white/5 text-[#ffd34e] shadow-sm">
-              <Trophy size={18} fill="#ffd34e" />
+              <Trophy size={18} />
               <span className="mt-0.5 text-[7.5px] font-black tracking-tighter text-[#ffd34e]">
                 JACKPOT
               </span>
