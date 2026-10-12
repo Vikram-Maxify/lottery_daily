@@ -9,7 +9,6 @@ import {
   Gift,
   HandCoins,
   Headphones,
-  History,
   Loader2,
   Lock,
   LogOut,
@@ -549,14 +548,6 @@ const ProfilePage = () => {
                     ? `${myWithdrawals.length} Requests`
                     : null
                 }
-              />
-
-              <MenuRowLight
-                icon={<History size={19} className="text-[#0284C7]" />}
-                iconBg="bg-sky-50"
-                title="Deposit History"
-                subtitle="All deposit slips and bank transfers"
-                onClick={() => navigate("/deposit")}
               />
 
               <MenuRowLight
