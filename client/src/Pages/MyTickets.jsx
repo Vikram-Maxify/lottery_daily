@@ -187,7 +187,7 @@ const MyTickets = () => {
 
   const rawTickets = useMemo(() => {
     const entries = Array.isArray(myEntries) ? myEntries : [];
-    return entries.map((item, index) => {
+    return entries.flatMap((item, index) => {
       const entry = item?.entry || item;
       const lotteryType = String(
         item?.lotteryType || (item?.isFestival ? "festival" : "daily"),
@@ -221,10 +221,10 @@ const MyTickets = () => {
       const ticketNumbers = rawNumbers
         .map((n) => String(n).trim())
         .filter(Boolean);
-      const primaryNumber = String(ticketNumbers[0] || "").trim();
+
       const status = normalizeStatus(entry?.status ?? item?.status);
 
-      const id =
+      const baseId =
         item?.orderId ||
         item?.entryId ||
         entry?._id ||
@@ -239,7 +239,7 @@ const MyTickets = () => {
       const prizes = item?.prizes || entry?.prizes || {};
       const purchaseDate = formatDate(entry?.createdAt ?? item?.createdAt);
       const purchaseTime = formatTime(entry?.createdAt ?? item?.createdAt);
-      const amount = Number(entry?.amount ?? item?.amount ?? item?.price ?? 0);
+      const totalAmount = Number(entry?.amount ?? item?.amount ?? item?.price ?? 0);
 
       const paymentStatusCode =
         item?.paymentStatusCode ??
@@ -250,32 +250,43 @@ const MyTickets = () => {
         item?.paymentStatus === "Success" ||
         paymentStatusCode === 1;
 
-      return {
-        id,
-        orderId: item?.orderId || null,
-        lotteryType,
-        lotteryTypeLabel,
-        isFestival,
-        marketName,
-        ticketNumbers,
-        primaryNumber,
-        digits: primaryNumber ? primaryNumber.split("") : [],
-        ticketCount: ticketNumbers.length || 1,
-        status,
-        paymentStatusCode,
-        isSuccessful,
-        drawDate,
-        drawTime,
-        price: formatAmount(amount),
-        rawAmount: amount,
-        purchaseDate,
-        purchaseTime,
-        prizes: {
-          first: Number(prizes?.first) || 0,
-          second: Number(prizes?.second) || 0,
-          third: Number(prizes?.third) || 0,
-        },
-      };
+      // If multiple ticket numbers are bundled into one purchase entry,
+      // expand each ticket number into its own individual card
+      const effectiveNumbers = ticketNumbers.length > 0 ? ticketNumbers : [""];
+      const perTicketAmount =
+        effectiveNumbers.length > 1
+          ? Number((totalAmount / effectiveNumbers.length).toFixed(2))
+          : totalAmount;
+
+      return effectiveNumbers.map((numStr, tIdx) => {
+        const id = effectiveNumbers.length > 1 ? `${baseId}_${numStr}_${tIdx}` : baseId;
+        return {
+          id,
+          orderId: item?.orderId || null,
+          lotteryType,
+          lotteryTypeLabel,
+          isFestival,
+          marketName,
+          ticketNumbers: [numStr],
+          primaryNumber: numStr,
+          digits: numStr ? numStr.split("") : [],
+          ticketCount: item?.quantity || item?.ticketCount || 10,
+          status,
+          paymentStatusCode,
+          isSuccessful,
+          drawDate,
+          drawTime,
+          price: formatAmount(perTicketAmount),
+          rawAmount: perTicketAmount,
+          purchaseDate,
+          purchaseTime,
+          prizes: {
+            first: Number(prizes?.first) || 0,
+            second: Number(prizes?.second) || 0,
+            third: Number(prizes?.third) || 0,
+          },
+        };
+      });
     });
   }, [myEntries]);
 

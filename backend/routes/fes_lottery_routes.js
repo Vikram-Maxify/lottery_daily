@@ -11,6 +11,7 @@ const {
   getActiveLotteryConfig,
   getLotteryConfigById,
   activateLotteryConfig,
+  deactivateLotteryConfig,
   updateEntryStatus,
   deleteLotteryConfig,
   addBulkUserLotteryEntries,
@@ -131,6 +132,20 @@ router.patch(
   authMiddleware,
   adminMiddleware,
   activateLotteryConfig
+);
+
+router.put(
+  "/:id/deactivate",
+  authMiddleware,
+  adminMiddleware,
+  deactivateLotteryConfig
+);
+
+router.patch(
+  "/:id/deactivate",
+  authMiddleware,
+  adminMiddleware,
+  deactivateLotteryConfig
 );
 
 

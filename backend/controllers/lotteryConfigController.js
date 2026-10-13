@@ -734,8 +734,7 @@ const createLotteryConfig = async (req, res) => {
     if (existingLottery) {
       return res.status(409).json({
         success: false,
-        message:
-          "Is market ki selected date ka lottery ticket already exist karta hai",
+        message: "A lottery already exists for this market and draw date.",
         data: existingLottery,
       });
     }
@@ -769,7 +768,7 @@ const createLotteryConfig = async (req, res) => {
 
       return res.status(500).json({
         success: false,
-        message: "Failed to upload market image",
+        message: `Failed to upload market image. ${uploadError.message}`,
         error: uploadError.message,
       });
     }
@@ -828,8 +827,7 @@ const createLotteryConfig = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message:
-          "Is market ki selected date ka lottery ticket already exist karta hai",
+        message: "A lottery already exists for this market and draw date.",
       });
     }
 
@@ -1767,62 +1765,73 @@ const getMyLotteryEntries = async (req, res) => {
         }
       });
 
-      // Determine ticket draw outcome (Confirmed / Won / Lost)
-      let ticketStatus = "confirmed";
-      if (config && Array.isArray(config.users)) {
-        const depUserId = String(dep.userId);
-        const matched = config.users.filter(
-          (u) =>
-            (uniqueIdentifiers.includes(String(u.userId)) ||
-              String(u.userId) === depUserId) &&
-            ticketNumbers.includes(String(u.number))
-        );
-        if (matched.some((e) => e.status === "win" || e.status === "won")) {
-          ticketStatus = "won";
-        } else if (
-          matched.length > 0 &&
-          matched.every((e) => e.status === "lost")
-        ) {
-          ticketStatus = "lost";
-        } else {
-          ticketStatus = "confirmed";
+      const singleAmount = Number(
+        (Number(dep.amount) / (ticketNumbers.length || 1)).toFixed(2)
+      );
+
+      for (let tIdx = 0; tIdx < ticketNumbers.length; tIdx++) {
+        const ticketNum = ticketNumbers[tIdx];
+
+        // Determine ticket draw outcome specifically for this ticketNum
+        let ticketStatus = "confirmed";
+        if (config && Array.isArray(config.users)) {
+          const depUserId = String(dep.userId);
+          const matched = config.users.filter(
+            (u) =>
+              (uniqueIdentifiers.includes(String(u.userId)) ||
+                String(u.userId) === depUserId) &&
+              String(u.number) === ticketNum
+          );
+          if (matched.some((e) => e.status === "win" || e.status === "won")) {
+            ticketStatus = "won";
+          } else if (
+            matched.length > 0 &&
+            matched.every((e) => e.status === "lost")
+          ) {
+            ticketStatus = "lost";
+          } else {
+            ticketStatus = "confirmed";
+          }
         }
+
+        const marketName =
+          dep.marketName ||
+          config?.marketName ||
+          (isFestival ? "Festival Lottery" : "Daily Lottery");
+
+        const drawDate = config?.drawDate || dep.createdAt;
+        const drawTime = config?.drawTime || "18:30";
+
+        entries.push({
+          _id: `${dep._id}_${tIdx}`,
+          depositId: dep._id,
+          entryId: dep.entryId || dep._id,
+          orderId: dep.orderId || null,
+          configId: dep.configId || null,
+          lotteryType: isFestival ? "festival" : "daily",
+          lotteryTypeLabel: isFestival ? "Festival Lottery" : "Daily Lottery",
+          marketName,
+          imageUrl: config?.imageUrl || "",
+          month: config?.month,
+          year: config?.year,
+          drawDate,
+          drawTime,
+          ticketNumbers: [ticketNum],
+          number: ticketNum,
+          ticketIndex: tIdx + 1,
+          ticketCount: 10,
+          quantity: 10,
+          amount: singleAmount,
+          price: singleAmount,
+          status: ticketStatus,
+          paymentStatus: "Success",
+          paymentStatusCode: 1,
+          isSuccessful: true,
+          prizes: config?.prizes || {},
+          isActive: Boolean(config?.isActive),
+          createdAt: dep.createdAt,
+        });
       }
-
-      const marketName =
-        dep.marketName ||
-        config?.marketName ||
-        (isFestival ? "Festival Lottery" : "Daily Lottery");
-
-      const drawDate = config?.drawDate || dep.createdAt;
-      const drawTime = config?.drawTime || "18:30";
-
-      entries.push({
-        _id: dep._id,
-        entryId: dep.entryId || dep._id,
-        orderId: dep.orderId || null,
-        configId: dep.configId || null,
-        lotteryType: isFestival ? "festival" : "daily",
-        lotteryTypeLabel: isFestival ? "Festival Lottery" : "Daily Lottery",
-        marketName,
-        imageUrl: config?.imageUrl || "",
-        month: config?.month,
-        year: config?.year,
-        drawDate,
-        drawTime,
-        ticketNumbers,
-        number: ticketNumbers[0] || "",
-        ticketCount: ticketNumbers.length,
-        amount: Number(dep.amount) || 0,
-        price: Number(dep.amount) || 0,
-        status: ticketStatus,
-        paymentStatus: "Success",
-        paymentStatusCode: 1,
-        isSuccessful: true,
-        prizes: config?.prizes || {},
-        isActive: Boolean(config?.isActive),
-        createdAt: dep.createdAt,
-      });
     }
 
     // 4. Also include direct entries from Daily Lottery Configs not already covered
@@ -2457,18 +2466,32 @@ const updateLotteryConfig = async (req, res) => {
 
     let updatedDrawDate = config.drawDate;
     let updatedDateString = formatDateString(config.drawDate);
+    let isDateModified = false;
 
     if (drawDate !== undefined && drawDate !== null && drawDate !== "") {
-      const dateValidation = validateDrawDate(drawDate);
+      const incomingDateStr = String(drawDate).trim().slice(0, 10);
+      const existingIsoDateStr = config.drawDate
+        ? new Date(config.drawDate).toISOString().slice(0, 10)
+        : "";
+      const existingLocalDateStr = formatDateString(config.drawDate);
 
-      if (!dateValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: dateValidation.message,
-        });
+      // Only validate and update if the draw date actually changed
+      if (
+        incomingDateStr !== existingIsoDateStr &&
+        incomingDateStr !== existingLocalDateStr
+      ) {
+        const dateValidation = validateDrawDate(drawDate);
+
+        if (!dateValidation.valid) {
+          return res.status(400).json({
+            success: false,
+            message: dateValidation.message,
+          });
+        }
+        updatedDrawDate = dateValidation.date;
+        updatedDateString = dateValidation.dateString;
+        isDateModified = true;
       }
-      updatedDrawDate = dateValidation.date;
-      updatedDateString = dateValidation.dateString;
     }
 
     // ================================================
@@ -2490,128 +2513,138 @@ const updateLotteryConfig = async (req, res) => {
     }
 
     // ================================================
-    // PRIZES VALIDATION (optional, but if provided must be complete)
+    // PRIZES VALIDATION & MERGING (Partial updates supported)
     // ================================================
 
-    let updatedPrizes = {
-      first: config.prizes?.first || 0,
-      second: config.prizes?.second || 0,
-      third: config.prizes?.third || 0,
-      fourth: config.prizes?.fourth || 0,
-      fifth: config.prizes?.fifth || 0,
+    const prizeKeys = ["first", "second", "third", "fourth", "fifth"];
+
+    const existingPrizesRaw = config.prizes
+      ? (typeof config.prizes.toObject === "function"
+          ? config.prizes.toObject()
+          : config.prizes)
+      : {};
+
+    const existingPrizes = {
+      first: existingPrizesRaw.first,
+      second: existingPrizesRaw.second,
+      third: existingPrizesRaw.third,
+      fourth: existingPrizesRaw.fourth,
+      fifth: existingPrizesRaw.fifth,
     };
 
+    const validatedIncomingPrizes = {};
+
     if (parsedPrizes !== undefined && parsedPrizes !== null) {
-      if (typeof parsedPrizes !== "object") {
+      if (
+        typeof parsedPrizes !== "object" ||
+        Array.isArray(parsedPrizes)
+      ) {
         return res.status(400).json({
           success: false,
           message: "Prize amounts must be a valid object",
         });
       }
 
+      for (const key of prizeKeys) {
+        if (parsedPrizes[key] !== undefined && parsedPrizes[key] !== null) {
+          if (parsedPrizes[key] === "") {
+            return res.status(400).json({
+              success: false,
+              message: `Valid ${key} prize amount is required`,
+            });
+          }
+
+          const numVal = Number(parsedPrizes[key]);
+          if (!Number.isFinite(numVal) || numVal < 0) {
+            return res.status(400).json({
+              success: false,
+              message: `Valid ${key} prize amount is required`,
+            });
+          }
+
+          validatedIncomingPrizes[key] = numVal;
+        }
+      }
+    }
+
+    // Merge incoming changes over existing prize values
+    const updatedPrizes = {
+      first:
+        validatedIncomingPrizes.first !== undefined
+          ? validatedIncomingPrizes.first
+          : existingPrizes.first,
+      second:
+        validatedIncomingPrizes.second !== undefined
+          ? validatedIncomingPrizes.second
+          : existingPrizes.second,
+      third:
+        validatedIncomingPrizes.third !== undefined
+          ? validatedIncomingPrizes.third
+          : existingPrizes.third,
+      fourth:
+        validatedIncomingPrizes.fourth !== undefined
+          ? validatedIncomingPrizes.fourth
+          : existingPrizes.fourth,
+      fifth:
+        validatedIncomingPrizes.fifth !== undefined
+          ? validatedIncomingPrizes.fifth
+          : existingPrizes.fifth,
+    };
+
+    // Ensure all prizes conform to schema and business rules
+    // For Daily Lottery: first, second, third are required (min: 0); fourth and fifth default to 0
+    for (const key of prizeKeys) {
+      const val = updatedPrizes[key];
       if (
-        parsedPrizes.first === undefined ||
-        parsedPrizes.first === null ||
-        parsedPrizes.first === ""
+        val === undefined ||
+        val === null ||
+        !Number.isFinite(Number(val)) ||
+        Number(val) < 0
       ) {
-        return res.status(400).json({
-          success: false,
-          message: "First prize is required",
-        });
+        if (key === "fourth" || key === "fifth") {
+          updatedPrizes[key] = 0;
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: `Valid ${key} prize amount is required`,
+          });
+        }
+      } else {
+        updatedPrizes[key] = Number(val);
       }
-
-      if (
-        parsedPrizes.second === undefined ||
-        parsedPrizes.second === null ||
-        parsedPrizes.second === ""
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Second prize is required",
-        });
-      }
-
-      if (
-        parsedPrizes.third === undefined ||
-        parsedPrizes.third === null ||
-        parsedPrizes.third === ""
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Third prize is required",
-        });
-      }
-
-      const firstPrize = Number(parsedPrizes.first);
-      const secondPrize = Number(parsedPrizes.second);
-      const thirdPrize = Number(parsedPrizes.third);
-      const fourthPrize =
-        parsedPrizes.fourth !== undefined
-          ? Number(parsedPrizes.fourth)
-          : config.prizes?.fourth || 0;
-      const fifthPrize =
-        parsedPrizes.fifth !== undefined
-          ? Number(parsedPrizes.fifth)
-          : config.prizes?.fifth || 0;
-
-      if (!Number.isFinite(firstPrize) || firstPrize < 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Valid first prize amount is required",
-        });
-      }
-
-      if (!Number.isFinite(secondPrize) || secondPrize < 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Valid second prize amount is required",
-        });
-      }
-
-      if (!Number.isFinite(thirdPrize) || thirdPrize < 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Valid third prize amount is required",
-        });
-      }
-
-      updatedPrizes = {
-        first: firstPrize,
-        second: secondPrize,
-        third: thirdPrize,
-        fourth:
-          Number.isFinite(fourthPrize) && fourthPrize >= 0 ? fourthPrize : 0,
-        fifth: Number.isFinite(fifthPrize) && fifthPrize >= 0 ? fifthPrize : 0,
-      };
     }
 
     // ================================================
     // CHECK DUPLICATE
-    // (same marketName + same drawDate, excluding self)
+    // Only check if drawDate or marketName was actually modified
     // ================================================
 
-    const startOfDay = new Date(updatedDrawDate);
-    startOfDay.setHours(0, 0, 0, 0);
+    const isMarketModified =
+      cleanMarketName.toLowerCase() !== (config.marketName || "").toLowerCase();
 
-    const endOfDay = new Date(updatedDrawDate);
-    endOfDay.setHours(23, 59, 59, 999);
+    if (isDateModified || isMarketModified) {
+      const startOfDay = new Date(updatedDrawDate);
+      startOfDay.setHours(0, 0, 0, 0);
 
-    const existingLottery = await LotteryConfig.findOne({
-      _id: { $ne: config._id },
-      marketName: cleanMarketName,
-      drawDate: {
-        $gte: startOfDay,
-        $lte: endOfDay,
-      },
-    });
+      const endOfDay = new Date(updatedDrawDate);
+      endOfDay.setHours(23, 59, 59, 999);
 
-    if (existingLottery) {
-      return res.status(409).json({
-        success: false,
-        message:
-          "Is market ki selected date ka lottery ticket already exist karta hai",
-        data: existingLottery,
+      const existingLottery = await LotteryConfig.findOne({
+        _id: { $ne: new mongoose.Types.ObjectId(id) },
+        marketName: cleanMarketName,
+        drawDate: {
+          $gte: startOfDay,
+          $lte: endOfDay,
+        },
       });
+
+      if (existingLottery) {
+        return res.status(409).json({
+          success: false,
+          message: "A lottery already exists for this market and draw date.",
+          data: existingLottery,
+        });
+      }
     }
 
     // ================================================
@@ -2653,10 +2686,16 @@ const updateLotteryConfig = async (req, res) => {
 
         return res.status(500).json({
           success: false,
-          message: "Failed to upload market image",
+          message: `Failed to upload market image. ${uploadError.message}`,
           error: uploadError.message,
         });
       }
+    } else if (
+      req.body.imageUrl !== undefined &&
+      typeof req.body.imageUrl === "string" &&
+      req.body.imageUrl.trim()
+    ) {
+      imageUrl = req.body.imageUrl.trim();
     } else if (!imageUrl) {
       // If this config currently has no image, inherit from previous config of same market
       const prevWithImg = await LotteryConfig.findOne({
@@ -2680,6 +2719,12 @@ const updateLotteryConfig = async (req, res) => {
     config.drawDate = updatedDrawDate;
     config.drawTime = updatedDrawTime;
     config.prizes = updatedPrizes;
+    config.markModified("prizes");
+
+    if (req.body.isActive !== undefined) {
+      config.isActive =
+        req.body.isActive === true || req.body.isActive === "true";
+    }
 
     await config.save();
 
@@ -2698,8 +2743,14 @@ const updateLotteryConfig = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message:
-          "Is market ki selected date ka lottery ticket already exist karta hai",
+        message: "A lottery already exists for this market and draw date.",
+      });
+    }
+
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
       });
     }
 

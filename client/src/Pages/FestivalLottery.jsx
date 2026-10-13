@@ -198,12 +198,12 @@ const FestivalLottery = () => {
   const [searchParams] = useSearchParams();
   const [showQuick, setShowQuick] = useState(true);
   const [quantity, setQuantityState] = useState(MIN_TICKETS);
-  const [draft, setDraft] = useState(() => {
+  const [ticketCodes, setTicketCodes] = useState(() => {
     const urlNum = new URLSearchParams(window.location.search).get("number");
     if (urlNum && TICKET_REGEX.test(urlNum.toUpperCase())) {
-      return urlNum.toUpperCase();
+      return [urlNum.toUpperCase()];
     }
-    return "";
+    return [""];
   });
   const [manualError, setManualError] = useState("");
   const [localSuccess, setLocalSuccess] = useState("");
@@ -213,7 +213,7 @@ const FestivalLottery = () => {
   // ✅ Purchase se pehle availability check chal raha hai
   const [isChecking, setIsChecking] = useState(false);
 
-  const draftRefs = useRef([]);
+  const draftRefs = useRef({});
   const tabsScrollRef = useRef(null);
   const tabRefs = useRef({});
 
@@ -350,7 +350,7 @@ const FestivalLottery = () => {
     }
     if (festivalKey && prevFestivalKeyRef.current !== festivalKey) {
       setQuantityState(MIN_TICKETS);
-      setDraft("");
+      setTicketCodes([""]);
       setManualError("");
       setLocalSuccess("");
       setSoldNumbers([]);
@@ -383,7 +383,11 @@ const FestivalLottery = () => {
   useEffect(() => {
     const numParam = searchParams.get("number");
     if (numParam && TICKET_REGEX.test(numParam.toUpperCase())) {
-      setDraft(numParam.toUpperCase());
+      setTicketCodes((prev) => {
+        const next = [...prev];
+        next[0] = numParam.toUpperCase();
+        return next;
+      });
     }
   }, [searchParams]);
 
@@ -453,41 +457,55 @@ const FestivalLottery = () => {
   // =====================================================
   // HANDLERS — TICKET SELECTION
   // =====================================================
-  const setQuantity = (next) => {
+  const updateQuantity = (next) => {
     if (depositLoading || isChecking) return;
 
     // Hamesha 10 ke step me, minimum 10, maximum 100
     const stepped = Math.round(Number(next) / TICKET_STEP) * TICKET_STEP;
-    setQuantityState(Math.min(Math.max(stepped, MIN_TICKETS), MAX_TICKETS));
+    const clamped = Math.min(Math.max(stepped, MIN_TICKETS), MAX_TICKETS);
+    setQuantityState(clamped);
+    const targetCount = Math.max(1, Math.floor(clamped / 10));
+    setTicketCodes((prev) => {
+      const nextCodes = [...prev];
+      if (nextCodes.length < targetCount) {
+        while (nextCodes.length < targetCount) nextCodes.push("");
+      } else if (nextCodes.length > targetCount) {
+        nextCodes.length = targetCount;
+      }
+      return nextCodes;
+    });
     setManualError("");
     setLocalSuccess("");
   };
 
+  const setQuantity = updateQuantity;
+
   const handleIncrease = () =>
-    setQuantity((Math.floor(quantity / TICKET_STEP) + 1) * TICKET_STEP);
+    updateQuantity((Math.floor(quantity / TICKET_STEP) + 1) * TICKET_STEP);
 
   const handleDecrease = () =>
-    setQuantity((Math.ceil(quantity / TICKET_STEP) - 1) * TICKET_STEP);
+    updateQuantity((Math.ceil(quantity / TICKET_STEP) - 1) * TICKET_STEP);
 
-  const focusDraft = (index) => {
-    const el = draftRefs.current[index];
+  const focusDraft = (tIndex, slotIndex) => {
+    const el = draftRefs.current[`${tIndex}_${slotIndex}`];
     if (el) {
       el.focus();
       if (el.select) el.select();
     }
   };
 
-  const updateDraft = (code) => {
-    setDraft(code);
-    setManualError("");
-    setLocalSuccess("");
-  };
-
-  const handleDraftChange = (index, e) => {
-    if (depositLoading) return;
+  const handleDraftChange = (tIndex, slotIndex, e) => {
+    if (depositLoading || isChecking) return;
     const raw = e.target.value;
     if (raw === "") {
-      updateDraft(draft.slice(0, index));
+      setTicketCodes((prev) => {
+        const next = [...prev];
+        const cur = next[tIndex] || "";
+        next[tIndex] = cur.slice(0, slotIndex);
+        return next;
+      });
+      setManualError("");
+      setLocalSuccess("");
       return;
     }
     const ch = raw
@@ -495,80 +513,205 @@ const FestivalLottery = () => {
       .replace(/[^0-9A-Z]/g, "")
       .slice(-1);
     if (!ch) return;
-    const pos = Math.min(index, draft.length);
+    const cur = ticketCodes[tIndex] || "";
+    const pos = Math.min(slotIndex, cur.length);
     if (!slotAccepts(pos, ch)) return;
-    const next = draft.slice(0, pos) + ch + draft.slice(pos + 1);
-    updateDraft(next);
-    if (pos < TICKET_LENGTH - 1) focusDraft(pos + 1);
+    const next = (cur.slice(0, pos) + ch + cur.slice(pos + 1)).slice(
+      0,
+      TICKET_LENGTH,
+    );
+    setTicketCodes((prev) => {
+      const nextCodes = [...prev];
+      nextCodes[tIndex] = next;
+      return nextCodes;
+    });
+    setManualError("");
+    setLocalSuccess("");
+    if (pos < TICKET_LENGTH - 1) focusDraft(tIndex, pos + 1);
   };
 
-  const handleDraftKeyDown = (index, e) => {
+  const handleDraftKeyDown = (tIndex, slotIndex, e) => {
+    const cur = ticketCodes[tIndex] || "";
     if (e.key === "Enter") {
       e.preventDefault();
       return;
     }
-    if (e.key === "Backspace" && !draft[index]) {
+    if (e.key === "Backspace" && !cur[slotIndex]) {
       e.preventDefault();
-      if (index > 0) {
-        updateDraft(draft.slice(0, index - 1));
-        focusDraft(index - 1);
+      if (slotIndex > 0) {
+        setTicketCodes((prev) => {
+          const next = [...prev];
+          const c = next[tIndex] || "";
+          next[tIndex] = c.slice(0, slotIndex - 1);
+          return next;
+        });
+        focusDraft(tIndex, slotIndex - 1);
       }
       return;
     }
-    if (e.key === "ArrowLeft" && index > 0) {
+    if (e.key === "ArrowLeft" && slotIndex > 0) {
       e.preventDefault();
-      focusDraft(index - 1);
+      focusDraft(tIndex, slotIndex - 1);
     }
-    if (e.key === "ArrowRight" && index < TICKET_LENGTH - 1) {
+    if (e.key === "ArrowRight" && slotIndex < TICKET_LENGTH - 1) {
       e.preventDefault();
-      focusDraft(index + 1);
+      focusDraft(tIndex, slotIndex + 1);
     }
   };
 
-  const handleDraftPaste = (e) => {
+  const handleDraftPaste = (tIndex, e) => {
     e.preventDefault();
-    if (depositLoading) return;
+    if (depositLoading || isChecking) return;
     const code = sanitizeCode(e.clipboardData.getData("text"));
     if (!code) return;
-    updateDraft(code);
-    focusDraft(Math.min(code.length, TICKET_LENGTH - 1));
+    setTicketCodes((prev) => {
+      const next = [...prev];
+      next[tIndex] = code.slice(0, TICKET_LENGTH);
+      return next;
+    });
+    focusDraft(tIndex, Math.min(code.length, TICKET_LENGTH - 1));
   };
 
-  const handleRandomDraft = async () => {
-    if (depositLoading) return;
+  const handleRandomSingleDraft = async (tIndex) => {
+    if (depositLoading || isChecking) return;
     setManualError("");
-    const usedCodes = [draft, ...soldNumbers].filter(Boolean);
-    for (let i = 0; i < 15; i++) {
-      const code = randomUniqueCode(usedCodes);
+    setLocalSuccess("");
+    const usedCodes = ticketCodes
+      .filter((_, idx) => idx !== tIndex)
+      .concat(soldNumbers)
+      .filter(Boolean);
+
+    for (let i = 0; i < 20; i++) {
+      const candidate = randomUniqueCode(usedCodes);
       try {
-        const avail = await verifyNumberForBet(code);
-        if (avail.canBet) {
-          updateDraft(code);
+        const avail = await verifyNumberForBet(candidate);
+        if (avail?.canBet) {
+          setTicketCodes((prev) => {
+            const next = [...prev];
+            next[tIndex] = candidate;
+            return next;
+          });
           return;
         }
-        // sold nikla to yaad rakho, dobara try nahi hoga
-        usedCodes.push(code);
+        usedCodes.push(candidate);
         setSoldNumbers((prev) =>
-          prev.includes(code) ? prev : [...prev, code],
+          prev.includes(candidate) ? prev : [...prev, candidate],
         );
       } catch {
-        updateDraft(code);
+        setTicketCodes((prev) => {
+          const next = [...prev];
+          next[tIndex] = candidate;
+          return next;
+        });
         return;
       }
     }
-    updateDraft(randomUniqueCode(usedCodes));
+    setTicketCodes((prev) => {
+      const next = [...prev];
+      next[tIndex] = randomUniqueCode(usedCodes);
+      return next;
+    });
   };
 
-  const handleClearDraft = () => {
-    if (depositLoading) return;
-    updateDraft("");
-    focusDraft(0);
+  const handleRandomAllDrafts = async () => {
+    if (depositLoading || isChecking) return;
+    setManualError("");
+    setLocalSuccess("");
+
+    const usedCodes = [...soldNumbers].filter(Boolean);
+    const newCodes = [];
+
+    for (let t = 0; t < ticketCodes.length; t++) {
+      let picked = "";
+      for (let i = 0; i < 15; i++) {
+        const candidate = randomUniqueCode([...newCodes, ...usedCodes]);
+        try {
+          const check = await verifyNumberForBet(candidate);
+          if (check?.canBet) {
+            picked = candidate;
+            break;
+          }
+          usedCodes.push(candidate);
+          setSoldNumbers((prev) =>
+            prev.includes(candidate) ? prev : [...prev, candidate],
+          );
+        } catch {
+          picked = candidate;
+          break;
+        }
+      }
+      if (!picked) {
+        picked = randomUniqueCode([...newCodes, ...usedCodes]);
+      }
+      newCodes.push(picked);
+      usedCodes.push(picked);
+    }
+
+    setTicketCodes(newCodes);
   };
+
+  const handleClearSingleDraft = (tIndex) => {
+    if (depositLoading || isChecking) return;
+    setTicketCodes((prev) => {
+      const next = [...prev];
+      next[tIndex] = "";
+      return next;
+    });
+    focusDraft(tIndex, 0);
+    setManualError("");
+    setLocalSuccess("");
+  };
+
+  const handleClearAllDrafts = () => {
+    if (depositLoading || isChecking) return;
+    setTicketCodes((prev) => prev.map(() => ""));
+    focusDraft(0, 0);
+    setManualError("");
+    setLocalSuccess("");
+  };
+
+  // Status computation for each ticket input
+  const ticketStatuses = useMemo(() => {
+    const counts = {};
+    ticketCodes.forEach((c) => {
+      const trimmed = String(c || "").trim().toUpperCase();
+      if (trimmed.length === TICKET_LENGTH) {
+        counts[trimmed] = (counts[trimmed] || 0) + 1;
+      }
+    });
+
+    return ticketCodes.map((c) => {
+      const trimmed = String(c || "").trim().toUpperCase();
+      const isValid = TICKET_REGEX.test(trimmed);
+      const isSold = soldNumbers.includes(trimmed);
+      const isDuplicate = isValid && counts[trimmed] > 1;
+      return {
+        isValid,
+        isSold,
+        isDuplicate,
+        code: trimmed,
+        length: trimmed.length,
+      };
+    });
+  }, [ticketCodes, soldNumbers]);
+
+  const allTicketsValid = useMemo(() => {
+    const expectedCount = Math.max(1, Math.floor(quantity / 10));
+    if (ticketCodes.length !== expectedCount) return false;
+    const normalized = ticketCodes.map((c) =>
+      String(c || "").trim().toUpperCase(),
+    );
+    if (!normalized.every((c) => TICKET_REGEX.test(c))) return false;
+    if (new Set(normalized).size !== normalized.length) return false;
+    if (normalized.some((c) => soldNumbers.includes(c))) return false;
+    return true;
+  }, [ticketCodes, quantity, soldNumbers]);
+
+  const isTicketValid = allTicketsValid;
+  const hasKnownSold = ticketStatuses.some((s) => s.isSold);
 
   // =====================================================
   // HANDLER — PURCHASE
-  // Frontend se quantity (10-ke-step) aur amount quantity ke hisaab se
-  // jata hai, par order me ticket number sirf 1 jata hai (user ka chuna hua).
   // =====================================================
   const handlePurchase = async () => {
     if (depositLoading || isChecking) return;
@@ -614,47 +757,77 @@ const FestivalLottery = () => {
       }
 
       // -------------------------------------------------
-      // TICKET NUMBER VALIDATION
+      // MULTI-TICKET VALIDATION
+      // Formula: Required inputs = quantity / 10
       // -------------------------------------------------
-      if (!TICKET_REGEX.test(draft)) {
+      const expectedInputs = Math.max(1, Math.floor(quantity / 10));
+
+      if (ticketCodes.length !== expectedInputs) {
         setManualError(
-          `Please enter a valid 8-character ticket number (e.g. ${TICKET_EXAMPLE})`,
+          `Please provide ticket numbers for all ${expectedInputs} tickets.`,
         );
         return;
       }
 
-      if (soldNumbers.includes(draft)) {
+      for (let i = 0; i < ticketCodes.length; i++) {
+        const code = String(ticketCodes[i] || "").trim().toUpperCase();
+
+        if (!code || !TICKET_REGEX.test(code)) {
+          setManualError(
+            `Ticket Number ${i + 1}: Please enter a valid 8-character ticket number (e.g. ${TICKET_EXAMPLE})`,
+          );
+          return;
+        }
+
+        if (soldNumbers.includes(code)) {
+          setManualError(
+            `Ticket Number ${i + 1} (${code}) has already been sold. Please choose another number.`,
+          );
+          return;
+        }
+      }
+
+      // Check duplicates among entered tickets
+      const normalizedCodes = ticketCodes.map((c) =>
+        String(c || "").trim().toUpperCase(),
+      );
+      const uniqueCodes = new Set(normalizedCodes);
+
+      if (uniqueCodes.size !== normalizedCodes.length) {
         setManualError(
-          "This number has already been sold. Please choose another number.",
+          "Duplicate ticket numbers are not allowed. Each ticket must have a unique number.",
         );
         return;
       }
 
       // -------------------------------------------------
-      // ✅ CHECK NUMBER AVAILABILITY (BuyTicket jaisa)
-      // Sold hai to purchase nahi hoga.
+      // CHECK NUMBER AVAILABILITY FOR ALL NUMBERS
       // -------------------------------------------------
       setIsChecking(true);
       setLocalSuccess("Checking ticket availability...");
 
-      const availabilityCheck = await verifyNumberForBet(draft);
+      for (let i = 0; i < normalizedCodes.length; i++) {
+        const code = normalizedCodes[i];
+        const availabilityCheck = await verifyNumberForBet(code);
 
-      if (!availabilityCheck?.canBet) {
-        setSoldNumbers((prev) =>
-          prev.includes(draft) ? prev : [...prev, draft],
-        );
-        setLocalSuccess("");
-        setManualError(
-          availabilityCheck?.message ||
-            "This number has already been sold. Please choose another number.",
-        );
-        return;
+        if (!availabilityCheck?.canBet) {
+          setSoldNumbers((prev) =>
+            prev.includes(code) ? prev : [...prev, code],
+          );
+          setLocalSuccess("");
+          setIsChecking(false);
+          setManualError(
+            availabilityCheck?.message ||
+              `Ticket Number ${i + 1} (${code}) has already been sold. Please choose another number.`,
+          );
+          return;
+        }
       }
 
       // -------------------------------------------------
-      // ✅ SIRF 1 TICKET NUMBER JAYEGA, AMOUNT QUANTITY KA
+      // CREATE DEPOSIT WITH ALL VALIDATED TICKETS
       // -------------------------------------------------
-      const lotteryNumbers = [draft];
+      const lotteryNumbers = normalizedCodes;
       const totalPayable = calcFestivalAmount(setPriceAmount, quantity);
 
       setLocalSuccess(`Creating payment order for ${quantity} ticket(s)...`);
@@ -666,6 +839,7 @@ const FestivalLottery = () => {
           amount: totalPayable,
           configId: purchaseConfig._id,
           lotteryNumbers,
+          quantity,
           lotteryType: "festival",
         }),
       ).unwrap();
@@ -686,7 +860,7 @@ const FestivalLottery = () => {
         `Order ${orderId} created. Redirecting to payment page...`,
       );
 
-      setDraft("");
+      setTicketCodes((prev) => prev.map(() => ""));
 
       setTimeout(() => {
         window.location.href = paymentUrl;
@@ -706,9 +880,6 @@ const FestivalLottery = () => {
       setIsChecking(false);
     }
   };
-
-  const isTicketValid = TICKET_REGEX.test(draft);
-  const hasKnownSold = soldNumbers.includes(draft);
 
   const displayError = manualError || depositError;
 
@@ -984,88 +1155,192 @@ const FestivalLottery = () => {
               </div>
             </div>
 
-            {/* ================= TICKET BOX INPUT ================= */}
-            <div
-              className={`mt-3 rounded-2xl border p-3 ${
-                displayError
-                  ? "border-red-300 bg-red-50/50"
-                  : TICKET_REGEX.test(draft)
-                    ? "border-emerald-300 bg-emerald-50/40"
-                    : "border-[#dfe5f0] bg-[#f9fbff]"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2">
+            {/* ================= TICKET BOX INPUTS ================= */}
+            <div className="mt-3 rounded-2xl border border-[#dfe5f0] bg-white p-3.5 shadow-sm">
+              <div className="flex items-center justify-between gap-2 border-b border-[#eef2f8] pb-3">
                 <div className="min-w-0 leading-tight">
-                  <h3 className="text-[14px] font-extrabold text-[#173e70]">
-                    Enter Ticket Number
+                  <h3 className="truncate text-[15px] font-extrabold text-[#173e70]">
+                    Enter Ticket Numbers ({ticketCodes.length})
                   </h3>
                   <p className="truncate text-[10px] text-[#4b5563]">
-                    Format: {TICKET_EXAMPLE} ( {draft.length}/{TICKET_LENGTH})
+                    Format: {TICKET_EXAMPLE} · {ticketCodes.length}{" "}
+                    {ticketCodes.length === 1 ? "input" : "inputs"} for{" "}
+                    {quantity} tickets
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <button
                     type="button"
-                    onClick={handleClearDraft}
-                    disabled={!draft || depositLoading}
+                    onClick={handleClearAllDrafts}
+                    disabled={
+                      depositLoading ||
+                      isChecking ||
+                      ticketCodes.every((c) => !c)
+                    }
                     className="text-[12px] font-medium text-[#3d4468] underline underline-offset-2 disabled:opacity-40"
                   >
-                    Clear
+                    Clear All
                   </button>
                   <button
                     type="button"
-                    onClick={handleRandomDraft}
-                    disabled={depositLoading}
-                    className="flex items-center gap-1 rounded-lg border border-[#c9d3e3] bg-white px-3 py-1.5 text-[12px] font-bold text-[#173e70] disabled:opacity-50"
+                    onClick={handleRandomAllDrafts}
+                    disabled={depositLoading || isChecking}
+                    className="flex items-center gap-1 rounded-lg border border-[#c9d3e3] bg-white px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-[12px] font-bold text-[#173e70] disabled:opacity-50 active:scale-95 transition"
                   >
-                    <Shuffle size={13} /> Random
+                    <Shuffle size={13} /> Random All
                   </button>
                 </div>
               </div>
 
-              <div
-                className="mt-3 grid gap-1.5"
-                style={{
-                  gridTemplateColumns: `repeat(${TICKET_LENGTH}, minmax(0, 1fr))`,
-                }}
-              >
-                {SLOT_PATTERN.map((_, i) => {
-                  const filled = Boolean(draft[i]);
+              {/* List of independent ticket inputs */}
+              <div className="mt-3 space-y-3.5">
+                {ticketCodes.map((code, tIndex) => {
+                  const statusInfo = ticketStatuses[tIndex] || {
+                    isValid: false,
+                    isSold: false,
+                    isDuplicate: false,
+                    length: 0,
+                  };
+
                   return (
-                    <input
-                      key={i}
-                      ref={(el) => {
-                        draftRefs.current[i] = el;
-                      }}
-                      value={draft[i] || ""}
-                      onChange={(e) => handleDraftChange(i, e)}
-                      onKeyDown={(e) => handleDraftKeyDown(i, e)}
-                      onPaste={handleDraftPaste}
-                      onFocus={(e) => e.target.select()}
-                      disabled={depositLoading}
-                      inputMode={SLOT_PATTERN[i] === "D" ? "numeric" : "text"}
-                      autoCapitalize="characters"
-                      autoComplete="off"
-                      spellCheck={false}
-                      placeholder={slotPlaceholder(i)}
-                      aria-label={`Ticket character ${i + 1}`}
-                      className={`h-12 w-full min-w-0 rounded-xl border-2 text-center text-[18px] font-extrabold outline-none transition placeholder:font-bold placeholder:text-[#c3c8de] focus:border-[#ed1d43] focus:shadow-[0_0_0_3px_rgba(237,29,67,0.15)] disabled:opacity-50 ${
-                        filled
-                          ? "border-[#173e70] bg-white text-[#173e70]"
-                          : "border-[#c9d3e3] bg-[#f1f3fa] text-[#173e70]"
+                    <div
+                      key={tIndex}
+                      className={`rounded-xl border p-2.5 sm:p-3 transition-colors ${
+                        statusInfo.isDuplicate || statusInfo.isSold
+                          ? "border-red-300 bg-red-50/40"
+                          : statusInfo.isValid
+                            ? "border-emerald-300 bg-emerald-50/30"
+                            : "border-[#e2e7f0] bg-[#f9fbff]"
                       }`}
-                    />
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#173e70] text-[10px] font-black text-white">
+                            {tIndex + 1}
+                          </span>
+                          <span className="text-[12.5px] font-extrabold text-[#173e70]">
+                            Ticket Number {tIndex + 1}
+                          </span>
+                          <span className="rounded bg-[#eef3fa] px-1.5 py-0.5 text-[9.5px] font-bold text-[#4b5563]">
+                            10 Tickets
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleClearSingleDraft(tIndex)}
+                            disabled={!code || depositLoading || isChecking}
+                            className="text-[11px] font-semibold text-[#6b7280] hover:text-[#ed1d43] disabled:opacity-30"
+                          >
+                            Clear
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRandomSingleDraft(tIndex)}
+                            disabled={depositLoading || isChecking}
+                            className="flex items-center gap-1 rounded-md border border-[#c9d3e3] bg-white px-2 py-1 text-[10.5px] font-bold text-[#173e70] hover:bg-[#eef3fa] active:scale-95 disabled:opacity-50"
+                          >
+                            <Shuffle size={11} /> Random
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 8 character slot boxes */}
+                      <div
+                        className="mt-2 grid gap-1 sm:gap-1.5"
+                        style={{
+                          gridTemplateColumns: `repeat(${TICKET_LENGTH}, minmax(0, 1fr))`,
+                        }}
+                      >
+                        {SLOT_PATTERN.map((slot, sIndex) => {
+                          const filled = Boolean(code[sIndex]);
+                          const isLetter = slot === "L";
+                          return (
+                            <input
+                              key={sIndex}
+                              ref={(el) => {
+                                draftRefs.current[`${tIndex}_${sIndex}`] = el;
+                              }}
+                              value={code[sIndex] || ""}
+                              onChange={(e) =>
+                                handleDraftChange(tIndex, sIndex, e)
+                              }
+                              onKeyDown={(e) =>
+                                handleDraftKeyDown(tIndex, sIndex, e)
+                              }
+                              onPaste={(e) => handleDraftPaste(tIndex, e)}
+                              onFocus={(e) => e.target.select()}
+                              disabled={depositLoading || isChecking}
+                              inputMode={isLetter ? "text" : "numeric"}
+                              autoCapitalize="characters"
+                              autoComplete="off"
+                              spellCheck={false}
+                              placeholder={slotPlaceholder(sIndex)}
+                              aria-label={`Ticket ${tIndex + 1} character ${sIndex + 1}`}
+                              className={`h-10 sm:h-11 w-full min-w-0 rounded-lg border-2 p-0 text-center text-[16px] sm:text-[17px] font-extrabold outline-none transition placeholder:font-bold placeholder:text-[#c3c8de] focus:border-[#ed1d43] focus:shadow-[0_0_0_3px_rgba(237,29,67,0.15)] disabled:opacity-50 ${
+                                filled
+                                  ? isLetter
+                                    ? "border-[#ed1d43] bg-[#fff0f2] text-[#ed1d43]"
+                                    : "border-[#173e70] bg-white text-[#173e70]"
+                                  : isLetter
+                                    ? "border-[#f3b6c1] bg-[#fff7f8] text-[#173e70]"
+                                    : "border-[#c9d3e3] bg-[#f1f3fa] text-[#173e70]"
+                              }`}
+                            />
+                          );
+                        })}
+                      </div>
+
+                      {/* Status pill for this specific input */}
+                      <div className="mt-2 flex items-center justify-between gap-1 text-[10.5px]">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span
+                            className={`h-2 w-2 shrink-0 rounded-full ${
+                              statusInfo.isDuplicate || statusInfo.isSold
+                                ? "bg-red-500"
+                                : statusInfo.isValid
+                                  ? "bg-emerald-500"
+                                  : "bg-[#f08a25]"
+                            }`}
+                          />
+                          <span
+                            className={`truncate ${
+                              statusInfo.isDuplicate
+                                ? "font-bold text-red-600"
+                                : statusInfo.isSold
+                                  ? "font-bold text-red-600"
+                                  : statusInfo.isValid
+                                    ? "font-bold text-emerald-700"
+                                    : "text-[#4b5563]"
+                            }`}
+                          >
+                            {statusInfo.isDuplicate
+                              ? `Duplicate number: already used in another ticket`
+                              : statusInfo.isSold
+                                ? `Number ${code} is already sold`
+                                : statusInfo.isValid
+                                  ? `Ready: ${code}`
+                                  : `Enter ${TICKET_LENGTH} chars (${statusInfo.length}/${TICKET_LENGTH})`}
+                          </span>
+                        </div>
+                        <span className="shrink-0 font-medium text-[#6b7280]">
+                          {statusInfo.length}/{TICKET_LENGTH}
+                        </span>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
 
               {manualError && (
-                <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-center text-[11px] font-medium text-red-600">
+                <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-center text-[11px] font-medium text-red-600">
                   {manualError}
                 </p>
               )}
 
-              <div className="mt-3 flex items-center justify-between gap-2">
+              {/* Summary Footer */}
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-[#eef2f8] pt-2.5">
                 <div className="flex min-w-0 items-center gap-1.5 text-[11px]">
                   <span
                     className={`h-2.5 w-2.5 shrink-0 rounded-full ${
@@ -1080,8 +1355,8 @@ const FestivalLottery = () => {
                     }`}
                   >
                     {isTicketValid
-                      ? `Ticket Number Ready: ${draft}`
-                      : `Enter ${TICKET_LENGTH} characters (${draft.length}/${TICKET_LENGTH})`}
+                      ? `All ${ticketCodes.length} Ticket Numbers Ready`
+                      : `Fill all ${ticketCodes.length} ticket number inputs`}
                   </span>
                 </div>
                 <span className="shrink-0 rounded-full border border-[#ed1d43]/30 bg-[#fff0f2] px-2.5 py-1 text-[11px] font-extrabold text-[#ed1d43]">
@@ -1137,8 +1412,14 @@ const FestivalLottery = () => {
           {/* ================= LUCKY / DAILY NUMBERS SELECTOR ================= */}
           <DailyNumbersSection
             mode="festival"
-            selectedNumber={draft}
-            onSelectNumber={(code) => updateDraft(code)}
+            selectedNumber={ticketCodes[0] || ""}
+            onSelectNumber={(code) =>
+              setTicketCodes((prev) => {
+                const next = [...prev];
+                next[0] = code;
+                return next;
+              })
+            }
           />
 
           {/* ================= QUICK TICKET VERIFICATION WIDGET ================= */}

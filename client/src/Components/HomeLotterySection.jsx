@@ -548,7 +548,7 @@ const HomeLotterySection = () => {
         ====================================================== */}
 
         {(activeBannerLoading || activeBanners.length > 0) && (
-          <section className="pt-[9px]">
+          <section className="">
             <div className="relative overflow-hidden bg-[#d9dee8] shadow-[0_8px_22px_rgba(0,0,0,0.15)]">
               {/* LOADING */}
 

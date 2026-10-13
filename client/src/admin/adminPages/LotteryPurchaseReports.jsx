@@ -184,14 +184,23 @@ const TicketStatusBadge = ({ status }) => {
    Table aur mobile card dono me use hota hai
 ========================================================= */
 const TicketChips = ({ tickets, onViewAll }) => {
-  const displayFirst = tickets[0] || "-";
-  const extraCount = tickets.length - 1;
+  if (!tickets || tickets.length === 0) {
+    return <span className="font-mono text-xs text-gray-400">-</span>;
+  }
+  const maxDirect = 3;
+  const directTickets = tickets.slice(0, maxDirect);
+  const extraCount = tickets.length - maxDirect;
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 font-mono text-xs font-bold text-amber-900">
-        {displayFirst}
-      </span>
+      {directTickets.map((t, idx) => (
+        <span
+          key={idx}
+          className="rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 font-mono text-xs font-bold text-amber-900"
+        >
+          {t}
+        </span>
+      ))}
       {extraCount > 0 && (
         <button
           onClick={onViewAll}

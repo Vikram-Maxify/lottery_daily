@@ -171,8 +171,12 @@ export const updateLotteryConfig = createAsyncThunk(
             : JSON.stringify(lotteryData.prizes ?? {})
         );
       }
-      if (lotteryData.image) {
-        formData.append("image", lotteryData.image);
+      if (lotteryData.isActive !== undefined) {
+        formData.append("isActive", String(lotteryData.isActive));
+      }
+      const imageToUpload = lotteryData.image || lotteryData.imageFile;
+      if (imageToUpload) {
+        formData.append("image", imageToUpload);
       }
 
       const response = await api.put(
@@ -623,12 +627,6 @@ const festivalLotterySlice = createSlice({
         }
 
         if (updatedConfig.isActive) {
-          state.configs = state.configs.map((config) => ({
-            ...config,
-            isActive:
-              String(config._id) === String(updatedConfig._id),
-          }));
-
           state.activeConfig = updatedConfig;
         }
       })
@@ -908,11 +906,11 @@ const festivalLotterySlice = createSlice({
         const activatedConfig = action.payload?.data;
         if (!activatedConfig) return;
 
-        state.configs = state.configs.map((config) => ({
-          ...config,
-          isActive:
-            String(config._id) === String(activatedConfig._id),
-        }));
+        state.configs = state.configs.map((config) =>
+          String(config._id) === String(activatedConfig._id)
+            ? { ...config, ...activatedConfig, isActive: true }
+            : config
+        );
 
         state.config = activatedConfig;
         state.activeConfig = activatedConfig;
@@ -963,7 +961,10 @@ const festivalLotterySlice = createSlice({
           String(state.activeConfig._id) ===
             String(deactivatedConfig._id)
         ) {
-          state.activeConfig = null;
+          const remainingActive = state.configs.find(
+            (c) => c.isActive && String(c._id) !== String(deactivatedConfig._id)
+          );
+          state.activeConfig = remainingActive || null;
         }
       })
       .addCase(deactivateLotteryConfig.rejected, (state, action) => {

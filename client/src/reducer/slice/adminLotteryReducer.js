@@ -125,15 +125,36 @@ export const updateLotteryConfig = createAsyncThunk(
       }
 
       const fd = new FormData();
-      fd.append("marketName", lotteryData.marketName);
-      fd.append("month", String(lotteryData.month));
-      fd.append("year", String(lotteryData.year));
-      fd.append("drawDate", lotteryData.drawDate);
-      fd.append("drawTime", lotteryData.drawTime);
-      fd.append("prizes", JSON.stringify(lotteryData.prizes));
+      if (lotteryData.marketName !== undefined) {
+        fd.append("marketName", lotteryData.marketName ?? "");
+      }
+      if (lotteryData.month !== undefined) {
+        fd.append("month", String(lotteryData.month ?? ""));
+      }
+      if (lotteryData.year !== undefined) {
+        fd.append("year", String(lotteryData.year ?? ""));
+      }
+      if (lotteryData.drawDate !== undefined) {
+        fd.append("drawDate", lotteryData.drawDate ?? "");
+      }
+      if (lotteryData.drawTime !== undefined) {
+        fd.append("drawTime", lotteryData.drawTime ?? "");
+      }
+      if (lotteryData.prizes !== undefined) {
+        fd.append(
+          "prizes",
+          typeof lotteryData.prizes === "string"
+            ? lotteryData.prizes
+            : JSON.stringify(lotteryData.prizes ?? {})
+        );
+      }
+      if (lotteryData.isActive !== undefined) {
+        fd.append("isActive", String(lotteryData.isActive));
+      }
 
-      if (imageFile) {
-        fd.append("image", imageFile);
+      const img = imageFile || lotteryData.image || lotteryData.imageFile;
+      if (img) {
+        fd.append("image", img);
       }
 
       const response = await api.put(

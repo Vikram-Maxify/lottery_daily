@@ -35,6 +35,11 @@ const lotteryUserEntrySchema = new mongoose.Schema(
       min: 0,
     },
 
+    quantity: {
+      type: Number,
+      default: 10,
+    },
+
     isBuy: {
       type: Boolean,
       default: false,

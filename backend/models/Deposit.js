@@ -88,6 +88,11 @@ const depositSchema = new mongoose.Schema(
       },
     },
 
+    quantity: {
+      type: Number,
+      default: 10,
+    },
+
     // ===============================================
     // USER DETAILS
     // ===============================================

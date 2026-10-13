@@ -1,9 +1,9 @@
-import React, { useState } from "react";
 import {
   ArrowRight,
   BarChart3,
   BookOpen,
   CalendarDays,
+  Check,
   Copy,
   Crown,
   FileText,
@@ -14,79 +14,427 @@ import {
   Trophy,
   User,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+
+import {
+  getActiveTopWinners,
+  selectActiveTopWinners,
+} from "../reducer/slice/topWinnerSlice";
 
 // =====================================================
 // CONSTANTS
 // =====================================================
 
-// ⚠️ Apne bottom navbar ki height (px) yahan daalo.
 const BOTTOM_NAV_HEIGHT = 64;
 
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1605196560547-b2f7281b7355?auto=format&fit=crop&w=1400&q=80";
-
-const LATEST = {
-  drawDate: "26 Sep 2026 (Saturday)",
-  drawTime: "8:00 PM",
-  ticket: "10F 68057",
-  prize: "₹1 CRORE",
-};
 
 const TICKET_TABS = [
   { key: "daily", label: "DEAR DAILY LOTTERY", icon: Crown },
   { key: "festival", label: "DEAR FESTIVAL LOTTERY", icon: Gift },
 ];
 
-const PRIZE_TIERS = [
-  { no: 1, rank: "1st Prize", amount: "₹1 CRORE", ticket: "28FC200", tickets: "10 Tickets", badge: "bg-[#ffd34e] text-[#7a0f1e]" },
-  { no: 2, rank: "2nd Prize", amount: "₹30 LAKH", ticket: "28FC201", tickets: "10 Tickets", badge: "bg-[#2e7dd7] text-white" },
-  { no: 3, rank: "3rd Prize", amount: "₹20,000", ticket: "28FC202", tickets: "10 Tickets", badge: "bg-[#f08a25] text-white" },
-  { no: 4, rank: "4th Prize", amount: "₹20,000", ticket: "28FC2XX", tickets: "10 Tickets", badge: "bg-[#20a66a] text-white" },
-  { no: 5, rank: "5th Prize", amount: "₹900", ticket: "28FCXXX", tickets: "10 Tickets", badge: "bg-[#8c4bd6] text-white" },
+const FALLBACK_WINNERS = [
+  {
+    name: "Rakesh Kumar",
+    location: "West Bengal",
+    prize: "₹1,00,00,000",
+    ticket: "28FC200",
+    image: "",
+  },
+  {
+    name: "Sunita Devi",
+    location: "Assam",
+    prize: "₹1,00,00,000",
+    ticket: "28FC201",
+    image: "",
+  },
+  {
+    name: "Md. Irfan",
+    location: "Kolkata",
+    prize: "₹1,00,00,000",
+    ticket: "28FC202",
+    image: "",
+  },
+  {
+    name: "Suresh Patel",
+    location: "Guwahati",
+    prize: "₹1,00,00,000",
+    ticket: "28FC203",
+    image: "",
+  },
 ];
 
-const TOP_WINNERS = [
-  { name: "Rakesh Kumar", location: "West Bengal", prize: "₹1,00,00,000", ticket: "28FC200" },
-  { name: "Sunita Devi", location: "Assam", prize: "₹1,00,00,000", ticket: "28FC201" },
-  { name: "Md. Irfan", location: "Kolkata", prize: "₹1,00,00,000", ticket: "28FC202" },
-  { name: "Suresh Patel", location: "Guwahati", prize: "₹1,00,00,000", ticket: "28FC203" },
-];
-
-const PAST_DRAWS = [
-  { no: 1, date: "26 Sep 2026", day: "Sat", time: "8:00 PM", drawNumber: "DL-6824", ticket: "28FC200" },
-  { no: 2, date: "25 Sep 2026", day: "Fri", time: "8:00 PM", drawNumber: "DL-6823", ticket: "77CC682" },
-  { no: 3, date: "24 Sep 2026", day: "Thu", time: "8:00 PM", drawNumber: "DL-6822", ticket: "32BB814" },
-  { no: 4, date: "23 Sep 2026", day: "Wed", time: "8:00 PM", drawNumber: "DL-6821", ticket: "19AA237" },
-  { no: 5, date: "22 Sep 2026", day: "Tue", time: "8:00 PM", drawNumber: "DL-6820", ticket: "91DD732" },
-];
-
-const WINNING_RULES = [
-  { no: 1, condition: "All digits/characters match", example: "28FC200", prize: "₹50 Lakh", total: "₹5 Crore", badge: "bg-[#ed1d43]", row: "bg-[#ffe4e8]" },
-
-  { no: 2, condition: "Alphabet does not match but all remaining digits match", example: "28FC201", prize: "₹30 Lakh", total: "₹3 Crore", badge: "bg-[#2e7dd7]", row: "bg-[#e3f0ff]" },
-
-  { no: 3, condition: "All numbers after the alphabet match", example: "28FC202", prize: "₹20,000", total: "₹2 Lakh", badge: "bg-[#f08a25]", row: "bg-[#ffefdc]" },
-
-  { no: 4, condition: "Left-most 4 digits match", example: "28FC2XX", prize: "₹20,000", total: "₹2 Lakh", badge: "bg-[#20a66a]", row: "bg-[#dcf8ea]" },
-
-  { no: 5, condition: "Left-most 3 digits match", example: "28FCXXX", prize: "₹900", total: "₹9,000", badge: "bg-[#8c4bd6]", row: "bg-[#f0e4ff]" },
-];
+// Ticket format generator: First 2 digits + 1 uppercase letter + remaining digits (e.g. 63V40110)
+const LETTERS_POOL = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const generateFormattedTicket = (rng) => {
+  const prefixDigits = String(10 + Math.floor(rng() * 90)); // First 2 digits (10-99)
+  const letter = LETTERS_POOL[Math.floor(rng() * LETTERS_POOL.length)]; // 1 uppercase letter
+  const suffixDigits = String(Math.floor(rng() * 100000)).padStart(5, "0"); // Remaining 5 digits
+  return `${prefixDigits}${letter}${suffixDigits}`; // e.g., 63V40110
+};
 
 // =====================================================
-// MAIN PAGE
+// DETERMINISTIC PSEUDO-RANDOM GENERATOR (MULBERRY32)
+// Seeded strictly by date in IST so values remain constant
+// throughout the day and only change when the day ends.
+// =====================================================
+
+const createSeededRandom = (seedStr) => {
+  let h = 1779033703 ^ seedStr.length;
+  for (let i = 0; i < seedStr.length; i++) {
+    h = Math.imul(h ^ seedStr.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return () => {
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+};
+
+const getTodayISTDateString = () => {
+  return new Date().toLocaleDateString("en-CA", {
+    timeZone: "Asia/Kolkata",
+  }); // Returns "YYYY-MM-DD" in Indian Standard Time
+};
+
+const getTodayISTFormatted = () => {
+  const d = new Date();
+  const day = d.toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+  });
+  const month = d.toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    month: "short",
+  });
+  const year = d.toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+  });
+  const weekday = d.toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    weekday: "long",
+  });
+  return `${day} ${month} ${year} (${weekday})`;
+};
+
+// =====================================================
+// PER-DAY PRIZE & NUMBERS GENERATOR
+// 1st Prize: 1 Crore to 5 Crore
+// 2nd & 3rd Prize: In Lakhs
+// 4th & 5th Prize: In Thousands
+// Only changes when the date ends (midnight IST).
+// =====================================================
+
+const getDailyPrizeTiers = (dateStr, tabKey = "daily") => {
+  const seed = `${dateStr}_${tabKey}`;
+  const rng = createSeededRandom(seed);
+
+  // 1st Prize: 1 Crore to 5 Crore
+  const firstPrizes = [
+    "₹1 CRORE",
+    "₹1.5 CRORE",
+    "₹2 CRORE",
+    "₹2.5 CRORE",
+    "₹3 CRORE",
+    "₹3.5 CRORE",
+    "₹4 CRORE",
+    "₹5 CRORE",
+  ];
+
+  // 2nd Prize: In Lakhs
+  const secondPrizes = [
+    "₹25 LAKH",
+    "₹30 LAKH",
+    "₹35 LAKH",
+    "₹40 LAKH",
+    "₹50 LAKH",
+    "₹75 LAKH",
+    "₹90 LAKH",
+  ];
+
+  // 3rd Prize: In Lakhs
+  const thirdPrizes = [
+    "₹1 LAKH",
+    "₹2 LAKH",
+    "₹3 LAKH",
+    "₹5 LAKH",
+    "₹8 LAKH",
+    "₹10 LAKH",
+    "₹15 LAKH",
+    "₹20 LAKH",
+  ];
+
+  // 4th Prize: In Thousands
+  const fourthPrizes = [
+    "₹10,000",
+    "₹15,000",
+    "₹20,000",
+    "₹25,000",
+    "₹30,000",
+    "₹40,000",
+    "₹50,000",
+  ];
+
+  // 5th Prize: In Thousands
+  const fifthPrizes = [
+    "₹1,000",
+    "₹1,500",
+    "₹2,000",
+    "₹2,500",
+    "₹3,000",
+    "₹4,000",
+    "₹5,000",
+    "₹7,500",
+    "₹9,000",
+  ];
+
+  const pick = (arr) => arr[Math.floor(rng() * arr.length)];
+
+  // Ticket Series & Numbers
+  const seriesPool =
+    tabKey === "festival"
+      ? ["99FS", "88DL", "77MK", "66SP", "55HL", "44DW", "33NV", "22XF"]
+      : ["28FC", "37YB", "18TG", "52BN", "74DX", "19AM", "63EL", "41KP"];
+
+  const series = pick(seriesPool);
+  const baseNum = 200 + Math.floor(rng() * 700); // 200-899
+  const prefix2 = String(baseNum).slice(0, 2);
+
+  return [
+    {
+      no: 1,
+      rank: "1st Prize",
+      amount: pick(firstPrizes),
+      ticket: `${series}${baseNum}`,
+      tickets: "10 Tickets",
+      badge: "bg-[#ffd34e] text-[#7a0f1e]",
+    },
+    {
+      no: 2,
+      rank: "2nd Prize",
+      amount: pick(secondPrizes),
+      ticket: `${series}${baseNum + 1}`,
+      tickets: "10 Tickets",
+      badge: "bg-[#2e7dd7] text-white",
+    },
+    {
+      no: 3,
+      rank: "3rd Prize",
+      amount: pick(thirdPrizes),
+      ticket: `${series}${baseNum + 2}`,
+      tickets: "10 Tickets",
+      badge: "bg-[#f08a25] text-white",
+    },
+    {
+      no: 4,
+      rank: "4th Prize",
+      amount: pick(fourthPrizes),
+      ticket: `${series}${prefix2}XX`,
+      tickets: "10 Tickets",
+      badge: "bg-[#20a66a] text-white",
+    },
+    {
+      no: 5,
+      rank: "5th Prize",
+      amount: pick(fifthPrizes),
+      ticket: `${series}XXX`,
+      tickets: "10 Tickets",
+      badge: "bg-[#8c4bd6] text-white",
+    },
+  ];
+};
+
+// =====================================================
+// PER-DAY PAST DRAW RESULTS GENERATOR
+// Randomizes past 5 draws per day based on date seed in IST.
+// Only changes after midnight IST (when date ends).
+// Ticket format: First 2 digits + 1 uppercase letter + remaining 5 digits (e.g. 63V40110).
+// =====================================================
+const getPastDraws = (dateStr, tabKey = "festival") => {
+  const seed = `${dateStr}_past_draws_${tabKey}`;
+  const rng = createSeededRandom(seed);
+
+  // Parse YYYY-MM-DD
+  const parts = (dateStr || "").split("-");
+  const year = parseInt(parts[0], 10) || 2026;
+  const month = (parseInt(parts[1], 10) || 10) - 1;
+  const day = parseInt(parts[2], 10) || 13;
+
+  // Compute base draw sequence from epoch days
+  const daysSinceEpoch = Math.floor(
+    Date.UTC(year, month, day) / (1000 * 60 * 60 * 24)
+  );
+  const baseDrawNo = (daysSinceEpoch % 8000) + 1200;
+  const drawPrefix = tabKey === "festival" ? "FL" : "DL";
+  const drawTime = tabKey === "festival" ? "8:00 PM" : "6:30 PM";
+
+  const draws = [];
+  for (let i = 1; i <= 5; i++) {
+    const pastDate = new Date(Date.UTC(year, month, day - i, 12, 0, 0));
+    const dateFormatted = pastDate.toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+    const dayName = pastDate.toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      weekday: "short",
+    });
+
+    draws.push({
+      no: i,
+      date: dateFormatted,
+      day: dayName,
+      time: drawTime,
+      drawNumber: `${drawPrefix}-${baseDrawNo - i}`,
+      ticket: generateFormattedTicket(rng),
+    });
+  }
+
+  return draws;
+};
+
+// =====================================================
+// MAIN LEADERBOARD PAGE COMPONENT
 // =====================================================
 
 const LeaderboardPage = () => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
   const [activeTab, setActiveTab] = useState("festival");
+  const [selectedTier, setSelectedTier] = useState(1);
+  const [copied, setCopied] = useState(false);
+
+  // ===================================================
+  // TOP WINNERS FROM ADMIN REDUX STORE
+  // ===================================================
+
+  const activeWinners = useSelector(selectActiveTopWinners);
+
+  useEffect(() => {
+    dispatch(getActiveTopWinners());
+  }, [dispatch]);
+
+  // Display top winners coming from admin (same as Home page)
+  const displayWinners = useMemo(() => {
+    if (Array.isArray(activeWinners) && activeWinners.length > 0) {
+      return activeWinners.map((w) => ({
+        name: w.name || "Winner",
+        location: w.wonAt
+          ? new Date(w.wonAt).toLocaleDateString("en-IN", {
+              timeZone: "Asia/Kolkata",
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })
+          : "Verified Winner",
+        prize: `₹${Number(w.winningAmount || 0).toLocaleString("en-IN")}`,
+        ticket: w.ticketNumber || "—",
+        image: w.image || "",
+      }));
+    }
+    return FALLBACK_WINNERS;
+  }, [activeWinners]);
+
+  // ===================================================
+  // PER-DAY PRIZE TIERS (1st to 5th)
+  // Changes ONLY after midnight IST, not on page refresh
+  // ===================================================
+
+  const todayDateStr = useMemo(() => getTodayISTDateString(), []);
+  const todayFormatted = useMemo(() => getTodayISTFormatted(), []);
+
+  const todayPrizeTiers = useMemo(() => {
+    return getDailyPrizeTiers(todayDateStr, activeTab);
+  }, [todayDateStr, activeTab]);
+
+  const pastDraws = useMemo(() => {
+    return getPastDraws(todayDateStr, activeTab);
+  }, [todayDateStr, activeTab]);
+
+  const activeTierObj = useMemo(() => {
+    return (
+      todayPrizeTiers.find((t) => t.no === selectedTier) || todayPrizeTiers[0]
+    );
+  }, [todayPrizeTiers, selectedTier]);
 
   const lotteryName =
     activeTab === "festival" ? "FESTIVAL LOTTERY" : "DAILY LOTTERY";
 
   const copyNumber = async () => {
     try {
-      await navigator.clipboard.writeText(LATEST.ticket.replace(/\s+/g, ""));
+      await navigator.clipboard.writeText(
+        activeTierObj.ticket.replace(/\s+/g, ""),
+      );
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
     } catch {}
   };
+
+  // Harmonized Winning Rules based on day's generated tiers
+  const dynamicWinningRules = useMemo(() => {
+    const p1 = todayPrizeTiers[0];
+    const p2 = todayPrizeTiers[1];
+    const p3 = todayPrizeTiers[2];
+    const p4 = todayPrizeTiers[3];
+    const p5 = todayPrizeTiers[4];
+
+    return [
+      {
+        no: 1,
+        condition: "All digits/characters match",
+        example: p1.ticket,
+        prize: p1.amount,
+        total: p1.amount,
+        badge: "bg-[#ed1d43]",
+        row: "bg-[#ffe4e8]",
+      },
+      {
+        no: 2,
+        condition: "Alphabet does not match but all remaining digits match",
+        example: p2.ticket,
+        prize: p2.amount,
+        total: p2.amount,
+        badge: "bg-[#2e7dd7]",
+        row: "bg-[#e3f0ff]",
+      },
+      {
+        no: 3,
+        condition: "All numbers after the alphabet match",
+        example: p3.ticket,
+        prize: p3.amount,
+        total: p3.amount,
+        badge: "bg-[#f08a25]",
+        row: "bg-[#ffefdc]",
+      },
+      {
+        no: 4,
+        condition: "Left-most 4 digits match",
+        example: p4.ticket,
+        prize: p4.amount,
+        total: p4.amount,
+        badge: "bg-[#20a66a]",
+        row: "bg-[#dcf8ea]",
+      },
+      {
+        no: 5,
+        condition: "Left-most 3 digits match",
+        example: p5.ticket,
+        prize: p5.amount,
+        total: p5.amount,
+        badge: "bg-[#8c4bd6]",
+        row: "bg-[#f0e4ff]",
+      },
+    ];
+  }, [todayPrizeTiers]);
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#eef3fa] text-[#173e70]">
@@ -113,7 +461,9 @@ const LeaderboardPage = () => {
                 >
                   <Icon
                     size={17}
-                    className={`shrink-0 ${active ? "text-[#ffd34e]" : "text-[#ed1d43]"}`}
+                    className={`shrink-0 ${
+                      active ? "text-[#ffd34e]" : "text-[#ed1d43]"
+                    }`}
                   />
                   <span className="min-w-0">{t.label}</span>
                 </button>
@@ -155,7 +505,7 @@ const LeaderboardPage = () => {
                     Draw No:
                   </p>
                   <p className="whitespace-nowrap text-[12px] font-black tracking-wide text-[#173e70]">
-                    {LATEST.ticket}
+                    {activeTierObj.ticket}
                   </p>
                 </div>
               </div>
@@ -173,42 +523,51 @@ const LeaderboardPage = () => {
                 </div>
 
                 <p className="mt-1 text-[10.5px] leading-tight text-white/85">
-                  Draw Date: {LATEST.drawDate}
+                  Draw Date: {todayFormatted}
                   <br />
-                  Draw Time: {LATEST.drawTime}
+                  Draw Time: 8:00 PM
                 </p>
 
                 <div className="mt-2 flex items-end justify-between gap-1">
                   <div className="min-w-0">
                     <p className="bg-gradient-to-b from-[#fff1a8] to-[#e0a11b] bg-clip-text font-serif text-[15px] font-black leading-none text-transparent">
-                      1ST PRIZE
+                      {activeTierObj.rank.toUpperCase()}
                     </p>
                     <p
                       className="mt-0.5 whitespace-nowrap font-black leading-none text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"
                       style={{ fontSize: "clamp(22px, 7vw, 30px)" }}
                     >
-                      {LATEST.prize}
+                      {activeTierObj.amount}
                     </p>
                   </div>
 
                   <span className="relative flex h-9 w-9 shrink-0 items-center justify-center">
                     <span className="absolute inset-0 rounded-full bg-[#ffd34e]/30 blur-md" />
-                    <Trophy size={32} className="relative text-[#ffd34e]" fill="#ffd34e" />
+                    <Trophy
+                      size={32}
+                      className="relative text-[#ffd34e]"
+                      fill="#ffd34e"
+                    />
                   </span>
                 </div>
 
                 <div className="mt-2 flex">
                   <div className="flex min-w-0 max-w-full items-center gap-2 rounded-lg border border-[#ffd34e]/60 bg-white px-2 py-1">
-                    <span className="whitespace-nowrap text-[15px] font-black tracking-wide text-[#173e70]">
-                      {LATEST.ticket}
+                    <span className="whitespace-nowrap font-mono text-[15px] font-black tracking-wide text-[#173e70]">
+                      {activeTierObj.ticket}
                     </span>
                     <button
                       type="button"
                       onClick={copyNumber}
                       aria-label="Copy number"
                       className="shrink-0 text-[#173e70] active:scale-90"
+                      title="Copy ticket number"
                     >
-                      <Copy size={14} />
+                      {copied ? (
+                        <Check size={14} className="text-emerald-600" />
+                      ) : (
+                        <Copy size={14} />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -222,10 +581,15 @@ const LeaderboardPage = () => {
         </section>
 
         <main className="space-y-3 px-2 pt-3">
-          {/* ================= PRIZE TIERS ================= */}
+          {/* ================= PRIZE TIERS (1st to 5th TABS) ================= */}
           <section className="grid grid-cols-5 gap-1">
-            {PRIZE_TIERS.map((tier) => (
-              <PrizeTile key={tier.no} {...tier} active={tier.no === 1} />
+            {todayPrizeTiers.map((tier) => (
+              <PrizeTile
+                key={tier.no}
+                {...tier}
+                active={tier.no === selectedTier}
+                onClick={() => setSelectedTier(tier.no)}
+              />
             ))}
           </section>
 
@@ -236,49 +600,56 @@ const LeaderboardPage = () => {
               title="Check Result"
               sub="Enter Ticket Number"
               tone="bg-[#ed1d43]"
+              onClick={() => navigate("/results")}
             />
             <QuickAction
               icon={<BarChart3 size={20} />}
               title="All Draw Results"
               sub="View past results"
               tone="bg-[#2e7dd7]"
+              onClick={() => navigate("/results")}
             />
             <QuickAction
               icon={<Trophy size={20} />}
               title="Prize Structure"
               sub="See winning rules"
               tone="bg-[#8c4bd6]"
+              onClick={() => {
+                const el = document.getElementById("winning-rules-section");
+                if (el) el.scrollIntoView({ behavior: "smooth" });
+              }}
             />
             <QuickAction
               icon={<FileText size={20} />}
               title="Official PDF"
               sub="Download result"
               tone="bg-[#20a66a]"
+              onClick={() => navigate("/results")}
             />
           </section>
 
-          {/* ================= TOP WINNERS ================= */}
+          {/* ================= TOP WINNERS (FROM ADMIN) ================= */}
           <section className="rounded-[16px] bg-white p-3 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2">
               <div className="flex min-w-0 items-center gap-2">
-                <Trophy size={20} className="shrink-0 text-[#d4a017]" fill="#ffd34e" />
+                <Trophy
+                  size={20}
+                  className="shrink-0 text-[#d4a017]"
+                  fill="#ffd34e"
+                />
                 <h2 className="text-[14px] font-extrabold text-[#173e70]">
-                  Top Winners (₹1 Crore)
+                  Top Winners
                 </h2>
               </div>
 
-              <button
-                type="button"
-                className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[#c9d3e3] bg-white px-2 py-1.5 text-[10.5px] font-semibold text-[#173e70]"
-              >
-                View All Winners
-                <ArrowRight size={12} />
-              </button>
+              <span className="text-[10px] font-bold text-[#8a99ad]">
+                Total: {displayWinners.length}
+              </span>
             </div>
 
-            {/* swipe row */}
+            {/* swipe row with actual admin top winners */}
             <div className="-mx-3 mt-3 flex snap-x gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {TOP_WINNERS.map((w, i) => (
+              {displayWinners.map((w, i) => (
                 <WinnerCard key={i} rank={i + 1} {...w} />
               ))}
             </div>
@@ -296,7 +667,8 @@ const LeaderboardPage = () => {
 
               <button
                 type="button"
-                className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[#c9d3e3] bg-white px-2 py-1.5 text-[10.5px] font-semibold text-[#173e70]"
+                onClick={() => navigate("/results")}
+                className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[#c9d3e3] bg-white px-2 py-1.5 text-[10.5px] font-semibold text-[#173e70] active:scale-95 transition"
               >
                 View All Results
                 <ArrowRight size={12} />
@@ -315,7 +687,13 @@ const LeaderboardPage = () => {
 
                 <thead>
                   <tr className="bg-[#3a0b17] text-white">
-                    {["#", "Draw Date", "Draw No.", "1st Prize No.", "Result"].map((h) => (
+                    {[
+                      "#",
+                      "Draw Date",
+                      "Draw No.",
+                      "1st Prize No.",
+                      "Result",
+                    ].map((h) => (
                       <th
                         key={h}
                         className="px-1 py-2 text-[9px] font-semibold leading-tight"
@@ -327,10 +705,12 @@ const LeaderboardPage = () => {
                 </thead>
 
                 <tbody>
-                  {PAST_DRAWS.map((d, i) => (
+                  {pastDraws.map((d, i) => (
                     <tr
                       key={d.no}
-                      className={`${i % 2 === 0 ? "bg-white" : "bg-[#f6f9fe]"} border-b border-[#e2e5f0]`}
+                      className={`${
+                        i % 2 === 0 ? "bg-white" : "bg-[#f6f9fe]"
+                      } border-b border-[#e2e5f0]`}
                     >
                       <td className="px-1 py-2.5 text-[11px] font-black text-[#ed1d43]">
                         {d.no}
@@ -354,10 +734,13 @@ const LeaderboardPage = () => {
                       <td className="px-1 py-2.5">
                         <button
                           type="button"
-                          className="flex items-center gap-0.5 whitespace-nowrap rounded-md bg-gradient-to-b from-[#ffb800] to-[#d99a00] px-1.5 py-1 text-[9px] font-extrabold text-white shadow-sm active:scale-95"
+                          onClick={() => navigate("/results")}
+                          className="flex items-center gap-0.5 whitespace-nowrap rounded-md bg-gradient-to-b from-[#ffb800] to-[#d99a00] px-1.5 py-1 text-[9px] font-extrabold text-white shadow-sm active:scale-95 transition"
                         >
                           <span className="min-[400px]:hidden">View</span>
-                          <span className="hidden min-[400px]:inline">View Result</span>
+                          <span className="hidden min-[400px]:inline">
+                            View Result
+                          </span>
                           <ArrowRight size={9} strokeWidth={3} />
                         </button>
                       </td>
@@ -369,7 +752,10 @@ const LeaderboardPage = () => {
           </section>
 
           {/* ================= WINNING RULES ================= */}
-          <section className="overflow-hidden rounded-[18px] bg-gradient-to-br from-[#3a0b17] via-[#2b0a16] to-[#1a0710] p-2.5 shadow-lg">
+          <section
+            id="winning-rules-section"
+            className="overflow-hidden rounded-[18px] bg-gradient-to-br from-[#3a0b17] via-[#2b0a16] to-[#1a0710] p-2.5 shadow-lg"
+          >
             <div className="flex flex-wrap items-center justify-between gap-2 px-1">
               <div className="flex items-center gap-2">
                 <BookOpen size={22} className="shrink-0 text-[#ffd34e]" />
@@ -378,17 +764,14 @@ const LeaderboardPage = () => {
                 </h2>
               </div>
 
-              <button
-                type="button"
-                className="flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-white/40 px-2.5 text-[10.5px] font-semibold text-white"
-              >
-                View Full Rules
-                <ArrowRight size={12} />
-              </button>
+              <span className="text-[10px] font-bold text-[#ffd34e]/80">
+                Official Multipliers
+              </span>
             </div>
 
             <p className="mt-2 px-1 text-[11px] leading-snug text-white/80">
-              Match your ticket number with the drawn number and see exciting prizes!
+              Match your ticket number with the drawn number and see exciting
+              prizes!
             </p>
 
             <div className="mt-2 overflow-hidden rounded-lg">
@@ -403,21 +786,25 @@ const LeaderboardPage = () => {
 
                 <thead>
                   <tr className="bg-[#1a0710] text-white">
-                    {["#", "Match Condition", "Example", "Prize / Ticket", "Total (×10)"].map(
-                      (h) => (
-                        <th
-                          key={h}
-                          className="px-1 py-2.5 text-[9.5px] font-semibold leading-tight"
-                        >
-                          {h}
-                        </th>
-                      )
-                    )}
+                    {[
+                      "#",
+                      "Match Condition",
+                      "Example",
+                      "Prize / Ticket",
+                      "Total (×10)",
+                    ].map((h) => (
+                      <th
+                        key={h}
+                        className="px-1 py-2.5 text-[9.5px] font-semibold leading-tight"
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
 
                 <tbody>
-                  {WINNING_RULES.map((r) => (
+                  {dynamicWinningRules.map((r) => (
                     <RuleRow key={r.no} {...r} />
                   ))}
                 </tbody>
@@ -445,10 +832,23 @@ const LeaderboardPage = () => {
 // SMALL COMPONENTS
 // =====================================================
 
-const PrizeTile = ({ no, rank, amount, ticket, tickets, badge, active }) => (
-  <div
-    className={`relative min-w-0 rounded-xl px-0.5 py-2 text-center shadow-md ${
-      active ? "bg-gradient-to-b from-[#ff1744] to-[#c9102f]" : "bg-white"
+const PrizeTile = ({
+  no,
+  rank,
+  amount,
+  ticket,
+  tickets,
+  badge,
+  active,
+  onClick,
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`relative min-w-0 rounded-xl px-0.5 py-2 text-center shadow-md transition-all active:scale-95 ${
+      active
+        ? "bg-gradient-to-b from-[#ff1744] to-[#c9102f] ring-2 ring-[#ffd34e]/60"
+        : "bg-white hover:bg-[#fff9f0]"
     }`}
   >
     <span
@@ -466,7 +866,7 @@ const PrizeTile = ({ no, rank, amount, ticket, tickets, badge, active }) => (
     </p>
 
     <p
-      className={`mt-0.5 whitespace-nowrap text-[10.5px] font-black leading-tight ${
+      className={`mt-0.5 whitespace-nowrap text-[10px] sm:text-[10.5px] font-black leading-tight ${
         active ? "text-white" : "text-[#173e70]"
       }`}
     >
@@ -490,13 +890,14 @@ const PrizeTile = ({ no, rank, amount, ticket, tickets, badge, active }) => (
     >
       {tickets}
     </p>
-  </div>
+  </button>
 );
 
-const QuickAction = ({ icon, title, sub, tone }) => (
+const QuickAction = ({ icon, title, sub, tone, onClick }) => (
   <button
     type="button"
-    className="flex min-w-0 items-center gap-2.5 rounded-xl bg-white p-2.5 text-left shadow-sm transition active:scale-[0.97]"
+    onClick={onClick}
+    className="flex min-w-0 items-center gap-2.5 rounded-xl bg-white p-2.5 text-left shadow-sm transition active:scale-[0.97] hover:shadow-md"
   >
     <span
       className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white ${tone}`}
@@ -514,28 +915,35 @@ const QuickAction = ({ icon, title, sub, tone }) => (
   </button>
 );
 
-const WinnerCard = ({ rank, name, location, prize, ticket }) => (
-  <div className="flex w-[108px] shrink-0 snap-start flex-col items-center rounded-xl border border-[#f1d9a0] bg-gradient-to-b from-[#fff0c9] to-[#fff8e8] px-1.5 pb-2 pt-1.5 text-center shadow-sm">
-    <span className="flex items-center gap-0.5">
-      <Crown size={13} className="text-[#d4a017]" fill="#d4a017" />
-      <span className="text-[12px] font-black text-[#a0561b]">{rank}</span>
+const WinnerCard = ({ rank, name, location, prize, ticket, image }) => (
+  <div className="flex w-[114px] shrink-0 snap-start flex-col items-center rounded-xl border border-[#f1d9a0] bg-gradient-to-b from-[#fff0c9] to-[#fff8e8] px-1.5 pb-2 pt-1.5 text-center shadow-sm">
+    <span className="mt-1 flex h-11 w-11 items-center justify-center rounded-full border-2 border-[#d4a017] bg-[#fff5d1] text-[#a0561b] overflow-hidden shadow-xs">
+      {image ? (
+        <img
+          src={image}
+          alt={name}
+          className="h-full w-full object-cover"
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
+      ) : (
+        <User size={22} />
+      )}
     </span>
 
-    <span className="mt-1 flex h-11 w-11 items-center justify-center rounded-full border-2 border-[#d4a017] bg-[#fff5d1] text-[#a0561b]">
-      <User size={22} />
-    </span>
-
-    <p className="mt-1 text-[11px] font-black leading-tight text-[#173e70]">
+    <p className="mt-1 text-[11px] font-black leading-tight text-[#173e70] truncate max-w-full">
       {name}
     </p>
-    <p className="mt-0.5 text-[9.5px] leading-tight text-[#4b5563]">
+    <p className="mt-0.5 text-[9px] leading-tight text-[#4b5563] truncate max-w-full">
       {location}
     </p>
     <p className="mt-1 whitespace-nowrap text-[9px] leading-tight text-[#4b5563]">
-      Ticket: {ticket}
+      Ticket:{" "}
+      <span className="font-mono font-bold text-[#173e70]">{ticket}</span>
     </p>
 
-    <span className="mt-1.5 w-full whitespace-nowrap rounded-full bg-gradient-to-r from-[#ff1744] to-[#c9102f] px-1 py-1 text-[9.5px] font-black text-white">
+    <span className="mt-1.5 w-full whitespace-nowrap rounded-full bg-gradient-to-r from-[#ff1744] to-[#c9102f] px-1 py-1 text-[9.5px] font-black text-white shadow-xs">
       {prize}
     </span>
   </div>

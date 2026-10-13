@@ -554,25 +554,20 @@ const DailyNumbersSection = ({
           </>
         )}
       </div>
-
       {/* =====================================================
           CHECK CUSTOM NUMBER
       ===================================================== */}
 
       <div className="mt-3.5 rounded-xl border border-[#ebd9b0] bg-white/80 p-2.5 sm:p-3">
-        <form
-          onSubmit={handleCheckCustom}
-          className="flex flex-wrap items-center gap-2"
-        >
+        <form onSubmit={handleCheckCustom} className="flex flex-col gap-2">
+          {/* Label Row */}
           <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#173e70]">
-            <Zap size={13} className="text-[#f59e0b]" />
-
-            <span className="hidden min-[420px]:inline">
-              Check Availability:
-            </span>
+            <Zap size={13} className="shrink-0 text-[#f59e0b]" />
+            <span>Check Availability</span>
           </div>
 
-          <div className="flex min-w-[150px] flex-1 items-center gap-1.5">
+          {/* Input + Button Row */}
+          <div className="flex w-full items-stretch gap-2">
             <input
               type="text"
               placeholder="e.g. 10A78965"
@@ -581,13 +576,13 @@ const DailyNumbersSection = ({
                 setCustomCheckInput(e.target.value.toUpperCase())
               }
               maxLength={8}
-              className="h-8 flex-1 rounded-lg border border-[#e2d4b5] bg-[#fffdf8] px-2.5 text-[12px] font-black tracking-wider text-[#173e70] placeholder:font-normal placeholder:tracking-normal placeholder:text-[#94a3b8] outline-none transition focus:border-[#ed1d43]"
+              className="h-9 min-w-0 flex-1 rounded-lg border border-[#e2d4b5] bg-[#fffdf8] px-2.5 text-[12px] font-black tracking-wider text-[#173e70] placeholder:font-normal placeholder:tracking-normal placeholder:text-[#94a3b8] outline-none transition focus:border-[#ed1d43]"
             />
 
             <button
               type="submit"
               disabled={checkLoading || !customCheckInput.trim()}
-              className="flex h-8 shrink-0 items-center gap-1 rounded-lg bg-gradient-to-r from-[#173e70] to-[#255ba0] px-3 text-[11px] font-bold text-white shadow-sm transition active:scale-95 disabled:opacity-50"
+              className="flex h-9 shrink-0 items-center gap-1 rounded-lg bg-gradient-to-r from-[#173e70] to-[#255ba0] px-3 text-[11.5px] font-bold text-white shadow-sm transition active:scale-95 disabled:opacity-50"
             >
               {checkLoading ? (
                 <RefreshCw size={12} className="animate-spin" />
@@ -602,29 +597,29 @@ const DailyNumbersSection = ({
 
         {checkResult && (
           <div
-            className={`mt-2 flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[11px] font-bold ${
+            className={`mt-2 flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-bold ${
               checkResult.canBet
                 ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
                 : "border border-red-200 bg-red-50 text-red-700"
             }`}
           >
-            <div className="flex items-center gap-1.5">
+            <div className="flex min-w-0 items-center gap-1.5">
               {checkResult.canBet ? (
-                <CheckCircle2 size={14} className="text-emerald-600" />
+                <CheckCircle2 size={14} className="shrink-0 text-emerald-600" />
               ) : (
-                <XCircle size={14} className="text-red-600" />
+                <XCircle size={14} className="shrink-0 text-red-600" />
               )}
 
-              <span>{checkResult.message}</span>
+              <span className="min-w-0 break-words">{checkResult.message}</span>
             </div>
 
             {checkResult.canBet && (
               <button
                 type="button"
                 onClick={() => handlePickNumber(customCheckInput.trim())}
-                className="rounded bg-emerald-600 px-2 py-0.5 text-[10.5px] font-extrabold text-white transition hover:bg-emerald-700"
+                className="shrink-0 whitespace-nowrap rounded bg-emerald-600 px-2 py-0.5 text-[10.5px] font-extrabold text-white transition hover:bg-emerald-700"
               >
-                Use this number →
+                Use →
               </button>
             )}
           </div>

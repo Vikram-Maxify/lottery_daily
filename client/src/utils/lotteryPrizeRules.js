@@ -80,12 +80,26 @@ export const formatDrawTime = (timeValue) => {
 };
 
 /**
+ * Masks a ticket code, keeping only the LAST `visible` characters.
+ * e.g. maskTicketCode("12A12345", 6) -> "**A12345"
+ *      maskTicketCode("12A12345", 5) -> "***12345"
+ *      maskTicketCode("12A12345", 4) -> "****2345"
+ */
+export const maskTicketCode = (code, visible, maskChar = "*") => {
+  const str = String(code || "");
+  const keep = Math.max(0, Math.min(Number(visible) || 0, str.length));
+  return maskChar.repeat(str.length - keep) + str.slice(str.length - keep);
+};
+
+/**
  * Generates exactly 5 winning rules mapped to API prizes:
- * 1. All 6 digits match -> prizes.first
- * 2. Last 5 digits match -> prizes.second
- * 3. Last 4 digits match -> prizes.third
- * 4. Last 3 digits match -> prizes.fourth
- * 5. Last 2 digits match -> prizes.fifth
+ * 1. Last 6 digits match -> prizes.first   (example: **A12345)
+ * 2. Last 5 digits match -> prizes.second  (example: ***12345)
+ * 3. Last 4 digits match -> prizes.third   (example: ****2345)
+ * 4. Last 3 digits match -> prizes.fourth  (example: *****345)
+ * 5. Last 2 digits match -> prizes.fifth   (example: ******45)
+ *
+ * Example codes are masked: only the matching last N characters are visible.
  */
 export const getFestivalWinningRules = (
   prizes = {},
@@ -96,13 +110,12 @@ export const getFestivalWinningRules = (
 
   const isBExample = String(exampleCode || "").includes("B");
   const baseCode = isBExample ? "12B12345" : "12A12345";
-  const prefix = isBExample ? "99B" : "99A";
 
   const config = [
     {
       number: 1,
-      condition: "All 6 digits match",
-      example: baseCode,
+      condition: "All digits match",
+      visible: 8,
       key: "first",
       badge: "bg-[#ed1d43]",
       row: "bg-[#ffe4e8]",
@@ -110,7 +123,7 @@ export const getFestivalWinningRules = (
     {
       number: 2,
       condition: "Last 5 digits match",
-      example: `${prefix}12345`,
+      visible: 5,
       key: "second",
       badge: "bg-[#2e7dd7]",
       row: "bg-[#e3f0ff]",
@@ -118,15 +131,15 @@ export const getFestivalWinningRules = (
     {
       number: 3,
       condition: "Last 4 digits match",
-      example: `${prefix}92345`,
+      visible: 4,
       key: "third",
       badge: "bg-[#f08a25]",
       row: "bg-[#ffefdc]",
     },
     {
       number: 4,
-      condition: "Last 3 digits match",
-      example: `${prefix}99345`,
+      condition: "Last 4 digits match",
+      visible: 4,
       key: "fourth",
       badge: "bg-[#20a66a]",
       row: "bg-[#dcf8ea]",
@@ -134,7 +147,7 @@ export const getFestivalWinningRules = (
     {
       number: 5,
       condition: "Last 3 digits match",
-      example: `${prefix}99945`,
+      visible: 3,
       key: "fifth",
       badge: "bg-[#8c4bd6]",
       row: "bg-[#f0e4ff]",
@@ -150,13 +163,15 @@ export const getFestivalWinningRules = (
     const perTicketAmount =
       ruleTickets > 0 ? Math.round(totalAmount / ruleTickets) : totalAmount;
 
+    const maskedExample = maskTicketCode(baseCode, r.visible);
+
     return {
       number: r.number,
       n: String(r.number), // for HomeLotterySection.jsx
       condition: r.condition,
       cond: r.condition,
-      example: r.example,
-      ex: r.example,
+      example: maskedExample,
+      ex: maskedExample,
       key: r.key,
       badge: r.badge,
       row: r.row,

@@ -8,6 +8,8 @@ const TransactionHistory = require("../models/TransactionHistory");
 const QwackPayCallbackLog = require("../models/QwackPayCallbackLog");
 const LotteryConfig = require("../models/LotteryConfig");
 const Festival = require("../models/Festival");
+const Amount = require("../models/amountModel");
+const FestivalAmount = require("../models/festival_amountModel");
 const {
   checkNumbersAvailability,
   reserveNumbersAtomically,
@@ -322,16 +324,41 @@ const createDeposit = async (req, res) => {
           });
         }
 
-        const ticketPrice = Number(lotteryConfig.ticketPrice || lotteryConfig.price) || 0;
+        // Validate quantity relationship: quantity must equal lotteryNumbers.length * 10
+        if (req.body?.quantity !== undefined && req.body?.quantity !== null) {
+          const reqQty = Number(req.body.quantity);
+          const expectedInputsCount = Math.floor(reqQty / 10);
+          if (
+            !Number.isFinite(reqQty) ||
+            reqQty % 10 !== 0 ||
+            reqQty <= 0 ||
+            normalizedLotteryNumbers.length !== expectedInputsCount
+          ) {
+            return res.status(400).json({
+              success: false,
+              message: `Quantity mismatch: ${reqQty} tickets require exactly ${expectedInputsCount} ticket number(s), but received ${normalizedLotteryNumbers.length}`,
+            });
+          }
+        }
 
-        if (ticketPrice > 0 && !isFestivalConfig) {
-          const expectedAmount =
-            ticketPrice * normalizedLotteryNumbers.length;
+        // Validate amount
+        let setPrice = Number(lotteryConfig.ticketPrice || lotteryConfig.price) || 0;
+        if (!setPrice || setPrice <= 0) {
+          if (isFestivalConfig) {
+            const festDoc = await FestivalAmount.findOne();
+            setPrice = Number(festDoc?.amount) || 270;
+          } else {
+            const dailyDoc = await Amount.findOne();
+            setPrice = Number(dailyDoc?.amount) || 250;
+          }
+        }
 
+        if (setPrice > 0) {
+          const expectedAmount = setPrice * normalizedLotteryNumbers.length;
           if (Math.abs(money - expectedAmount) > 1) {
             return res.status(400).json({
               success: false,
-              message: `Amount mismatch. Expected ₹${expectedAmount} for ${normalizedLotteryNumbers.length} ticket(s)`,
+              message: `Amount mismatch. Expected ₹${expectedAmount} for ${normalizedLotteryNumbers.length * 10} tickets (${normalizedLotteryNumbers.length} ticket number(s))`,
             });
           }
         }
@@ -403,6 +430,7 @@ const createDeposit = async (req, res) => {
         lotteryType: resolvedLotteryType,
         marketName: resolvedMarketName,
         lotteryNumbers: normalizedLotteryNumbers,
+        quantity: normalizedLotteryNumbers.length > 0 ? normalizedLotteryNumbers.length * 10 : 10,
         number:
           normalizedLotteryNumbers.length === 1
             ? normalizedLotteryNumbers[0]
@@ -764,8 +792,9 @@ const processLotteryEntries = async (deposit, user, session = null) => {
         entryDate,
         number: numberStr,
         amount: ticketPrice,
+        quantity: 10,
         isBuy: true,
-        prize: { first: 0, second: 0, third: 0 },
+        prize: { first: 0, second: 0, third: 0, fourth: 0, fifth: 0 },
         prizeType: null,
         status: "pending",
       });
