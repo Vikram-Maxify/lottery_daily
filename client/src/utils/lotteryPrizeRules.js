@@ -90,7 +90,7 @@ export const formatDrawTime = (timeValue) => {
 export const getFestivalWinningRules = (
   prizes = {},
   exampleCode = "12A12345",
-  ruleTickets = 10
+  ruleTickets = 10,
 ) => {
   const safePrizes = prizes || {};
 
@@ -133,7 +133,7 @@ export const getFestivalWinningRules = (
     },
     {
       number: 5,
-      condition: "Last 2 digits match",
+      condition: "Last 3 digits match",
       example: `${prefix}99945`,
       key: "fifth",
       badge: "bg-[#8c4bd6]",

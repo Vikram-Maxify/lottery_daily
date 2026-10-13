@@ -3,16 +3,12 @@ import {
   BarChart3,
   CalendarDays,
   Crown,
-  FileText,
   Gift,
   Home,
-  Landmark,
-  ShieldCheck,
   Sparkles,
   Target,
   Ticket,
   User,
-  Users,
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -53,6 +49,8 @@ import {
 } from "../utils/lotteryPrizeRules";
 import QuickVerifyTicket from "./QuickVerifyTicket";
 import TopWinnersToast from "./TopWinnersToast";
+
+import licenseBanner from "../assets/lisenced.png";
 
 // =====================================================
 // HELPERS
@@ -119,6 +117,130 @@ const NAV_ITEMS = [
   { label: "Results", icon: BarChart3, path: "/results" },
   { label: "Profile", icon: User, path: "/profile" },
 ];
+
+const RoyalShield = () => (
+  <svg viewBox="0 0 100 110" className="h-12 w-12 shrink-0" fill="none">
+    <path
+      d="M50 5 82 17V48C82 71 67 88 50 101 33 88 18 71 18 48V17L50 5Z"
+      fill="#102F56"
+      stroke="#DDB75E"
+      strokeWidth="3"
+    />
+    <path
+      d="M50 12 75 21V48C75 66 64 80 50 91 36 80 25 66 25 48V21L50 12Z"
+      stroke="#EBD18C"
+      strokeWidth="1.2"
+    />
+    <path
+      d="M34 49 45 60 67 36"
+      stroke="#F5D47D"
+      strokeWidth="6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M31 9 37 3 43 9 50 1 57 9 63 3 69 9"
+      stroke="#DDB75E"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M23 76 11 88 29 86 35 96 42 87M77 76 89 88 71 86 65 96 58 87"
+      stroke="#DDB75E"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const GoldCertificate = () => (
+  <svg viewBox="0 0 48 48" className="h-8 w-8" fill="none">
+    <rect
+      x="9"
+      y="5"
+      width="28"
+      height="34"
+      rx="3"
+      fill="#FFF9E9"
+      stroke="#C99A35"
+      strokeWidth="2"
+    />
+    <path
+      d="M15 14H31M15 20H31M15 26H26"
+      stroke="#B98B32"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <circle
+      cx="33"
+      cy="34"
+      r="8"
+      fill="#173E70"
+      stroke="#E3BD65"
+      strokeWidth="2"
+    />
+    <path
+      d="m29 34 3 3 5-6"
+      stroke="#F5D47D"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const LotteryDrum = () => (
+  <svg viewBox="0 0 48 48" className="h-8 w-8" fill="none">
+    <path
+      d="M8 15 15 10M40 15 33 10M10 15 15 36M38 15 33 36"
+      stroke="#B98B32"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+    />
+    <ellipse
+      cx="24"
+      cy="23"
+      rx="14"
+      ry="12"
+      fill="#FFF8E7"
+      stroke="#C99A35"
+      strokeWidth="2"
+    />
+    <path
+      d="M10 23C10 31 16 35 24 35S38 31 38 23"
+      stroke="#C99A35"
+      strokeWidth="2"
+    />
+    <circle cx="18" cy="20" r="4" fill="#E8BD57" stroke="#B98B32" />
+    <circle cx="27" cy="17" r="4" fill="#173E70" />
+    <circle cx="29" cy="27" r="4" fill="#E8BD57" stroke="#B98B32" />
+    <path
+      d="M24 35V42M17 42H31"
+      stroke="#B98B32"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const TrustShield = () => (
+  <svg viewBox="0 0 48 48" className="h-8 w-8" fill="none">
+    <path
+      d="M24 4 40 10V22C40 33 32 40 24 44 16 40 8 33 8 22V10L24 4Z"
+      fill="#173E70"
+      stroke="#C99A35"
+      strokeWidth="2"
+    />
+    <path
+      d="m16 23 6 6 11-13"
+      stroke="#F5D47D"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 const WINNERS = [
   {
@@ -490,45 +612,19 @@ const HomeLotterySection = () => {
         {/* =====================================================
             LICENSED
         ====================================================== */}
+        {/* =====================================================
+            LICENSED
+        ====================================================== */}
 
         <section className="px-2.5 pt-3">
-          <div className="flex items-stretch overflow-hidden rounded-2xl bg-[#fffaf2] shadow-lg">
-            <div className="flex min-w-0 flex-[1.35] items-center gap-2 px-2.5 py-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#d8c8ad] bg-[#f7f0e4] text-[#173e70]">
-                <Landmark size={23} />
-              </div>
-
-              <div className="min-w-0 leading-tight">
-                <h2 className="text-[14px] font-black text-[#173e70]">
-                  Licensed & Regulated
-                </h2>
-
-                <p className="mt-0.5 text-[10px] font-medium text-[#344054]">
-                  By Government of Nagaland
-                </p>
-
-                <p className="text-[9px] text-gray-500">
-                  Nagaland State Lotteries
-                </p>
-              </div>
-            </div>
-
-            <div className="grid flex-1 grid-cols-3 border-l border-[#d8c8ad]">
-              <TrustFeature
-                icon={<ShieldCheck size={19} />}
-                text="100% Legal"
-              />
-
-              <TrustFeature
-                icon={<FileText size={19} />}
-                text="Verified Draws"
-              />
-
-              <TrustFeature
-                icon={<Users size={19} />}
-                text="Transparent System"
-              />
-            </div>
+          <div className="overflow-hidden rounded-2xl border border-[#DDBB70] shadow-[0_4px_14px_rgba(23,62,112,0.10)]">
+            <img
+              src={licenseBanner}
+              alt="Government Approved - Nagaland State Lotteries"
+              loading="lazy"
+              className="block h-auto w-full select-none object-cover"
+              draggable={false}
+            />
           </div>
         </section>
 

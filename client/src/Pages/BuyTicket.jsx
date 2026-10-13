@@ -9,7 +9,6 @@ import {
   Shuffle,
   Ticket,
   Trophy,
-  Users,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -67,6 +66,8 @@ import {
   selectKycDocuments,
   selectKycLoading,
 } from "../reducer/slice/kycReducer";
+
+import banner from "../assets/dear-1.jpg";
 
 // =====================================================
 // CONSTANTS
@@ -680,6 +681,14 @@ const BuyTicket = () => {
       : lotteryPrizes?.first,
   );
 
+  // Hero banner pe prize tabhi dikhega jab admin se valid prize aaye
+  const hasFirstPrize = Number(lotteryPrizes?.first) > 0;
+
+  // Prize text lamba ho to font chhota (banner ke box me fit karne ke liye)
+  const bannerPrizeLen = String(firstPrizeAmount || "").length;
+  const bannerPrizeFontSize =
+    bannerPrizeLen <= 8 ? "4.4cqw" : bannerPrizeLen <= 11 ? "3.6cqw" : "2.8cqw";
+
   // ===================================================
   // INITIAL API CALLS
   // ===================================================
@@ -1225,65 +1234,48 @@ const BuyTicket = () => {
       <NumberSoldNotification />
 
       {/* =================================================
-          HERO
+          HERO (BANNER IMAGE + DYNAMIC FIRST PRIZE)
       ================================================= */}
 
-      <section className="relative min-h-[190px] overflow-hidden bg-[#3b0a14]">
-        <div className="absolute inset-0 bg-gradient-to-r from-[#2a0610]/95 via-[#4a0b18]/85 to-[#2a0610]/70" />
+      <section className="relative overflow-hidden bg-[#3b0a14]">
+        <div
+          className="relative w-full"
+          style={{ containerType: "inline-size" }}
+        >
+          <img
+            src={banner}
+            alt="Daily Lottery"
+            loading="lazy"
+            className="block h-auto w-full select-none"
+            draggable={false}
+          />
 
-        <div className="pointer-events-none absolute -right-10 top-0 h-52 w-52 rounded-full bg-[#ff8a00]/25 blur-3xl" />
-
-        <div className="pointer-events-none absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-[#ff1744]/20 blur-3xl" />
-
-        <div className="relative grid min-h-[190px] grid-cols-[1.05fr_1fr] items-center gap-2 px-3 py-5">
-          <div className="relative z-10 min-w-0">
-            <h1 className="font-serif font-black leading-[0.9] tracking-tight">
-              <span className="block bg-gradient-to-b from-[#fff1a8] to-[#e0a11b] bg-clip-text text-[40px] text-transparent">
-                Daily
+          {/* Admin se aane wala First Prize — banner ke empty box me */}
+          {hasFirstPrize && (
+            <div
+              className="pointer-events-none absolute flex items-center justify-center"
+              style={{
+                left: "74.3%",
+                top: "55.8%",
+                width: "24%",
+                transform: "translate(-50%, -50%) rotate(-10deg)",
+              }}
+            >
+              <span
+                className="block whitespace-nowrap text-center font-black uppercase leading-none text-[#153c78]"
+                style={{
+                  fontSize: bannerPrizeFontSize,
+                  textShadow: "0 1px 0 rgba(255,255,255,0.6)",
+                }}
+              >
+                {firstPrizeAmount}
               </span>
-
-              <span className="block bg-gradient-to-b from-[#fff1a8] to-[#e0a11b] bg-clip-text text-[42px] text-transparent">
-                Lottery
-              </span>
-            </h1>
-
-            <p className="mt-2 text-[11px] font-medium leading-tight text-white">
-              Small Ticket, Big Opportunities
-            </p>
-
-            <div className="mt-3 grid grid-cols-3 gap-1">
-              <HeroFeature
-                icon={<CalendarDays size={21} />}
-                l1="Every Day"
-                l2="Draw"
-              />
-
-              <HeroFeature
-                icon={<Trophy size={21} />}
-                l1={firstPrizeAmount}
-                l2="Total Prize"
-              />
-
-              <HeroFeature
-                icon={<Users size={21} />}
-                l1="10 Tickets"
-                l2="per Draw"
-              />
             </div>
-          </div>
-
-          <div className="relative flex items-center justify-center">
-            <TicketMock
-              prize={firstPrizeAmount}
-              price={priceText}
-              number={HERO_TICKET_NUMBER}
-            />
-          </div>
+          )}
         </div>
       </section>
 
-      <main className="relative -mt-4 space-y-3 px-2">
-
+      <main className="relative mt-3 space-y-3 px-2">
         {/* =================================================
             BETTING CLOSED BANNER
         ================================================= */}
@@ -2027,8 +2019,17 @@ const DateChip = ({ chip, today, active, onClick, fluid = false }) => {
             : "border-dashed border-gray-300 bg-gray-100 opacity-60"
       }`}
     >
+      {/* ✅ Active Badge */}
+      {active && (
+        <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 rounded-full bg-[#ed1d43] px-2 py-0.5 text-[8px] font-bold text-white shadow-sm">
+          Active
+        </span>
+      )}
+
       {today && (
-        <span className="text-[10px] font-semibold text-[#ed1d43]">Today</span>
+        <span className="text-[10px] mt-1 font-semibold text-[#ed1d43]">
+          Today
+        </span>
       )}
 
       <span
@@ -2071,22 +2072,6 @@ const DateChip = ({ chip, today, active, onClick, fluid = false }) => {
     </button>
   );
 };
-
-// =====================================================
-// HERO FEATURE
-// =====================================================
-
-const HeroFeature = ({ icon, l1, l2 }) => (
-  <div className="flex min-w-0 flex-col items-center gap-1 text-center">
-    <span className="text-[#ffd34e]">{icon}</span>
-
-    <span className="break-words text-[8px] font-medium leading-tight text-white/90">
-      {l1}
-      <br />
-      {l2}
-    </span>
-  </div>
-);
 
 // =====================================================
 // INFO ITEM

@@ -10,6 +10,9 @@ import {
   Crown,
   Sparkles,
   Ticket,
+  Trophy,
+  Wallet,
+  XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -19,21 +22,6 @@ import {
   clearLotteryConfigError,
   getMyLotteryEntries,
 } from "../reducer/slice/createLotteryConfigSlice";
-
-// =====================================================
-// CONSTANTS - EXACT COLORS FROM SCREENSHOT
-// =====================================================
-const COLORS = {
-  red: "#D32F2F",
-  redSoft: "#E57373",
-  navy: "#0F1F3D",
-  navyLight: "#1A2C4E",
-  grayBg: "#F5F5F5",
-  grayBorder: "#E0E0E0",
-  grayText: "#6B7280",
-  gold: "#F5C542",
-  goldDark: "#B8860B",
-};
 
 // =====================================================
 // ENGLISH MONTH NAMES
@@ -52,6 +40,9 @@ const MONTH_NAMES_EN = [
   "Nov",
   "Dec",
 ];
+
+// Page background (notch cutouts use the same color)
+const PAGE_BG = "#EEF3FA";
 
 // =====================================================
 // DATE FORMATTER
@@ -308,17 +299,20 @@ const MyTickets = () => {
     [successfulTickets],
   );
   const winnerCount = useMemo(
-    () =>
-      successfulTickets.filter((t) => t.status === "won" || t.status === "win")
-        .length,
+    () => successfulTickets.filter((t) => t.status === "won").length,
+    [successfulTickets],
+  );
+  const lostCount = useMemo(
+    () => successfulTickets.filter((t) => t.status === "lost").length,
     [successfulTickets],
   );
 
   const tabs = [
     { key: "all", label: "All", count: successfulTickets.length },
-    { key: "daily", label: "Daily Lottery", count: dailyCount },
-    { key: "festival", label: "Festival Lottery", count: festivalCount },
+    { key: "daily", label: "Daily", count: dailyCount },
+    { key: "festival", label: "Festival", count: festivalCount },
     { key: "won", label: "Winners", count: winnerCount },
+    { key: "lost", label: "Lost", count: lostCount },
   ];
 
   const filteredTickets = useMemo(() => {
@@ -328,9 +322,9 @@ const MyTickets = () => {
     if (activeTab === "festival")
       return successfulTickets.filter((t) => t.lotteryType === "festival");
     if (activeTab === "won")
-      return successfulTickets.filter(
-        (t) => t.status === "won" || t.status === "win",
-      );
+      return successfulTickets.filter((t) => t.status === "won");
+    if (activeTab === "lost")
+      return successfulTickets.filter((t) => t.status === "lost");
     return successfulTickets;
   }, [successfulTickets, activeTab]);
 
@@ -342,112 +336,125 @@ const MyTickets = () => {
     } catch {}
   };
 
+  const statChips = [
+    { label: "Total", value: successfulTickets.length },
+    { label: "Daily", value: dailyCount },
+    { label: "Festival", value: festivalCount },
+    { label: "Winners", value: winnerCount },
+  ];
+
   return (
     <div
-      className="w-full min-h-screen pt-6 pb-[96px] px-3 sm:px-4"
-      style={{ backgroundColor: "#FFFFFF" }}
+      className="w-full min-h-screen text-[#131E3D] selection:bg-[#FFD84A] selection:text-black"
+      style={{ backgroundColor: PAGE_BG }}
     >
-      <main className="w-full max-w-[490px] mx-auto">
-        {/* ============================================ */}
-        {/* HEADER - Navy & Gold like screenshot */}
-        {/* ============================================ */}
-        <div
-          className="flex items-center justify-between gap-3 border-b pb-3"
-          style={{ borderColor: COLORS.grayBorder }}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="h-9 w-9 shrink-0 rounded-xl flex items-center justify-center transition active:scale-95 shadow-sm"
-              style={{
-                backgroundColor: COLORS.grayBg,
-                border: `1px solid ${COLORS.grayBorder}`,
-                color: COLORS.navy,
-              }}
-              aria-label="Go back"
-            >
-              <ArrowLeft size={18} />
-            </button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <Ticket
-                  size={20}
-                  strokeWidth={2}
-                  className="rotate-[-15deg] shrink-0"
-                  style={{ color: COLORS.gold }}
-                />
-                <h1
-                  className="text-lg sm:text-xl font-black tracking-tight truncate"
-                  style={{ color: COLORS.navy }}
-                >
-                  My Tickets
-                </h1>
-              </div>
-              <p
-                className="text-[11px] truncate"
-                style={{ color: COLORS.grayText }}
-              >
-                Confirmed Daily & Festival lottery purchases
-              </p>
-            </div>
-          </div>
+      <main className="relative mx-auto w-full max-w-[500px] min-h-screen pb-[96px]">
+        {/* =====================================================
+            HERO HEADER
+        ===================================================== */}
+        <div className="relative overflow-hidden rounded-b-[32px] bg-gradient-to-br from-[#0E1A45] via-[#1B2B65] to-[#142050] px-4 pt-5 pb-14 text-white shadow-[0_14px_35px_rgba(15,28,77,0.25)]">
+          <div className="pointer-events-none absolute -right-14 -top-14 h-52 w-52 rounded-full bg-[#ED1D43]/25 blur-3xl" />
+          <div className="pointer-events-none absolute -left-14 top-10 h-44 w-44 rounded-full bg-[#FFD84A]/15 blur-3xl" />
 
-          <div
-            className="shrink-0 px-2.5 py-1 rounded-lg text-right"
-            style={{
-              backgroundColor: "#FEF3C7",
-              border: `1px solid ${COLORS.gold}`,
-            }}
-          >
-            <span
-              className="text-xs font-black"
-              style={{ color: COLORS.goldDark }}
-            >
+          <div className="relative flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                aria-label="Go back"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 backdrop-blur-md transition hover:bg-white/20 active:scale-95"
+              >
+                <ArrowLeft size={18} />
+              </button>
+
+              <div className="min-w-0">
+                <h1 className="flex items-center gap-2 truncate text-[22px] font-black leading-tight tracking-tight">
+                  <Ticket
+                    size={22}
+                    className="shrink-0 -rotate-12 text-[#FFD84A]"
+                  />
+                  <span className="truncate">My Tickets</span>
+                </h1>
+                <p className="truncate text-[11px] text-white/65">
+                  Confirmed Daily & Festival purchases
+                </p>
+              </div>
+            </div>
+
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#FFD84A]/40 bg-[#FFD84A]/15 px-3 py-1 text-[11px] font-black text-[#FFD84A]">
+              <Sparkles size={12} />
               {successfulTickets.length}{" "}
               {successfulTickets.length === 1 ? "Ticket" : "Tickets"}
             </span>
           </div>
         </div>
 
-        {/* ============================================ */}
-        {/* TABS - Exact style from screenshot */}
-        {/* ============================================ */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar mt-3 pb-1">
+        {/* =====================================================
+            FLOATING STAT CHIPS
+        ===================================================== */}
+        <div className="relative z-10 -mt-9 px-3.5">
+          <div className="grid grid-cols-4 gap-1.5 rounded-[22px] border border-[#E2E8F0] bg-white p-2 shadow-[0_10px_28px_rgba(15,28,77,0.12)]">
+            {statChips.map((s, i) => (
+              <div
+                key={s.label}
+                className={`flex flex-col items-center rounded-2xl py-2 ${
+                  i === 3
+                    ? "border border-emerald-200 bg-emerald-50"
+                    : "bg-[#F8FAFC]"
+                }`}
+              >
+                <span
+                  className={`text-lg font-black leading-none ${
+                    i === 3 ? "text-emerald-600" : "text-[#131E3D]"
+                  }`}
+                >
+                  {myEntriesLoading ? "–" : s.value}
+                </span>
+                <span
+                  className={`mt-1 text-[10px] font-bold uppercase tracking-wide ${
+                    i === 3 ? "text-emerald-700" : "text-[#5A6788]"
+                  }`}
+                >
+                  {s.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* =====================================================
+            TABS
+        ===================================================== */}
+        <div className="mt-4 flex items-center gap-2 overflow-x-auto px-3.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {tabs.map((tab) => {
             const active = activeTab === tab.key;
+            const activeClass =
+              tab.key === "won"
+                ? "bg-gradient-to-r from-emerald-500 to-emerald-700 text-white shadow-[0_6px_16px_rgba(16,185,129,0.4)]"
+                : "bg-gradient-to-r from-[#ED1D43] to-[#C70F31] text-white shadow-[0_6px_16px_rgba(237,29,67,0.35)]";
+            const idleClass =
+              tab.key === "won"
+                ? "border border-emerald-200 bg-white text-emerald-700 hover:border-emerald-300"
+                : tab.key === "lost"
+                  ? "border border-red-200 bg-white text-red-600 hover:border-red-300"
+                  : "border border-[#E2E8F0] bg-white text-[#5A6788] hover:border-[#CBD5E1]";
+
             return (
               <button
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0"
-                style={
-                  active
-                    ? {
-                        backgroundColor: COLORS.navy,
-                        color: "#FFFFFF",
-                        border: `1px solid ${COLORS.navy}`,
-                        boxShadow: "0 2px 6px rgba(15, 31, 61, 0.25)",
-                      }
-                    : {
-                        backgroundColor: COLORS.grayBg,
-                        color: COLORS.grayText,
-                        border: `1px solid ${COLORS.grayBorder}`,
-                      }
-                }
+                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-xs font-extrabold transition-all active:scale-95 ${
+                  active ? activeClass : idleClass
+                }`}
               >
                 <span>{tab.label}</span>
                 <span
-                  className="text-[10px] px-1.5 py-0.2 rounded-full font-black"
-                  style={
+                  className={`rounded-full px-1.5 text-[10px] font-black leading-[16px] ${
                     active
-                      ? {
-                          backgroundColor: "rgba(255,255,255,0.2)",
-                          color: "#FFFFFF",
-                        }
-                      : { backgroundColor: "#E5E7EB", color: COLORS.grayText }
-                  }
+                      ? "bg-white/25 text-white"
+                      : "bg-[#F1F5F9] text-[#5A6788]"
+                  }`}
                 >
                   {tab.count}
                 </span>
@@ -456,124 +463,98 @@ const MyTickets = () => {
           })}
         </div>
 
-        {/* ============================================ */}
-        {/* LOADING STATE */}
-        {/* ============================================ */}
-        {myEntriesLoading ? (
-          <div
-            className="mt-6 h-[160px] rounded-xl flex flex-col items-center justify-center"
-            style={{
-              backgroundColor: COLORS.grayBg,
-              border: `1px solid ${COLORS.grayBorder}`,
-            }}
-          >
-            <Ticket
-              size={32}
-              className="animate-pulse"
-              style={{ color: COLORS.gold }}
-            />
-            <p
-              className="mt-2 text-xs font-semibold"
-              style={{ color: COLORS.grayText }}
-            >
-              Loading your tickets...
-            </p>
-          </div>
-        ) : error && !successfulTickets.length ? (
-          <div
-            className="mt-6 rounded-xl p-4 flex flex-col items-center text-center"
-            style={{
-              backgroundColor: "#FEF2F2",
-              border: "1px solid #FECACA",
-            }}
-          >
-            <AlertCircle size={28} style={{ color: COLORS.red }} />
-            <p
-              className="mt-1.5 text-xs font-medium"
-              style={{ color: COLORS.red }}
-            >
-              {error}
-            </p>
-            <button
-              type="button"
-              onClick={() => dispatch(getMyLotteryEntries())}
-              className="mt-2.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition"
-              style={{
-                backgroundColor: COLORS.navy,
-                color: "#FFFFFF",
-              }}
-            >
-              Retry
-            </button>
-          </div>
-        ) : null}
+        {/* =====================================================
+            STATES + LIST
+        ===================================================== */}
+        <div className="mt-3 space-y-3 px-3.5">
+          {/* LOADING SKELETON */}
+          {myEntriesLoading && (
+            <>
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="animate-pulse overflow-hidden rounded-[16px] border border-[#E2E8F0] bg-white shadow-sm"
+                >
+                  <div className="h-9 bg-[#1B2B65]/80" />
+                  <div className="space-y-2 p-3">
+                    <div className="flex gap-1">
+                      {Array.from({ length: 8 }).map((_, k) => (
+                        <div
+                          key={k}
+                          className="h-7 w-6 rounded-md bg-[#F1F5F9]"
+                        />
+                      ))}
+                    </div>
+                    <div className="h-8 rounded-lg bg-[#F8FAFC]" />
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
 
-        {/* ============================================ */}
-        {/* TICKETS LIST */}
-        {/* ============================================ */}
-        <div className="mt-3.5 space-y-3">
-          {filteredTickets.length > 0 ? (
-            filteredTickets.map((ticket) => (
+          {/* ERROR */}
+          {!myEntriesLoading && error && !successfulTickets.length && (
+            <div className="flex flex-col items-center rounded-[22px] border border-red-200 bg-red-50 p-5 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-[#ED1D43]">
+                <AlertCircle size={24} />
+              </div>
+              <p className="mt-2 text-xs font-semibold text-red-700">
+                {String(error)}
+              </p>
+              <button
+                type="button"
+                onClick={() => dispatch(getMyLotteryEntries())}
+                className="mt-3 rounded-xl bg-gradient-to-r from-[#0E1A45] to-[#1B2B65] px-5 py-2 text-xs font-black text-white shadow-md transition active:scale-95"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* TICKETS */}
+          {!myEntriesLoading &&
+            filteredTickets.map((ticket, idx) => (
               <TicketCard
-                key={ticket.id}
+                key={`${ticket.id}-${idx}`}
                 ticket={ticket}
                 copyId={copyId}
-                isCopied={copiedId === ticket.id}
+                copiedId={copiedId}
               />
-            ))
-          ) : !myEntriesLoading ? (
-            <div
-              className="mt-6 rounded-xl p-6 flex flex-col items-center text-center"
-              style={{
-                backgroundColor: COLORS.grayBg,
-                border: `1px solid ${COLORS.grayBorder}`,
-              }}
-            >
-              <div
-                className="h-12 w-12 rounded-xl flex items-center justify-center"
-                style={{
-                  backgroundColor: "#FEF3C7",
-                  border: `1px solid ${COLORS.gold}`,
-                }}
-              >
-                <Ticket size={24} style={{ color: COLORS.goldDark }} />
+            ))}
+
+          {/* EMPTY */}
+          {!myEntriesLoading && !error && filteredTickets.length === 0 && (
+            <div className="flex flex-col items-center rounded-[24px] border border-[#E2E8F0] bg-white p-7 text-center shadow-sm">
+              <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-[#FFD84A]/50 bg-gradient-to-br from-amber-50 to-white">
+                <Ticket size={30} className="-rotate-12 text-[#B8860B]" />
               </div>
-              <h3
-                className="mt-2.5 text-sm font-bold"
-                style={{ color: COLORS.navy }}
-              >
+              <h3 className="mt-3 text-base font-black text-[#131E3D]">
                 No Confirmed Tickets Found
               </h3>
-              <p
-                className="mt-1 text-xs max-w-[260px]"
-                style={{ color: COLORS.grayText }}
-              >
+              <p className="mt-1 max-w-[260px] text-xs text-[#5A6788]">
                 {activeTab === "all"
                   ? "You have not purchased any tickets yet. Pick your lucky numbers today!"
                   : `No confirmed tickets found in ${activeTab} category.`}
               </p>
-              <div className="mt-3.5 flex items-center gap-2">
-                {/* Daily Lottery - RED button like screenshot */}
+
+              <div className="mt-4 flex items-center gap-2.5">
                 <button
                   type="button"
                   onClick={() => navigate("/buy-ticket")}
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-black text-white shadow transition active:scale-95"
-                  style={{ backgroundColor: COLORS.red }}
+                  className="rounded-xl bg-gradient-to-r from-[#ED1D43] to-[#C70F31] px-4 py-2.5 text-xs font-black text-white shadow-[0_6px_18px_rgba(237,29,67,0.35)] transition active:scale-95"
                 >
                   Daily Lottery
                 </button>
-                {/* Festival Lottery - NAVY button like screenshot */}
                 <button
                   type="button"
                   onClick={() => navigate("/festival")}
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-black text-white shadow transition active:scale-95"
-                  style={{ backgroundColor: COLORS.navy }}
+                  className="rounded-xl bg-gradient-to-r from-[#0E1A45] to-[#1B2B65] px-4 py-2.5 text-xs font-black text-white shadow-[0_6px_18px_rgba(15,28,77,0.3)] transition active:scale-95"
                 >
                   Festival Lottery
                 </button>
               </div>
             </div>
-          ) : null}
+          )}
         </div>
       </main>
     </div>
@@ -581,132 +562,145 @@ const MyTickets = () => {
 };
 
 // =====================================================
-// TICKET CARD COMPONENT
+// STATUS THEMES (won = green, lost = red, default = navy)
 // =====================================================
-const TicketCard = ({ ticket, copyId, isCopied }) => {
+const THEMES = {
+  won: {
+    header: "from-[#064E3B] via-[#047857] to-[#065F46]",
+    badge: "border-emerald-200/60 bg-emerald-400 text-[#022C22]",
+    digit:
+      "border-emerald-400 bg-gradient-to-b from-emerald-50 to-emerald-100 text-emerald-800",
+    divider: "border-emerald-300",
+    notch: "border-emerald-500",
+    stubBox: "border-emerald-200 bg-emerald-50",
+    stubIcon: "text-emerald-700",
+    paidBox: "bg-[#064E3B]",
+    paidText: "text-emerald-300",
+    paidIcon: "text-emerald-300",
+  },
+  lost: {
+    header: "from-[#4C0519] via-[#9F1239] to-[#7F1D1D]",
+    badge: "border-red-200/50 bg-red-500/30 text-red-100",
+    digit:
+      "border-red-300 bg-gradient-to-b from-red-50 to-red-100 text-red-800",
+    divider: "border-red-300",
+    notch: "border-red-400",
+    stubBox: "border-red-200 bg-red-50",
+    stubIcon: "text-red-700",
+    paidBox: "bg-[#7F1D1D]",
+    paidText: "text-red-200",
+    paidIcon: "text-red-200",
+  },
+  default: {
+    header: "from-[#0E1A45] via-[#1B2B65] to-[#142050]",
+    badge: "border-emerald-400/40 bg-emerald-500/20 text-emerald-300",
+    digit:
+      "border-[#E2E8F0] bg-gradient-to-b from-white to-[#F1F5F9] text-[#131E3D]",
+    divider: "border-[#CBD5E1]",
+    notch: "border-[#E2E8F0]",
+    stubBox: "border-[#E2E8F0] bg-[#F8FAFC]",
+    stubIcon: "text-[#1B2B65]",
+    paidBox: "bg-[#0E1A45]",
+    paidText: "text-[#FFD84A]",
+    paidIcon: "text-[#FFD84A]",
+  },
+};
+
+// =====================================================
+// TICKET CARD COMPONENT (COMPACT)
+// =====================================================
+const TicketCard = ({ ticket, copyId, copiedId }) => {
   const [showAllTickets, setShowAllTickets] = useState(false);
-  const isWinner = ticket.status === "won" || ticket.status === "win";
+  const isWinner = ticket.status === "won";
+  const isLost = ticket.status === "lost";
   const isFestival = ticket.isFestival;
+  const isCopied = copiedId === ticket.id;
+
+  const t = isWinner ? THEMES.won : isLost ? THEMES.lost : THEMES.default;
 
   return (
     <div
-      className="relative w-full rounded-xl overflow-hidden shadow-md"
-      style={{
-        backgroundColor: "#FFFFFF",
-        border: `1px solid ${COLORS.grayBorder}`,
-      }}
+      className={`relative w-full overflow-hidden rounded-[16px] bg-white ${t.card}`}
     >
-      {/* ============================================ */}
-      {/* TOP HEADER BAR - Navy like screenshot */}
-      {/* ============================================ */}
+      {/* ================= HEADER ================= */}
       <div
-        className="relative z-[20] flex items-center justify-between gap-2 px-3 py-2"
-        style={{
-          backgroundColor: COLORS.navy,
-          borderBottom: `1px solid ${COLORS.navyLight}`,
-        }}
+        className={`relative flex items-center justify-between gap-2 bg-gradient-to-r px-3 py-2 ${t.header}`}
       >
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="relative flex min-w-0 items-center gap-1.5">
           <span
-            className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider text-white"
-            style={{
-              backgroundColor: isFestival ? COLORS.goldDark : COLORS.red,
-            }}
+            className={`shrink-0 rounded border border-white/25 px-1.5 py-[1px] text-[8px] font-black uppercase tracking-wider text-white ${
+              isFestival
+                ? "bg-gradient-to-r from-[#B8860B] to-[#D4A017]"
+                : "bg-gradient-to-r from-[#ED1D43] to-[#C70F31]"
+            }`}
           >
-            {ticket.lotteryTypeLabel}
+            {isFestival ? "Festival" : "Daily"}
           </span>
-          <span className="text-xs font-black text-white truncate">
+          <span className="truncate text-xs font-black text-white">
             {ticket.marketName}
           </span>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs font-black" style={{ color: COLORS.gold }}>
-            {ticket.price}
-          </span>
-          <span
-            className="px-1.5 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1"
-            style={
-              isWinner
-                ? {
-                    backgroundColor: "rgba(16, 185, 129, 0.2)",
-                    color: "#6EE7B7",
-                    border: "1px solid rgba(16, 185, 129, 0.4)",
-                  }
-                : {
-                    backgroundColor: "rgba(96, 165, 250, 0.2)",
-                    color: "#93C5FD",
-                    border: "1px solid rgba(96, 165, 250, 0.4)",
-                  }
-            }
-          >
-            {isWinner ? (
-              <>
-                <Sparkles size={10} style={{ color: "#6EE7B7" }} />
-                Winner
-              </>
-            ) : (
-              <>
-                <CheckCircle2 size={10} style={{ color: "#93C5FD" }} />
-                Confirmed
-              </>
-            )}
-          </span>
-        </div>
+        <span
+          className={`relative inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-[2px] text-[9px] font-extrabold ${t.badge}`}
+        >
+          {isWinner ? (
+            <Trophy size={10} />
+          ) : isLost ? (
+            <XCircle size={10} />
+          ) : (
+            <CheckCircle2 size={10} />
+          )}
+          {isWinner ? "Winner" : isLost ? "Lost" : "Confirmed"}
+        </span>
       </div>
 
-      {/* ============================================ */}
-      {/* BODY */}
-      {/* ============================================ */}
-      <div className="relative z-[20] p-2.5 sm:p-3 space-y-2">
-        {/* TICKET NUMBER STRIP */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <span
-              className="text-[10px] font-bold uppercase tracking-wider"
-              style={{ color: COLORS.grayText }}
-            >
-              Ticket Number
-            </span>
+      {/* ================= TICKET NUMBER ================= */}
+      <div className="px-3 pt-2 pb-2.5">
+        <div className="mb-1.5 flex items-center justify-between gap-2">
+          <span className="text-[9px] font-extrabold uppercase tracking-wider text-[#8A97AB]">
+            Ticket No.
+          </span>
+
+          <div className="flex items-center gap-1">
             {ticket.ticketCount > 1 && (
-              <span
-                className="text-[9px] font-extrabold px-1.5 py-0.2 rounded text-white"
-                style={{ backgroundColor: COLORS.red }}
-              >
+              <span className="rounded-full bg-[#ED1D43] px-1.5 py-[1px] text-[8px] font-black text-white">
                 {ticket.ticketCount} Tickets
               </span>
             )}
-          </div>
-
-          {/* 8-CHARACTER HORIZONTAL STRIP */}
-          <div className="flex items-center gap-1 sm:gap-1.5 flex-nowrap overflow-x-auto no-scrollbar">
-            {ticket.digits.map((char, idx) => (
-              <div
-                key={idx}
-                className="h-8 w-7 sm:h-8.5 sm:w-7.5 shrink-0 rounded-md flex items-center justify-center text-sm sm:text-base font-black font-mono select-all"
-                style={{
-                  backgroundColor: COLORS.grayBg,
-                  border: `1px solid ${COLORS.grayBorder}`,
-                  color: COLORS.navy,
-                }}
-              >
-                {char}
-              </div>
-            ))}
+            {ticket.prizes?.first > 0 && (
+              <span className="inline-flex items-center gap-0.5 rounded-full border border-[#FFD84A]/60 bg-amber-50 px-1.5 py-[1px] text-[8px] font-black text-[#8A6100]">
+                <Crown size={9} />
+                1st {formatPrize(ticket.prizes.first)}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* BULK EXPANDABLE TICKETS */}
+        <div className="flex flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {ticket.digits.length > 0 ? (
+            ticket.digits.map((char, idx) => (
+              <div
+                key={idx}
+                className={`flex h-7 w-6 shrink-0 select-all items-center justify-center rounded-md border font-mono text-sm font-black ${t.digit}`}
+              >
+                {char}
+              </div>
+            ))
+          ) : (
+            <span className="text-xs text-[#8A97AB]">—</span>
+          )}
+        </div>
+
+        {/* BULK EXPAND */}
         {ticket.ticketCount > 1 && (
-          <div
-            className="pt-1"
-            style={{ borderTop: `1px solid ${COLORS.grayBorder}` }}
-          >
+          <div className="mt-2">
             <button
               type="button"
-              onClick={() => setShowAllTickets((prev) => !prev)}
-              className="text-[11px] font-bold flex items-center gap-1 hover:underline"
-              style={{ color: COLORS.red }}
+              onClick={() => setShowAllTickets((p) => !p)}
+              className={`flex items-center gap-1 text-[10px] font-extrabold hover:underline ${
+                isWinner ? "text-emerald-600" : "text-[#ED1D43]"
+              }`}
             >
               <span>
                 {showAllTickets
@@ -721,123 +715,119 @@ const TicketCard = ({ ticket, copyId, isCopied }) => {
             </button>
 
             {showAllTickets && (
-              <div className="mt-1.5 flex flex-wrap gap-1 max-h-28 overflow-y-auto pr-1">
+              <div className="mt-1.5 flex max-h-28 flex-wrap gap-1 overflow-y-auto pr-1">
                 {ticket.ticketNumbers.map((num, i) => (
-                  <span
-                    key={i}
+                  <button
+                    type="button"
+                    key={`${num}-${i}`}
                     onClick={() => copyId(num)}
-                    className="cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-black transition active:scale-95"
-                    style={{
-                      backgroundColor: COLORS.grayBg,
-                      border: `1px solid ${COLORS.grayBorder}`,
-                      color: COLORS.navy,
-                    }}
-                    title="Click to copy"
+                    title="Tap to copy"
+                    className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-black text-[#131E3D] transition active:scale-95 ${t.stubBox}`}
                   >
-                    {num}
-                    <Copy size={9} style={{ color: COLORS.grayText }} />
-                  </span>
+                    {copiedId === num ? (
+                      <span className="text-[9px] text-emerald-600">
+                        Copied!
+                      </span>
+                    ) : (
+                      <>
+                        {num}
+                        <Copy size={9} className="text-[#8A97AB]" />
+                      </>
+                    )}
+                  </button>
                 ))}
               </div>
             )}
           </div>
         )}
+      </div>
 
-        {/* DETAILS ROW */}
+      {/* ================= DASHED DIVIDER WITH NOTCHES ================= */}
+      <div className="relative h-0">
         <div
-          className="grid grid-cols-2 gap-2 rounded-lg px-2.5 py-1.5 text-[11px]"
-          style={{
-            backgroundColor: COLORS.grayBg,
-            border: `1px solid ${COLORS.grayBorder}`,
-          }}
-        >
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Calendar
-              size={12}
-              style={{ color: COLORS.navy }}
-              className="shrink-0"
-            />
-            <div className="min-w-0">
-              <span
-                className="block text-[9px] uppercase font-bold leading-none"
-                style={{ color: COLORS.grayText }}
-              >
-                Draw Date & Time
-              </span>
-              <span
-                className="font-extrabold truncate block mt-0.5"
-                style={{ color: COLORS.navy }}
-              >
-                {ticket.drawDate.full} • {ticket.drawTime}
-              </span>
-            </div>
+          className={`absolute -left-2 -top-2 h-4 w-4 rounded-full border ${t.notch}`}
+          style={{ backgroundColor: PAGE_BG }}
+        />
+        <div
+          className={`absolute -right-2 -top-2 h-4 w-4 rounded-full border ${t.notch}`}
+          style={{ backgroundColor: PAGE_BG }}
+        />
+        <div className={`mx-3 border-t border-dashed ${t.divider}`} />
+      </div>
+
+      {/* ================= STUB ================= */}
+      <div className="px-3 pt-2.5 pb-2">
+        {/* 3 columns: Draw / Purchased / Amount */}
+        <div className="grid grid-cols-3 gap-1.5">
+          <div className={`min-w-0 rounded-lg border px-2 py-1.5 ${t.stubBox}`}>
+            <p className="flex items-center gap-1 text-[8px] font-extrabold uppercase leading-none tracking-wide text-[#8A97AB]">
+              <Calendar size={9} className={t.stubIcon} />
+              Draw
+            </p>
+            <p className="mt-1 truncate text-[10px] font-black leading-tight text-[#131E3D]">
+              {ticket.drawDate.full}
+            </p>
+            <p className="text-[9px] font-semibold leading-tight text-[#5A6788]">
+              {ticket.drawTime}
+            </p>
           </div>
 
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Clock3
-              size={12}
-              style={{ color: COLORS.navy }}
-              className="shrink-0"
-            />
-            <div className="min-w-0">
-              <span
-                className="block text-[9px] uppercase font-bold leading-none"
-                style={{ color: COLORS.grayText }}
-              >
-                Purchased On
-              </span>
-              <span
-                className="font-semibold truncate block mt-0.5"
-                style={{ color: COLORS.navy }}
-              >
-                {ticket.purchaseDate}, {ticket.purchaseTime}
-              </span>
-            </div>
+          <div className={`min-w-0 rounded-lg border px-2 py-1.5 ${t.stubBox}`}>
+            <p className="flex items-center gap-1 text-[8px] font-extrabold uppercase leading-none tracking-wide text-[#8A97AB]">
+              <Clock3 size={9} className={t.stubIcon} />
+              Bought
+            </p>
+            <p className="mt-1 truncate text-[10px] font-black leading-tight text-[#131E3D]">
+              {ticket.purchaseDate}
+            </p>
+            <p className="text-[9px] font-semibold leading-tight text-[#5A6788]">
+              {ticket.purchaseTime}
+            </p>
+          </div>
+
+          <div
+            className={`flex min-w-0 flex-col justify-center rounded-lg px-2 py-1.5 ${t.paidBox}`}
+          >
+            <p className="flex items-center gap-1 text-[8px] font-extrabold uppercase leading-none tracking-wide text-white/60">
+              <Wallet size={9} className={t.paidIcon} />
+              Paid
+            </p>
+            <p
+              className={`mt-1 truncate text-sm font-black leading-tight ${t.paidText}`}
+            >
+              {ticket.price}
+            </p>
           </div>
         </div>
 
-        {/* FOOTER ROW */}
-        <div
-          className="pt-1 flex items-center justify-between text-[10px]"
-          style={{ borderTop: `1px solid ${COLORS.grayBorder}` }}
-        >
-          <div className="flex items-center gap-1 min-w-0 truncate">
-            <span style={{ color: COLORS.grayText }}>Order:</span>
-            <span
-              className="font-mono font-bold truncate"
-              style={{ color: COLORS.navy }}
-            >
+        {/* ORDER ID */}
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1 text-[9px]">
+            <span className="font-bold text-[#8A97AB]">Order</span>
+            <span className="truncate font-mono font-black text-[#131E3D]">
               {ticket.id}
             </span>
-            <button
-              type="button"
-              onClick={() => copyId(ticket.id)}
-              className="p-0.5 transition shrink-0"
-              style={{ color: COLORS.grayText }}
-              title="Copy Order ID"
-            >
-              {isCopied ? (
-                <span
-                  className="text-[9px] font-bold"
-                  style={{ color: "#059669" }}
-                >
-                  Copied!
-                </span>
-              ) : (
-                <Copy size={10} />
-              )}
-            </button>
           </div>
 
-          {ticket.prizes?.first > 0 && (
-            <div
-              className="flex items-center gap-1 text-[10px] font-black shrink-0"
-              style={{ color: COLORS.goldDark }}
-            >
-              <Crown size={11} style={{ color: COLORS.goldDark }} />
-              <span>1st Prize: {formatPrize(ticket.prizes.first)}</span>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={() => copyId(ticket.id)}
+            title="Copy Order ID"
+            className={`flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-extrabold transition active:scale-95 ${
+              isCopied
+                ? "border-emerald-200 bg-emerald-50 text-emerald-600"
+                : "border-[#E2E8F0] bg-white text-[#5A6788] hover:bg-[#F8FAFC]"
+            }`}
+          >
+            {isCopied ? (
+              "Copied!"
+            ) : (
+              <>
+                <Copy size={9} />
+                Copy
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

@@ -7,9 +7,7 @@ import {
   PartyPopper,
   RefreshCw,
   ShieldCheck,
-  Sparkles,
   Ticket,
-  Trophy,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -24,6 +22,8 @@ import {
   selectFestivalResultImagesLoading,
   selectResultImagesError,
 } from "../reducer/slice/resultImageSlice";
+
+import banner from "../assets/dear-result-3.jpg";
 
 // ==========================================================
 // CONSTANTS
@@ -161,55 +161,15 @@ const ResultPage = () => {
         style={{ paddingBottom: BOTTOM_NAV_HEIGHT + 32 }}
       >
         {/* ================= HERO HEADER ================= */}
-        <section
-          className="relative overflow-hidden bg-[#3b0a14] bg-cover bg-center"
-          style={{ backgroundImage: `url(${HERO_IMAGE})` }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-[#2a0610]/95 via-[#4a0b18]/85 to-[#2a0610]/70" />
-          <div className="pointer-events-none absolute -right-10 top-0 h-52 w-52 rounded-full bg-[#ff8a00]/25 blur-3xl" />
-          <div className="pointer-events-none absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-[#ff1744]/20 blur-3xl" />
-
-          <Sparkles
-            size={16}
-            className="pointer-events-none absolute left-[46%] top-4 text-[#ffcf4a]/80"
+        <section className="relative overflow-hidden bg-[#3b0a14] h-[150px]">
+          {/* Banner Image */}
+          <img
+            src={banner}
+            draggable={false}
+            loading="lazy"
+            alt="Official Draw Charts - Lottery Results"
+            className="absolute inset-0 h-full w-full object-cover object-center"
           />
-          <Sparkles
-            size={12}
-            className="pointer-events-none absolute bottom-[25%] left-[6%] text-[#ffb82e]/70"
-          />
-
-          <div className="relative flex items-center justify-between px-4 pb-14 pt-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-[#ffd34e] bg-white/10 shadow-[0_0_25px_rgba(255,209,90,0.25)]">
-                <Trophy className="h-8 w-8 text-[#ffd34e]" strokeWidth={1.8} />
-              </div>
-
-              <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[#ffd34e]">
-                  Official Draw Charts
-                </p>
-                <h1 className="mt-0.5 bg-gradient-to-b from-[#fff1a8] to-[#e0a11b] bg-clip-text font-serif text-[28px] font-black leading-none text-transparent">
-                  Lottery Results
-                </h1>
-                <p className="mt-1 text-[11px] leading-tight text-white/80">
-                  View published daily & festival bumper result charts
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={isLoading}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition active:scale-95 hover:bg-white/20 disabled:opacity-50"
-              title="Refresh Results"
-            >
-              <RefreshCw
-                size={16}
-                className={isLoading ? "animate-spin" : ""}
-              />
-            </button>
-          </div>
         </section>
 
         {/* ================= CATEGORY TABS ================= */}

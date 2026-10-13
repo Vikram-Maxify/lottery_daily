@@ -85,7 +85,7 @@ const lotteryUserEntrySchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // =====================================================
@@ -108,7 +108,6 @@ const lotteryConfigSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-
 
     // ================================================
     // MONTH (1 - 12)
@@ -208,13 +207,13 @@ const lotteryConfigSchema = new mongoose.Schema(
 
     isActive: {
       type: Boolean,
-      default: false,
+      default: true,
       index: true,
     },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // =====================================================
@@ -234,10 +233,7 @@ lotteryConfigSchema.index(
   },
   {
     unique: true,
-  }
+  },
 );
 
-module.exports = mongoose.model(
-  "LotteryConfig",
-  lotteryConfigSchema
-);
+module.exports = mongoose.model("LotteryConfig", lotteryConfigSchema);

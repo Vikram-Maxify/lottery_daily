@@ -4,14 +4,11 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
-  Gift,
   ScrollText,
-  ShieldCheck,
   Shuffle,
   Sparkles,
   Ticket,
   Trophy,
-  Users,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -63,13 +60,13 @@ import {
   selectKycLoading,
 } from "../reducer/slice/kycReducer";
 
+import banner from "../assets/dear-fastival-2.jpg";
+
 // =====================================================
 // CONSTANTS
 // =====================================================
 const BOTTOM_NAV_HEIGHT = 64;
 const PURCHASE_BAR_HEIGHT = 90;
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1605196560547-b2f7281b7355?auto=format&fit=crop&w=1400&q=80";
 
 const QUICK_OPTIONS = [10, 20, 30, 50, 100];
 const MAX_TICKETS = 100;
@@ -322,21 +319,26 @@ const FestivalLottery = () => {
   }, [dispatch]);
 
   // Sync active festival tab
+
+  // Sync the initial festival selection without overriding
+  // a market that the user has manually selected.
   useEffect(() => {
-    if (activeFestivalConfig?.marketName) {
-      const activeKey = normalizeKey(activeFestivalConfig.marketName);
-      if (activeKey) {
-        setFestivalKey(activeKey);
-        return;
-      }
-    }
-    if (festivalTabs.length > 0) {
-      const exists = festivalTabs.some((t) => t.key === festivalKey);
-      if (!exists) {
-        setFestivalKey(festivalTabs[0].key);
-      }
-    }
-  }, [activeFestivalConfig, festivalTabs, festivalKey]);
+    if (!festivalTabs.length) return;
+
+    const selectedExists = festivalTabs.some((tab) => tab.key === festivalKey);
+
+    // Preserve the user's current selection.
+    if (selectedExists) return;
+
+    // Use the admin-selected active market only as the default.
+    const activeKey = normalizeKey(activeFestivalConfig?.marketName);
+
+    const initialKey = festivalTabs.some((tab) => tab.key === activeKey)
+      ? activeKey
+      : festivalTabs[0].key;
+
+    setFestivalKey(initialKey);
+  }, [activeFestivalConfig?.marketName, festivalTabs, festivalKey]);
 
   // Reset local selection ONLY when user explicitly changes festival tab
   const prevFestivalKeyRef = useRef(null);
@@ -415,6 +417,21 @@ const FestivalLottery = () => {
     currentLottery?.imageUrl || festival?.imageUrl || null;
   const lotteryPrizes = currentLottery?.prizes || {};
   const firstPrizeAmount = formatINR(lotteryPrizes?.first);
+
+  // Hero banner overlays (admin se aane wala data)
+  const hasFirstPrize = Number(lotteryPrizes?.first) > 0;
+  const bannerMarketText = String(marketName || "").trim();
+  const bannerPrizeText = String(firstPrizeAmount || "").trim();
+
+  // Font size auto-fit (cqw = banner width ka %), lamba text ho to chhota
+  const bannerMarketFontSize = `${Math.min(
+    3.4,
+    19 / (Math.max(bannerMarketText.length, 1) * 0.62),
+  ).toFixed(2)}cqw`;
+  const bannerPrizeFontSize = `${Math.min(
+    4.8,
+    22 / (Math.max(bannerPrizeText.length, 1) * 0.66),
+  ).toFixed(2)}cqw`;
 
   const winningRules = useMemo(
     () =>
@@ -717,61 +734,70 @@ const FestivalLottery = () => {
           paddingBottom: BOTTOM_NAV_HEIGHT + PURCHASE_BAR_HEIGHT + 16,
         }}
       >
-        {/* ================= HERO ================= */}
-        <section
-          className="relative overflow-hidden bg-[#3b0a14] bg-cover bg-center"
-          style={{ backgroundImage: `url(${HERO_IMAGE})` }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-[#2a0610]/95 via-[#4a0b18]/75 to-[#2a0610]/55" />
-          <div className="pointer-events-none absolute -right-10 top-0 h-52 w-52 rounded-full bg-[#ff8a00]/25 blur-3xl" />
-          <div className="pointer-events-none absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-[#ff1744]/20 blur-3xl" />
-          <Sparkles
-            size={16}
-            className="pointer-events-none absolute left-[46%] top-4 text-[#ffcf4a]/80"
-          />
-          <Sparkles
-            size={12}
-            className="pointer-events-none absolute bottom-[30%] left-[4%] text-[#ffb82e]/70"
-          />
-          <div className="relative grid grid-cols-[1.05fr_1fr] items-center gap-2 px-2 pb-14 pt-5">
-            <div className="relative z-10 min-w-0">
-              <h1 className="font-serif font-black leading-[0.9] tracking-tight">
-                <span className="block bg-gradient-to-b from-[#fff1a8] to-[#e0a11b] bg-clip-text text-[42px] text-transparent">
-                  Festival
+        {/* ================= HERO (BANNER IMAGE + DYNAMIC DATA) ================= */}
+        <section className="relative overflow-hidden bg-[#3b0a14]">
+          <div
+            className="relative w-full"
+            style={{ containerType: "inline-size" }}
+          >
+            <img
+              src={banner}
+              alt="Festival Lottery"
+              loading="lazy"
+              className="block h-auto w-full select-none"
+              draggable={false}
+            />
+
+            {/* Upper box: Market name (admin se) */}
+            {bannerMarketText && (
+              <div
+                className="pointer-events-none absolute flex items-center justify-center"
+                style={{
+                  left: "74.8%",
+                  top: "40%",
+                  width: "21%",
+                  transform: "translate(-50%, -50%) rotate(-7deg)",
+                }}
+              >
+                <span
+                  className="block whitespace-nowrap text-center font-black uppercase leading-none text-[#d7193f]"
+                  style={{
+                    fontSize: bannerMarketFontSize,
+                    textShadow: "0 1px 0 rgba(255,255,255,0.6)",
+                  }}
+                >
+                  {bannerMarketText}
                 </span>
-                <span className="block bg-gradient-to-b from-[#fff1a8] to-[#e0a11b] bg-clip-text text-[46px] text-transparent">
-                  Lottery
-                </span>
-              </h1>
-              <p className="mt-2 text-[11px] font-medium leading-tight text-white">
-                Bigger Draws, Bigger Celebrations
-              </p>
-              <div className="mt-3 grid grid-cols-4 gap-1">
-                <HeroFeature icon={<Gift size={20} />} text="Mega Prizes" />
-                <HeroFeature
-                  icon={<ShieldCheck size={20} />}
-                  text="Special Draws"
-                />
-                <HeroFeature
-                  icon={<Trophy size={20} />}
-                  text="Limited Period"
-                />
-                <HeroFeature icon={<Users size={20} />} text="More Chances" />
               </div>
-            </div>
-            <div className="relative flex items-center justify-center">
-              <FestivalHeroTicket
-                special={`${marketName} Special`}
-                price={price}
-                number={TICKET_EXAMPLE}
-                firstPrize={firstPrizeAmount}
-              />
-            </div>
+            )}
+
+            {/* Lower box: First prize (admin se) */}
+            {hasFirstPrize && (
+              <div
+                className="pointer-events-none absolute flex items-center justify-center"
+                style={{
+                  left: "76.7%",
+                  top: "58.4%",
+                  width: "24%",
+                  transform: "translate(-50%, -50%) rotate(-7deg)",
+                }}
+              >
+                <span
+                  className="block whitespace-nowrap text-center font-black uppercase leading-none text-[#153c78]"
+                  style={{
+                    fontSize: bannerPrizeFontSize,
+                    textShadow: "0 1px 0 rgba(255,255,255,0.6)",
+                  }}
+                >
+                  {bannerPrizeText}
+                </span>
+              </div>
+            )}
           </div>
         </section>
 
         {/* ================= FESTIVAL TABS ================= */}
-        <section className="relative z-10 -mt-10 px-2">
+        <section className="relative z-10 mt-3 px-2">
           <div className="rounded-2xl border border-[#e3d3ae] bg-[#fffaf4] p-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.10)]">
             <div className="flex items-center justify-between gap-2 px-0.5">
               <div className="min-w-0">
@@ -1337,54 +1363,6 @@ const FestivalTab = ({ festival, active, disabled, onClick, innerRef }) => {
     </button>
   );
 };
-
-const HeroFeature = ({ icon, text }) => (
-  <div className="flex min-w-0 flex-col items-center gap-1 text-center">
-    <span className="text-[#ffd34e]">{icon}</span>
-    <span className="text-[8px] font-medium leading-tight text-white/90">
-      {text}
-    </span>
-  </div>
-);
-
-const FestivalHeroTicket = ({ special, price, number, firstPrize }) => (
-  <div className="relative w-full max-w-[230px]">
-    <div className="absolute inset-0 -rotate-[5deg] rounded-lg border border-[#e5c8a4] bg-[#fdf1dc]" />
-    <div
-      className="relative rotate-[2deg] rounded-lg border-[0.3em] border-[#f7d9a8] bg-[#fffaf0] p-[0.7em] shadow-[0_20px_40px_rgba(0,0,0,0.5)]"
-      style={{ fontSize: "11px" }}
-    >
-      <div className="flex items-start justify-between gap-[0.4em]">
-        <div className="min-w-0">
-          <p className="text-[1.8em] font-black leading-none text-[#d7193f]">
-            DEAR
-          </p>
-          <p className="text-[0.7em] font-bold text-[#153c78]">
-            FESTIVAL LOTTERY
-          </p>
-          <p className="mt-[0.2em] font-serif text-[1.15em] font-black leading-tight text-[#d7193f]">
-            {special}
-          </p>
-        </div>
-        <div className="flex h-[3.4em] w-[3.4em] shrink-0 flex-col items-center justify-center rounded-full bg-[#d7198c] text-center text-[0.65em] font-black leading-tight text-white">
-          Price <span className="text-[1.4em]">₹{price}/-</span>
-        </div>
-      </div>
-      <p className="mt-[0.4em] text-[0.8em] font-bold text-[#26354b]">
-        First Prize
-      </p>
-      <p className="whitespace-nowrap text-[2.4em] font-black leading-none text-[#153c78]">
-        {firstPrize || "₹0"}
-      </p>
-      <div className="mt-[0.5em] border-y border-[#d7bba5] py-[0.3em] text-center">
-        <p className="text-[0.55em] font-bold text-[#26354b]">Ticket Number</p>
-        <p className="whitespace-nowrap text-[1.4em] font-black tracking-[0.15em] text-[#173e70]">
-          {number}
-        </p>
-      </div>
-    </div>
-  </div>
-);
 
 const MiniTicket = ({ className = "", title, price, firstPrize }) => (
   <div className={`relative ${className}`}>

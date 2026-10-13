@@ -1,8 +1,4 @@
-import React, { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
 import {
-  BarChart3,
   Calendar,
   CheckCircle2,
   ChevronRight,
@@ -15,13 +11,13 @@ import {
   RefreshCw,
   Search,
   Share2,
-  ShieldCheck,
-  Sparkles,
   Trophy,
   X,
   XCircle,
-  Zap,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 
 import {
   checkNumber,
@@ -31,6 +27,8 @@ import {
   selectLotteryCheckResult,
   selectLotteryError,
 } from "../reducer/slice/lotteryResultReducer";
+
+import banner from "../assets/dear-V-T-4.jpg";
 
 // =====================================================
 // CONSTANTS
@@ -50,7 +48,10 @@ const TICKET_REGEX = /^[0-9A-Z]{8}$/;
 // HELPERS
 // =====================================================
 
-const normalize = (v) => String(v || "").toUpperCase().replace(/\s+/g, "");
+const normalize = (v) =>
+  String(v || "")
+    .toUpperCase()
+    .replace(/\s+/g, "");
 
 // Format stub: 10F68057 -> "10F 68057"
 const formatStubNumber = (n) => {
@@ -99,7 +100,8 @@ const VarifyTicket = () => {
       if (checkResult.winner || checkResult.status === "win") {
         setResult({
           status: "win",
-          ticketNumber: checkResult.ticketNumber || checkResult.userNumber || input,
+          ticketNumber:
+            checkResult.ticketNumber || checkResult.userNumber || input,
           prizeLabel: checkResult.prizeLabel || "1st Prize",
           prizeAmount: checkResult.prizeAmount || "₹1,00,00,000",
           prizeSub: checkResult.prizeSub || "(Winning Prize)",
@@ -108,20 +110,25 @@ const VarifyTicket = () => {
           drawTime: checkResult.drawTime || "8:00 PM",
           lotteryName:
             checkResult.lotteryName ||
-            (activeTab === "festival" ? "Dear Festival Lottery" : "Dear Daily Lottery"),
+            (activeTab === "festival"
+              ? "Dear Festival Lottery"
+              : "Dear Daily Lottery"),
           winningNumber: checkResult.winningNumber || null,
           matchedDigits: checkResult.matchedDigits || null,
         });
       } else {
         setResult({
           status: "loss",
-          ticketNumber: checkResult.ticketNumber || checkResult.userNumber || input,
+          ticketNumber:
+            checkResult.ticketNumber || checkResult.userNumber || input,
           drawDate: checkResult.drawDate || "Recent Draw",
           drawDay: checkResult.drawDay || "",
           drawTime: checkResult.drawTime || "8:00 PM",
           lotteryName:
             checkResult.lotteryName ||
-            (activeTab === "festival" ? "Dear Festival Lottery" : "Dear Daily Lottery"),
+            (activeTab === "festival"
+              ? "Dear Festival Lottery"
+              : "Dear Daily Lottery"),
           message:
             checkResult.message ||
             "Better luck next time! This ticket number is not among the winning numbers for published draws.",
@@ -133,7 +140,9 @@ const VarifyTicket = () => {
   // Handle server error
   useEffect(() => {
     if (checkError) {
-      setInputError(typeof checkError === "string" ? checkError : "Verification failed");
+      setInputError(
+        typeof checkError === "string" ? checkError : "Verification failed",
+      );
     }
   }, [checkError]);
 
@@ -158,7 +167,9 @@ const VarifyTicket = () => {
     }
 
     if (!TICKET_REGEX.test(value)) {
-      setInputError("Invalid format. Please enter an 8-character ticket (e.g. 10F68057)");
+      setInputError(
+        "Invalid format. Please enter an 8-character ticket (e.g. 10F68057)",
+      );
       setResult(null);
       return;
     }
@@ -180,7 +191,7 @@ const VarifyTicket = () => {
         userNumber: value,
         ticketNumber: value,
         type: activeTab,
-      })
+      }),
     );
   };
 
@@ -249,65 +260,20 @@ Verified at: ${new Date().toLocaleString("en-IN")}
   };
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[#eef3fa] text-[#173e70]">
+    <div className="w-full overflow-x-hidden bg-[#eef3fa] text-[#173e70] pb-20">
       <div
         className="relative mx-auto w-full max-w-[500px] overflow-x-hidden"
         style={{ paddingBottom: BOTTOM_NAV_HEIGHT + 24 }}
       >
         {/* ================= HERO BANNER ================= */}
-        <section
-          className="relative overflow-hidden bg-[#3b0a14] bg-cover bg-center"
-          style={{ backgroundImage: `url(${HERO_IMAGE})` }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-[#2a0610]/95 via-[#4a0b18]/85 to-[#2a0610]/70" />
-          <div className="pointer-events-none absolute -right-10 top-0 h-52 w-52 rounded-full bg-[#ff8a00]/25 blur-3xl" />
-          <div className="pointer-events-none absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-[#ff1744]/20 blur-3xl" />
-
-          <Sparkles
-            size={16}
-            className="pointer-events-none absolute left-[46%] top-4 text-[#ffcf4a]/80"
+        <section className="relative overflow-hidden bg-[#06132d] shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
+          <img
+            src={banner}
+            alt="Verify Your Ticket"
+            loading="lazy"
+            className="block h-auto w-full select-none object-cover"
+            draggable={false}
           />
-          <Sparkles
-            size={12}
-            className="pointer-events-none absolute bottom-[30%] left-[4%] text-[#ffb82e]/70"
-          />
-
-          <div className="relative grid grid-cols-[1.1fr_1fr] items-center gap-2 px-3 pb-9 pt-5">
-            <div className="min-w-0">
-              <h1 className="bg-gradient-to-b from-[#fff1a8] to-[#e0a11b] bg-clip-text font-serif text-[28px] font-black leading-[0.95] text-transparent">
-                VERIFY
-                <br />
-                YOUR TICKET
-              </h1>
-              <p className="mt-2 text-[11.5px] font-medium leading-tight text-white/90">
-                Check if your ticket number is a winner in official draws
-              </p>
-
-              <div className="mt-3 grid grid-cols-4 gap-1">
-                <TrustBadge icon={<ShieldCheck size={16} />} label="100%" sub="Official" />
-                <TrustBadge icon={<Zap size={16} />} label="Instant" sub="Verified" />
-                <TrustBadge icon={<BarChart3 size={16} />} label="Accurate" sub="Result" />
-                <TrustBadge icon={<Clock size={16} />} label="Real Time" sub="Updates" />
-              </div>
-            </div>
-
-            <div className="relative flex items-center justify-center pr-2">
-              <div className="relative -rotate-6 rounded-xl border-2 border-[#e0b24a] bg-gradient-to-br from-[#fff8e6] to-[#ffe9b8] p-2.5 shadow-[0_15px_30px_rgba(0,0,0,0.45)]">
-                <p className="text-[18px] font-black leading-none text-[#d7193f]">DEAR</p>
-                <p className="text-[8px] font-bold text-[#153c78]">
-                  {activeTab === "festival" ? "FESTIVAL BUMPER" : "DAILY LOTTERY"}
-                </p>
-                <p className="mt-1 text-[7px] text-[#5a4a2a]">Top Jackpot</p>
-                <p className="text-[16px] font-black leading-none text-[#153c78]">₹1 CRORE</p>
-                <p className="mt-1 whitespace-nowrap text-[9px] font-black tracking-[0.15em] text-[#173e70]">
-                  10F 68057
-                </p>
-                <span className="absolute -right-2 -top-2 rounded-full bg-[#d7198c] px-2 py-[3px] text-[8px] font-black text-white">
-                  ₹20/-
-                </span>
-              </div>
-            </div>
-          </div>
         </section>
 
         {/* ================= TABS ================= */}
@@ -373,7 +339,7 @@ Verified at: ${new Date().toLocaleString("en-IN")}
                     e.target.value
                       .toUpperCase()
                       .replace(/[^0-9A-Z]/g, "")
-                      .slice(0, 8)
+                      .slice(0, 8),
                   );
                   setInputError("");
                 }}
@@ -411,7 +377,9 @@ Verified at: ${new Date().toLocaleString("en-IN")}
             )}
 
             <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5">
-              <span className="text-[11.5px] font-medium text-[#4b5563]">Quick Try:</span>
+              <span className="text-[11.5px] font-medium text-[#4b5563]">
+                Quick Try:
+              </span>
               {EXAMPLES.map((ex) => (
                 <button
                   key={ex}
@@ -522,7 +490,8 @@ Verified at: ${new Date().toLocaleString("en-IN")}
                   Official Draw Information
                 </p>
                 <p className="mt-1 text-[12px] leading-snug text-[#4b5563]">
-                  All ticket checks are computed directly against officially announced and published winning draw numbers in the database.
+                  All ticket checks are computed directly against officially
+                  announced and published winning draw numbers in the database.
                 </p>
               </div>
             </div>
@@ -555,7 +524,9 @@ Verified at: ${new Date().toLocaleString("en-IN")}
 
             <div className="mt-3 space-y-2.5 text-xs text-[#4b5563] leading-relaxed">
               <p>
-                <strong>1. Ticket Format:</strong> Dear Lottery tickets are 8 characters long, consisting of 2 digits, 1 series letter, and 5 number digits.
+                <strong>1. Ticket Format:</strong> Dear Lottery tickets are 8
+                characters long, consisting of 2 digits, 1 series letter, and 5
+                number digits.
               </p>
               <div className="rounded-xl bg-[#f6f9fe] p-3 text-center font-mono text-sm font-black text-[#173e70]">
                 10F 68057
@@ -564,9 +535,16 @@ Verified at: ${new Date().toLocaleString("en-IN")}
                 <strong>2. Prize Matching Rules:</strong>
               </p>
               <ul className="list-disc pl-4 space-y-1">
-                <li><strong>1st Prize:</strong> Exact 8-character match.</li>
-                <li><strong>2nd Prize:</strong> Matching first 7 or last 7 digits.</li>
-                <li><strong>3rd Prize:</strong> Matching first 5, middle 5, or last 5 digits.</li>
+                <li>
+                  <strong>1st Prize:</strong> Exact 8-character match.
+                </li>
+                <li>
+                  <strong>2nd Prize:</strong> Matching first 7 or last 7 digits.
+                </li>
+                <li>
+                  <strong>3rd Prize:</strong> Matching first 5, middle 5, or
+                  last 5 digits.
+                </li>
               </ul>
             </div>
 
@@ -605,18 +583,31 @@ Verified at: ${new Date().toLocaleString("en-IN")}
 
             <div className="mt-3 space-y-2.5">
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5">
-                <p className="text-xs font-black text-amber-900">🥇 1st Prize — ₹1 Crore</p>
-                <p className="text-[11px] text-amber-800 mt-0.5">All 8 characters must match the winning number exactly.</p>
+                <p className="text-xs font-black text-amber-900">
+                  🥇 1st Prize — ₹1 Crore
+                </p>
+                <p className="text-[11px] text-amber-800 mt-0.5">
+                  All 8 characters must match the winning number exactly.
+                </p>
               </div>
 
               <div className="rounded-xl border border-blue-200 bg-blue-50 p-2.5">
-                <p className="text-xs font-black text-blue-900">🥈 2nd Prize — ₹9,000</p>
-                <p className="text-[11px] text-blue-800 mt-0.5">Matches the first 7 or last 7 digits of the winning number.</p>
+                <p className="text-xs font-black text-blue-900">
+                  🥈 2nd Prize — ₹9,000
+                </p>
+                <p className="text-[11px] text-blue-800 mt-0.5">
+                  Matches the first 7 or last 7 digits of the winning number.
+                </p>
               </div>
 
               <div className="rounded-xl border border-purple-200 bg-purple-50 p-2.5">
-                <p className="text-xs font-black text-purple-900">🥉 3rd Prize — ₹450</p>
-                <p className="text-[11px] text-purple-800 mt-0.5">Matches the first 5, middle 5, or last 5 digits of the winning number.</p>
+                <p className="text-xs font-black text-purple-900">
+                  🥉 3rd Prize — ₹450
+                </p>
+                <p className="text-[11px] text-purple-800 mt-0.5">
+                  Matches the first 5, middle 5, or last 5 digits of the winning
+                  number.
+                </p>
               </div>
             </div>
 
@@ -642,7 +633,9 @@ const TrustBadge = ({ icon, label, sub }) => (
     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-b from-[#fff1a8] to-[#e0a11b] text-[#3b0a14]">
       {icon}
     </span>
-    <span className="text-[9px] font-black leading-tight text-white">{label}</span>
+    <span className="text-[9px] font-black leading-tight text-white">
+      {label}
+    </span>
     <span className="text-[9px] leading-tight text-white/80">{sub}</span>
   </div>
 );
@@ -657,7 +650,9 @@ const TabButton = ({ active, onClick, icon, label }) => (
         : "bg-[#fffaf4] text-[#173e70]"
     }`}
   >
-    <span className={`shrink-0 ${active ? "text-[#ffd34e]" : "text-[#ed1d43]"}`}>
+    <span
+      className={`shrink-0 ${active ? "text-[#ffd34e]" : "text-[#ed1d43]"}`}
+    >
       {icon}
     </span>
     {label}
@@ -701,7 +696,11 @@ const ResultCard = ({ result, onDownload, onShare }) => {
           : "border-2 border-[#ed1d43]/30 bg-gradient-to-br from-[#fff0f2] via-white to-[#fff5f6]"
       }`}
     >
-      {isWin ? <WinnerContent result={result} /> : <LoserContent result={result} />}
+      {isWin ? (
+        <WinnerContent result={result} />
+      ) : (
+        <LoserContent result={result} />
+      )}
 
       <div className="flex items-center justify-end gap-2 border-t border-[#e2e5f0] bg-[#f6f9fe] px-3 py-2">
         <button
@@ -735,7 +734,11 @@ const WinnerContent = ({ result }) => (
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <Trophy size={28} className="shrink-0 text-[#e0a11b]" fill="#ffd34e" />
+            <Trophy
+              size={28}
+              className="shrink-0 text-[#e0a11b]"
+              fill="#ffd34e"
+            />
             <p className="font-serif text-[22px] font-black leading-none text-[#20a66a]">
               WINNER!
             </p>
@@ -756,7 +759,11 @@ const WinnerContent = ({ result }) => (
 
     <div className="mt-3 grid grid-cols-4 gap-1 rounded-xl bg-white p-2.5 shadow-sm border border-[#e2e5f0]">
       <MetaItem label="Ticket Number" value={result.ticketNumber} />
-      <MetaItem label="Draw Date" value={result.drawDate} sub={result.drawDay} />
+      <MetaItem
+        label="Draw Date"
+        value={result.drawDate}
+        sub={result.drawDay}
+      />
       <MetaItem label="Draw Time" value={result.drawTime} />
       <MetaItem label="Lottery" value={result.lotteryName} />
     </div>
@@ -785,15 +792,22 @@ const LoserContent = ({ result }) => (
             Better luck next time!
           </p>
           <p className="mt-1 text-[11px] leading-snug text-[#4b5563]">
-            {result.message || "This ticket number is not among the winning numbers for the published draws."}
+            {result.message ||
+              "This ticket number is not among the winning numbers for the published draws."}
           </p>
         </div>
       </div>
     </div>
 
     <div className="mt-3 flex items-center justify-between rounded-xl bg-white p-2.5 text-xs text-[#6b7280] border border-[#e2e5f0]">
-      <span>Checked Ticket: <strong className="text-[#173e70]">{result.ticketNumber}</strong></span>
-      <span>Lottery: <strong className="text-[#173e70]">{result.lotteryName}</strong></span>
+      <span>
+        Checked Ticket:{" "}
+        <strong className="text-[#173e70]">{result.ticketNumber}</strong>
+      </span>
+      <span>
+        Lottery:{" "}
+        <strong className="text-[#173e70]">{result.lotteryName}</strong>
+      </span>
     </div>
   </div>
 );
@@ -812,7 +826,9 @@ const TicketStub = ({ number, faded = false }) => (
     <p className="text-[7.5px] font-bold text-[#153c78]">LOTTERY</p>
 
     <p className="mt-1 text-[6.5px] text-[#5a4a2a]">Top Jackpot</p>
-    <p className="text-[13px] font-black leading-none text-[#153c78]">₹1 CRORE</p>
+    <p className="text-[13px] font-black leading-none text-[#153c78]">
+      ₹1 CRORE
+    </p>
 
     <p className="mt-1 whitespace-nowrap text-[10px] font-black tracking-wider text-[#173e70]">
       {formatStubNumber(number)}
@@ -837,7 +853,9 @@ const MetaItem = ({ label, value, sub }) => (
       {value}
     </p>
     {sub && (
-      <p className="break-words text-[8px] leading-tight text-[#6b7280]">{sub}</p>
+      <p className="break-words text-[8px] leading-tight text-[#6b7280]">
+        {sub}
+      </p>
     )}
   </div>
 );

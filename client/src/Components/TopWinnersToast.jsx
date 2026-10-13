@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Clock, Crown, Trophy } from "lucide-react";
+import { Clock, Crown, Trophy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 const DURATION_MS = 4000; // 4 seconds per winner
@@ -207,28 +207,6 @@ const TopWinnersToast = ({ winners = [] }) => {
                 isPaused ? "toast-paused" : ""
               }`}
             />
-          </div>
-        </div>
-
-        {/* Floating Mini Controls (Dots & Quick Nav) */}
-        <div className="mt-1.5 flex items-center justify-end px-1">
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={handlePrev}
-              aria-label="Previous winner"
-              className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-[#173e70] shadow-sm hover:bg-gray-100 active:scale-95"
-            >
-              <ChevronLeft size={12} strokeWidth={2.5} />
-            </button>
-            <button
-              type="button"
-              onClick={handleNext}
-              aria-label="Next winner"
-              className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-[#173e70] shadow-sm hover:bg-gray-100 active:scale-95"
-            >
-              <ChevronRight size={12} strokeWidth={2.5} />
-            </button>
           </div>
         </div>
       </div>

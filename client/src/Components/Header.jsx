@@ -11,26 +11,23 @@ import {
   Wallet,
   X,
 } from "lucide-react";
+
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-
-// ==========================================================
-// MENU
-// ==========================================================
 
 const MENU_ITEMS = [
   { label: "Home", icon: Home, path: "/", tone: "bg-[#ed1d43]" },
   {
     label: "Daily Lottery",
     icon: Ticket,
-    path: "/daily-lottery",
+    path: "/buy-ticket",
     tone: "bg-[#2e7dd7]",
   },
   {
     label: "Festival Lottery",
     icon: Crown,
-    path: "/festival-lottery",
+    path: "/festival",
     tone: "bg-[#f08a25]",
   },
   {
@@ -39,13 +36,19 @@ const MENU_ITEMS = [
     path: "/my-tickets",
     tone: "bg-[#e11d48]",
   },
-  { label: "Results", icon: BarChart3, path: "/results", tone: "bg-[#20a66a]" },
-  { label: "Profile", icon: User, path: "/profile", tone: "bg-[#8c4bd6]" },
+  {
+    label: "Results",
+    icon: BarChart3,
+    path: "/results",
+    tone: "bg-[#20a66a]",
+  },
+  {
+    label: "Profile",
+    icon: User,
+    path: "/profile",
+    tone: "bg-[#8c4bd6]",
+  },
 ];
-
-// ==========================================================
-// HEADER
-// ==========================================================
 
 const Header = () => {
   const navigate = useNavigate();
@@ -64,26 +67,29 @@ const Header = () => {
 
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // page change hone par sidebar band
+  // Close drawer whenever the route changes.
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname]);
 
-  // sidebar khula ho to page scroll lock + Esc se band
+  // Lock background scrolling and support Escape key.
   useEffect(() => {
     if (!menuOpen) return;
 
-    const prevOverflow = document.body.style.overflow;
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    const onKey = (e) => {
-      if (e.key === "Escape") setMenuOpen(false);
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
     };
-    window.addEventListener("keydown", onKey);
+
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.body.style.overflow = prevOverflow;
-      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [menuOpen]);
 
@@ -94,38 +100,41 @@ const Header = () => {
 
   return (
     <>
-      {/* ================= TOP BAR ================= */}
-      <header className="fixed left-1/2 top-0 z-[9999] w-[490px] max-w-full -translate-x-1/2 border-b border-white/5 bg-[#061b3d]/95 backdrop-blur-md">
-        <div className="flex h-[70px] items-center justify-between px-3 sm:px-4">
-          {/* ---------- LOGO ---------- */}
-
-          <Link to="/" className="flex shrink-0 items-center">
+      {/* ================= TOP HEADER ================= */}
+      <header className="fixed left-1/2 top-0 z-[9999] w-full max-w-[490px] -translate-x-1/2 border-b border-white/10 bg-[#061b3d] shadow-md">
+        <div className="flex h-[70px] items-center justify-between gap-2 px-3 sm:px-4">
+          {/* LOGO */}
+          <Link
+            to="/"
+            aria-label="Dear Lottery Home"
+            className="flex min-w-0 shrink items-center"
+          >
             <img
-              src="https://i.ibb.co/1GHKxfrG/Dear-Lottery-Logo-1.png"
+              src="https://i.ibb.co/DPFc7fpd/Dear-logo.png"
               alt="Dear Lottery"
-              loading="lazy"
-              className="h-16 w-auto max-w-[150px] object-contain"
+              className="h-14 w-auto max-w-[125px] object-contain sm:h-16 sm:max-w-[150px]"
               draggable={false}
             />
           </Link>
 
-          {/* ---------- ACTIONS ---------- */}
-          <div className="flex items-center gap-2">
+          {/* HEADER ACTIONS */}
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {isLoggedIn ? (
               <button
                 type="button"
                 onClick={() => goTo("/user/withdraw")}
-                className="flex h-9 items-center gap-1.5 rounded-lg border border-white/25 bg-[#09234a] px-3 text-xs font-bold text-white active:scale-95"
+                className="flex h-9 items-center gap-1 rounded-lg border border-white/20 bg-[#09234a] px-2 text-xs font-bold text-white transition active:scale-95 sm:gap-1.5 sm:px-3"
+                aria-label={`Wallet balance ₹${walletAmount}`}
               >
-                <Wallet size={16} className="text-[#ff3155]" />₹
-                {walletAmount.toLocaleString("en-IN")}
+                <Wallet size={16} className="shrink-0 text-[#ff3155]" />
+                <span>₹{walletAmount.toLocaleString("en-IN")}</span>
               </button>
             ) : (
               <>
                 <button
                   type="button"
                   onClick={() => goTo("/login")}
-                  className="h-9 rounded-lg border border-white/70 px-4 text-xs font-semibold text-white transition active:scale-95"
+                  className="h-9 rounded-lg border border-white/50 px-2.5 text-xs font-semibold text-white transition hover:bg-white/10 active:scale-95 sm:px-4"
                 >
                   Login
                 </button>
@@ -133,115 +142,135 @@ const Header = () => {
                 <button
                   type="button"
                   onClick={() => goTo("/register")}
-                  className="h-9 rounded-lg bg-[#ff1744] px-4 text-xs font-semibold text-white shadow-lg shadow-red-900/40 transition active:scale-95"
+                  className="h-9 rounded-lg bg-[#ff1744] px-2.5 text-xs font-bold text-white shadow-md shadow-red-900/30 transition hover:bg-[#e9123b] active:scale-95 sm:px-4"
                 >
                   Register
                 </button>
               </>
             )}
 
+            {/* MENU TOGGLE */}
             <button
               type="button"
-              onClick={() => setMenuOpen(true)}
-              aria-label="Open menu"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
               aria-expanded={menuOpen}
-              className="flex h-9 w-9 items-center justify-center text-white active:scale-90"
+              aria-controls="mobile-navigation"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white transition hover:bg-white/10 active:scale-95"
             >
-              <Menu size={26} />
+              {menuOpen ? <X size={25} /> : <Menu size={26} />}
             </button>
           </div>
         </div>
       </header>
 
-      {/* Spacer for fixed header */}
-      <div className="h-[62px]" />
+      {/* SPACE FOR FIXED HEADER */}
+      <div className="h-[70px]" />
 
-      {/* ================= SIDEBAR (right se slide) ================= */}
-      {/* Header ke bahar render hota hai, warna backdrop-blur fixed ko tod deta hai */}
+      {/* ================= MOBILE DRAWER ================= */}
       <div
         className={`fixed inset-0 z-[10000] ${
           menuOpen ? "pointer-events-auto" : "pointer-events-none"
         }`}
         aria-hidden={!menuOpen}
       >
-        <div className="relative mx-auto h-full w-[490px] max-w-full overflow-hidden">
-          {/* overlay */}
-          <div
-            onClick={() => setMenuOpen(false)}
-            className={`absolute inset-0 bg-black/60 backdrop-blur-[2px] transition-opacity duration-300 ${
-              menuOpen ? "opacity-100" : "opacity-0"
-            }`}
-          />
+        {/* Backdrop */}
+        <button
+          type="button"
+          tabIndex={menuOpen ? 0 : -1}
+          aria-label="Close navigation menu"
+          onClick={() => setMenuOpen(false)}
+          className={`absolute inset-0 h-full w-full cursor-default bg-black/60 backdrop-blur-[2px] transition-opacity duration-300 ${
+            menuOpen ? "opacity-100" : "opacity-0"
+          }`}
+        />
 
-          {/* panel */}
+        {/* Drawer container */}
+        <div className="relative mx-auto h-full w-full max-w-[490px] overflow-hidden">
           <aside
+            id="mobile-navigation"
             role="dialog"
-            aria-label="Main menu"
-            className={`absolute right-0 top-0 flex h-full w-[82%] max-w-[320px] flex-col bg-[#eef3fa] shadow-[-12px_0_40px_rgba(0,0,0,0.45)] transition-transform duration-300 ease-out will-change-transform ${
+            aria-modal={menuOpen ? "true" : undefined}
+            aria-label="Main navigation"
+            className={`absolute right-0 top-0 z-10 flex h-full w-[88%] max-w-[340px] flex-col overflow-hidden rounded-l-2xl bg-[#f4f6fb] shadow-[-12px_0_40px_rgba(0,0,0,0.35)] transition-transform duration-300 ease-out ${
               menuOpen ? "translate-x-0" : "translate-x-full"
             }`}
           >
-            {/* ---------- panel header ---------- */}
-            <div className="relative shrink-0 overflow-hidden bg-gradient-to-br from-[#3a0b17] via-[#2b0a16] to-[#1a0710] px-4 pb-5 pt-4">
-              <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[#ff8a00]/25 blur-3xl" />
-              <div className="pointer-events-none absolute -left-10 bottom-0 h-32 w-32 rounded-full bg-[#ff1744]/20 blur-3xl" />
+            {/* DRAWER HEADER */}
+            <div className="relative shrink-0 overflow-hidden bg-gradient-to-br from-[#102b50] via-[#173e70] to-[#071a35] px-4 pb-4 pt-3">
+              <div className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-[#e8b64e]/15 blur-3xl" />
+              <div className="pointer-events-none absolute -left-12 bottom-0 h-28 w-28 rounded-full bg-[#ff1744]/10 blur-3xl" />
 
-              <button
-                type="button"
-                onClick={() => setMenuOpen(false)}
-                aria-label="Close menu"
-                className="relative ml-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/30 text-white transition active:scale-90"
-              >
-                <X size={20} />
-              </button>
+              <div className="relative flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[2px] text-[#e8c778]">
+                    DEAR LOTTERY
+                  </p>
+                  <h2 className="mt-1 text-lg font-extrabold text-white">
+                    {isLoggedIn ? "My Account" : "Welcome"}
+                  </h2>
+                </div>
 
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen(false)}
+                  aria-label="Close menu"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20 active:scale-90"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* USER PROFILE */}
               {isLoggedIn ? (
                 <button
                   type="button"
                   onClick={() => goTo("/profile")}
-                  className="relative mt-1 flex w-full items-center gap-3 text-left"
+                  className="relative mt-4 flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.06] p-3 text-left transition hover:bg-white/10"
                 >
-                  <span className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-full border-[3px] border-[#ffd34e] bg-white/10 shadow-[0_0_20px_rgba(255,209,90,0.25)]">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-[#e8c778] bg-white/10">
                     <UserRound
-                      size={28}
-                      className="text-[#ffd34e]"
-                      strokeWidth={1.5}
+                      size={25}
+                      className="text-[#f5d47d]"
+                      strokeWidth={1.7}
                     />
                   </span>
 
-                  <span className="min-w-0">
-                    <span className="block text-[12px] text-white/70">
-                      Hello,
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[11px] text-white/65">
+                      Welcome back,
                     </span>
-                    <span className="block break-words bg-gradient-to-b from-[#fff1a8] to-[#e0a11b] bg-clip-text font-serif text-[22px] font-black leading-tight text-transparent">
+                    <span className="mt-0.5 block break-words text-base font-extrabold leading-tight text-[#ffe39b]">
                       {user?.name || "User"}
                     </span>
-                    <span className="block text-[12px] text-white/80">
-                      +91 {user?.mobile || "----------"}
+                    <span className="mt-1 block truncate text-xs text-white/75">
+                      {user?.mobile
+                        ? `+91 ${user.mobile}`
+                        : "View your profile"}
                     </span>
                   </span>
+
+                  <ChevronRight size={19} className="shrink-0 text-white/60" />
                 </button>
               ) : (
-                <div className="relative mt-1">
-                  <p className="bg-gradient-to-b from-[#fff1a8] to-[#e0a11b] bg-clip-text font-serif text-[24px] font-black leading-tight text-transparent">
-                    Welcome
-                  </p>
-                  <p className="mt-0.5 text-[12px] text-white/75">
-                    Login karke lottery khelo aur jeeto
+                <div className="relative mt-2">
+                  <p className="text-xs leading-relaxed text-white/75">
+                    Login karke lottery khelo aur jeeto.
                   </p>
 
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => goTo("/login")}
-                      className="h-10 rounded-xl border border-white/50 text-[13px] font-bold text-white transition active:scale-95"
+                      className="h-10 rounded-xl border border-white/35 text-sm font-bold text-white transition hover:bg-white/10 active:scale-95"
                     >
                       Login
                     </button>
+
                     <button
                       type="button"
                       onClick={() => goTo("/register")}
-                      className="h-10 rounded-xl bg-gradient-to-r from-[#ff1744] to-[#e0102f] text-[13px] font-extrabold text-white shadow-[0_6px_18px_rgba(255,20,67,0.45)] transition active:scale-95"
+                      className="h-10 rounded-xl bg-gradient-to-r from-[#ff1744] to-[#d80e34] text-sm font-extrabold text-white shadow-md transition active:scale-95"
                     >
                       Register
                     </button>
@@ -249,52 +278,62 @@ const Header = () => {
                 </div>
               )}
 
-              {/* wallet strip */}
+              {/* WALLET */}
               {isLoggedIn && (
                 <button
                   type="button"
                   onClick={() => goTo("/user/withdraw")}
-                  className="relative mt-4 flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 transition active:scale-[0.98]"
+                  className="relative mt-3 flex min-h-[48px] w-full items-center justify-between gap-2 rounded-xl border border-[#e8c778]/25 bg-white/[0.08] px-3 py-2 transition hover:bg-white/[0.13] active:scale-[0.99]"
                 >
-                  <span className="flex items-center gap-2">
-                    <Wallet size={20} className="text-[#ffd34e]" />
-                    <span className="text-[12px] text-white/80">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Wallet size={19} className="shrink-0 text-[#f5d47d]" />
+                    <span className="text-xs font-medium text-white/85">
                       Wallet Balance
                     </span>
                   </span>
-                  <span className="text-[18px] font-black text-[#ffd34e]">
+
+                  <span className="shrink-0 text-base font-extrabold text-[#ffe39b]">
                     ₹{walletAmount.toLocaleString("en-IN")}
                   </span>
                 </button>
               )}
             </div>
 
-            {/* ---------- menu list ---------- */}
-            <nav className="flex-1 space-y-2 overflow-y-auto px-3 py-3">
+            {/* NAVIGATION LINKS */}
+            <nav
+              aria-label="Main navigation links"
+              className="flex-1 space-y-2 overflow-y-auto overscroll-contain px-3 py-4"
+            >
               {MENU_ITEMS.map(({ label, icon: Icon, path, tone }) => {
-                const active = location.pathname === path;
+                const active =
+                  path === "/"
+                    ? location.pathname === "/"
+                    : location.pathname === path ||
+                      location.pathname.startsWith(`${path}/`);
 
                 return (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => goTo(path)}
-                    className={`flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left transition active:scale-[0.98] ${
+                  <Link
+                    key={path}
+                    to={path}
+                    onClick={() => setMenuOpen(false)}
+                    aria-current={active ? "page" : undefined}
+                    tabIndex={menuOpen ? 0 : -1}
+                    className={`group flex min-h-[52px] w-full items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors duration-200 active:scale-[0.98] ${
                       active
-                        ? "bg-gradient-to-r from-[#ff1744] to-[#c9102f] shadow-[0_6px_18px_rgba(255,20,67,0.35)]"
-                        : "bg-white shadow-sm"
+                        ? "border-[#173e70] bg-[#173e70] shadow-md shadow-blue-950/15"
+                        : "border-[#e2e8f0] bg-white hover:border-[#b6c8df] hover:bg-[#f9fbff]"
                     }`}
                   >
                     <span
                       className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white ${
-                        active ? "bg-white/20" : tone
+                        active ? "bg-white/15" : tone
                       }`}
                     >
-                      <Icon size={20} />
+                      <Icon size={20} strokeWidth={2} />
                     </span>
 
                     <span
-                      className={`min-w-0 flex-1 text-[15px] font-extrabold ${
+                      className={`min-w-0 flex-1 text-sm font-bold ${
                         active ? "text-white" : "text-[#173e70]"
                       }`}
                     >
@@ -302,19 +341,23 @@ const Header = () => {
                     </span>
 
                     <ChevronRight
-                      size={20}
-                      className={`shrink-0 ${active ? "text-white" : "text-[#173e70]/60"}`}
+                      size={19}
+                      className={`shrink-0 transition-transform duration-200 group-hover:translate-x-0.5 ${
+                        active
+                          ? "text-white"
+                          : "text-[#173e70]/45 group-hover:text-[#173e70]"
+                      }`}
                     />
-                  </button>
+                  </Link>
                 );
               })}
             </nav>
 
-            {/* ---------- footer ---------- */}
-            <div className="shrink-0 border-t border-[#173e70]/10 px-4 py-3">
+            {/* DRAWER FOOTER */}
+            <div className="shrink-0 border-t border-[#173e70]/10 bg-white/80 px-4 py-3">
               <div className="flex items-center justify-center gap-2 text-[#173e70]">
-                <ShieldCheck size={18} />
-                <p className="text-[13px] font-medium">Play with trust</p>
+                <ShieldCheck size={17} className="text-[#bd9135]" />
+                <p className="text-xs font-semibold">Play Responsibly</p>
               </div>
             </div>
           </aside>

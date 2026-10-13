@@ -330,30 +330,36 @@ const ProfilePage = () => {
               </button>
             </div>
 
-            {/* User Details */}
+            {/* User Details (HIGHLIGHTED: Name, Mobile, UID) */}
             <div className="min-w-0 flex-1">
+              {/* Name */}
               <div className="flex items-center gap-1.5">
-                <h1 className="truncate text-2xl font-black tracking-tight text-white">
+                <h1 className="truncate text-[28px] leading-tight font-black tracking-tight text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.65)]">
                   {user?.name || "Player"}
                 </h1>
                 {isKycApproved && (
                   <BadgeCheck
-                    size={18}
+                    size={20}
                     className="text-[#10B981] fill-[#10B981]/20 shrink-0"
                   />
                 )}
               </div>
 
-              <p className="text-xs text-white/75 font-mono mt-0.5">
-                +91 {user?.mobile || "----------"}
-              </p>
+              {/* Mobile Number Pill */}
+              <div className="mt-1.5 inline-flex max-w-full items-center gap-2 rounded-xl border border-[#FFD84A]/40 bg-black/35 px-3 py-1.5 backdrop-blur-md shadow-[0_0_18px_rgba(255,216,74,0.18)]">
+                <Phone size={14} className="shrink-0 text-[#FFD84A]" />
+                <span className="truncate font-mono text-[15px] font-black tracking-wider text-white">
+                  +91 {user?.mobile || "----------"}
+                </span>
+              </div>
 
-              <div className="mt-2 flex items-center gap-2">
+              {/* KYC + UID */}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span
-                  className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                  className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-1 rounded-full border ${
                     isKycApproved
-                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                      : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                      ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/40"
+                      : "bg-amber-500/25 text-amber-300 border-amber-500/40"
                   }`}
                 >
                   {isKycApproved ? (
@@ -367,8 +373,14 @@ const ProfilePage = () => {
                   )}
                 </span>
 
-                <span className="text-[10px] text-white/50 font-mono">
-                  ID: {user?.uuid?.slice(0, 8) || "N/A"}
+                {/* UID Gold Badge */}
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#FFD84A] px-2.5 py-1 text-[11px] font-black text-[#2A0815] shadow-[0_0_14px_rgba(255,216,74,0.4)]">
+                  <span className="uppercase tracking-wider opacity-70">
+                    UID
+                  </span>
+                  <span className="font-mono tracking-wider">
+                    {user?.uuid?.slice(0, 8) || "N/A"}
+                  </span>
                 </span>
               </div>
             </div>
@@ -628,14 +640,6 @@ const ProfilePage = () => {
               <ChevronRight size={18} className="text-[#ED1D43]" />
             </button>
           </div>
-        </div>
-
-        {/* Trust Footer */}
-        <div className="mt-8 mb-4 text-center">
-          <p className="text-[11px] text-[#8A97AB] flex items-center justify-center gap-1.5 font-semibold">
-            <ShieldCheck size={14} className="text-[#10B981]" />
-            <span>Official Maxify Lottery Portal • Safe & Verified</span>
-          </p>
         </div>
       </div>
 
