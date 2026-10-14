@@ -1117,7 +1117,7 @@ const AdminLottery = () => {
           <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#FFD83D]">
-                Bharat Lottery
+                DEAR LOTTERY
               </p>
 
               <h2 className="mt-1 text-2xl font-black text-white">

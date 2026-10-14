@@ -1,45 +1,45 @@
+import {
+  ArrowRight,
+  BarChart3,
+  Bell,
+  CalendarDays,
+  CalendarPlus,
+  ChevronRight,
+  Clock,
+  Crown,
+  Image as ImageIcon,
+  IndianRupee,
+  Medal,
+  Ticket,
+  Trophy,
+  UserCheck,
+  Users,
+} from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
 import {
-  Users,
-  Ticket,
-  Trophy,
-  Crown,
-  IndianRupee,
-  CalendarDays,
-  CalendarPlus,
-  Image as ImageIcon,
-  Bell,
-  BarChart3,
-  ArrowRight,
-  ChevronRight,
-  Clock,
-  Medal,
-  UserCheck,
-} from "lucide-react";
-import {
-  ResponsiveContainer,
-  ComposedChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ComposedChart,
+  LabelList,
   Line,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  LabelList,
 } from "recharts";
 
-import { fetchDashboardStats } from "../../reducer/slice/adminSlice";
 import { getAllUsers } from "../../reducer/slice/adminAuthReducer";
 import {
   getAllKyc,
   selectAdminKycDocuments,
 } from "../../reducer/slice/adminKycReducer"; // <- path check kar lena
+import { fetchDashboardStats } from "../../reducer/slice/adminSlice";
 
 /* ================= CONSTANTS ================= */
 
@@ -108,7 +108,7 @@ const isUserSuspended = (u) =>
   u.isBlocked === true ||
   u.isSuspended === true ||
   ["blocked", "suspended", "banned"].includes(
-    String(u.status || "").toLowerCase()
+    String(u.status || "").toLowerCase(),
   );
 
 // KYC doc status (pending/approved/rejected) -> label + tone
@@ -128,7 +128,7 @@ const kycUserKey = (doc) =>
       doc?.userUuid ||
       doc?.userId ||
       doc?.uuid ||
-      ""
+      "",
   );
 
 const EmptyChart = ({ text = "No data yet" }) => (
@@ -161,7 +161,7 @@ const Dashboard = () => {
 
   const { users = [] } = useSelector((state) => state.adminAuth);
   const { dashboardStats = {}, dashboardLoading } = useSelector(
-    (state) => state.admin
+    (state) => state.admin,
   );
   const kycDocs = useSelector(selectAdminKycDocuments);
 
@@ -181,9 +181,21 @@ const Dashboard = () => {
       value: num(dashboardStats.totalUsers ?? users.length),
       icon: Users,
     },
-    { title: "Total Tickets", value: num(dashboardStats.totalEntries), icon: Ticket },
-    { title: "Total Draws", value: num(dashboardStats.totalConfigs), icon: Trophy },
-    { title: "Total Winners", value: num(dashboardStats.totalWinners), icon: Crown },
+    {
+      title: "Total Tickets",
+      value: num(dashboardStats.totalEntries),
+      icon: Ticket,
+    },
+    {
+      title: "Total Draws",
+      value: num(dashboardStats.totalConfigs),
+      icon: Trophy,
+    },
+    {
+      title: "Total Winners",
+      value: num(dashboardStats.totalWinners),
+      icon: Crown,
+    },
     {
       title: "Total Prize Amount",
       value: dashboardLoading
@@ -223,7 +235,7 @@ const Dashboard = () => {
       [...users]
         .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
         .slice(0, 5),
-    [users]
+    [users],
   );
 
   /* ---------- ACTIVE USERS (LOGGED IN WITHIN LAST 3-4 DAYS) ---------- */
@@ -283,7 +295,10 @@ const Dashboard = () => {
   const sales = dashboardStats.salesOverview || [];
   const distribution = dashboardStats.distribution || [];
   const todayDraws = dashboardStats.todayDraws || [];
-  const winningTickets = (dashboardStats.recentWinningTickets || []).slice(0, 5);
+  const winningTickets = (dashboardStats.recentWinningTickets || []).slice(
+    0,
+    5,
+  );
   const totalDist = distribution.reduce((s, d) => s + (d.value || 0), 0);
 
   const quickActions = [
@@ -326,7 +341,10 @@ const Dashboard = () => {
         {statCards.map((c) => {
           const Icon = c.icon;
           return (
-            <div key={c.title} className={`${CARD} flex items-center gap-3 p-4`}>
+            <div
+              key={c.title}
+              className={`${CARD} flex items-center gap-3 p-4`}
+            >
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#FFEFA8]">
                 <Icon size={26} className="text-[#C27A00]" strokeWidth={2.2} />
               </div>
@@ -355,7 +373,7 @@ const Dashboard = () => {
           />
           <div className="relative flex h-full flex-col items-center justify-center text-center sm:ml-24">
             <h1 className="bg-gradient-to-b from-[#FFE46B] via-[#F7B500] to-[#E39A00] bg-clip-text text-3xl font-black tracking-tight text-transparent sm:text-5xl">
-              BHARAT LOTTERY
+              DEAR LOTTERY
             </h1>
             <p className="mt-1 text-sm font-semibold tracking-[0.35em] text-white sm:text-lg">
               ADMIN DASHBOARD
@@ -368,7 +386,11 @@ const Dashboard = () => {
 
         {/* Today's Draws */}
         <div className={`${CARD} p-4`}>
-          <SectionTitle icon={CalendarDays} title="Today's Draws" to="/admin/lottery" />
+          <SectionTitle
+            icon={CalendarDays}
+            title="Today's Draws"
+            to="/admin/lottery"
+          />
           {todayDraws.length === 0 ? (
             <div className="h-28">
               <EmptyChart text="No draws today" />
@@ -505,7 +527,9 @@ const Dashboard = () => {
                       <span className="flex items-center gap-1.5 text-[#374151]">
                         <span
                           className="h-2.5 w-2.5 rounded-full"
-                          style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
+                          style={{
+                            background: PIE_COLORS[i % PIE_COLORS.length],
+                          }}
                         />
                         {d.name}
                       </span>
@@ -552,7 +576,11 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {/* Recent Winning Tickets */}
         <div className={`${CARD} p-4`}>
-          <SectionTitle icon={Medal} title="Recent Winning Tickets" to="/admin/results" />
+          <SectionTitle
+            icon={Medal}
+            title="Recent Winning Tickets"
+            to="/admin/results"
+          />
           <div className="overflow-x-auto">
             <table className="w-full min-w-[520px] text-left text-[11px]">
               <thead>
@@ -586,7 +614,9 @@ const Dashboard = () => {
                       </td>
                       <td
                         className="text-base font-black"
-                        style={{ color: NUMBER_COLORS[i % NUMBER_COLORS.length] }}
+                        style={{
+                          color: NUMBER_COLORS[i % NUMBER_COLORS.length],
+                        }}
                       >
                         {t.winningNumber}
                       </td>
@@ -598,7 +628,9 @@ const Dashboard = () => {
                           ₹{Number(t.prizeAmount || 0).toLocaleString("en-IN")}
                         </div>
                       </td>
-                      <td className="text-[10px] text-[#374151]">{t.ticketNo}</td>
+                      <td className="text-[10px] text-[#374151]">
+                        {t.ticketNo}
+                      </td>
                       <td>
                         <span className={pill("green")}>
                           {t.status || "Verified"}
@@ -733,7 +765,10 @@ const Dashboard = () => {
               {activeUsersList.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-[#9CA3AF]">
-                    <UserCheck size={28} className="mx-auto mb-2 text-gray-300" />
+                    <UserCheck
+                      size={28}
+                      className="mx-auto mb-2 text-gray-300"
+                    />
                     <p className="font-bold text-[#374151]">
                       No active users in the last 3-4 days
                     </p>
@@ -761,7 +796,9 @@ const Dashboard = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="font-mono text-[#374151]">{u.mobile || "-"}</td>
+                      <td className="font-mono text-[#374151]">
+                        {u.mobile || "-"}
+                      </td>
                       <td className="whitespace-nowrap font-medium text-[#1A1A1A]">
                         {u.lastLogin?.time ? (
                           <div className="flex items-center gap-1 text-[11px]">

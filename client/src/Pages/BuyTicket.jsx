@@ -4,6 +4,7 @@ import {
   CalendarDays,
   ChevronDown,
   Clock,
+  Crown,
   Info,
   ScrollText,
   Shuffle,
@@ -98,6 +99,10 @@ const TICKET_LENGTH = SLOT_PATTERN.length;
 
 const TICKET_EXAMPLE = "12B12345";
 const HERO_TICKET_NUMBER = "47B39120";
+
+// ✅ Admin ki API image (imageUrl) premium card ke hero banner me dikhani hai ya nahi.
+// false karoge to purana TicketMock layout dikhega.
+const USE_API_IMAGE = true;
 
 // This regex matches:
 // DD + L + DDDDD
@@ -1575,122 +1580,20 @@ const BuyTicket = () => {
             DAILY LOTTERY TICKET (PREMIUM)
         ================================================= */}
 
-        <section className="relative overflow-hidden rounded-[16px] border border-[#f1d9a0] bg-white shadow-sm">
-          {/* TOP: ticket + title + price */}
-          <div className="bg-gradient-to-r from-[#fff0c9] via-[#fff8e8] to-[#ffe7b8] px-3 py-3">
-            <div className="grid grid-cols-[auto_1fr] items-center gap-3">
-              <div className="w-[96px]">
-                <TicketMock
-                  small
-                  prize={firstPrizeAmount}
-                  price={priceText}
-                  number={HERO_TICKET_NUMBER}
-                />
-              </div>
-
-              <div className="min-w-0">
-                <h2 className="font-serif text-[18px] font-black leading-tight text-[#173e70]">
-                  Daily Lottery Ticket
-                </h2>
-
-                <p className="mt-0.5 text-[10px] font-medium text-[#8a4b12]">
-                  Small Ticket, Big Opportunities
-                </p>
-
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className="rounded-md bg-[#ed1d43] px-2.5 py-1 text-[13px] font-extrabold text-white shadow-sm">
-                    {priceText}{" "}
-                    <span className="text-[8px] font-medium">per ticket</span>
-                  </span>
-
-                  <span className="text-[10px] font-semibold text-[#8a4b12]">
-                    Max {MAX_TICKETS} / order
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3 p-3">
-            {/* PRIZE HIGHLIGHT */}
-            <div className="flex items-center gap-3 rounded-xl border border-[#e6c97c] bg-gradient-to-r from-[#fff6df] to-[#fffdf5] px-3 py-2.5">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#ffe58a] to-[#f0b429] text-[#6b3a06] shadow-sm">
-                <Trophy size={24} />
-              </span>
-
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#8a4b12]">
-                  Total First Prize
-                </p>
-
-                <p className="truncate text-[28px] font-black uppercase leading-tight text-[#d7193f]">
-                  {firstPrizeAmount}
-                </p>
-              </div>
-
-              <div className="shrink-0 rounded-lg bg-white/80 px-2 py-1 text-center">
-                <p className="text-[8px] font-medium text-[#4b5563]">
-                  {RULE_TICKETS} Winners
-                </p>
-
-                <p className="text-[11px] font-extrabold text-[#173e70]">
-                  {firstPrizePerTicket}
-                </p>
-
-                <p className="text-[8px] font-medium text-[#4b5563]">each</p>
-              </div>
-            </div>
-
-            {/* DRAW DATE | DRAW TIME | BETS CLOSE IN */}
-            <div className="grid grid-cols-3 divide-x divide-[#dfe5f0] rounded-xl bg-[#f3f6fb] py-2.5">
-              <div className="flex min-w-0 flex-col items-center px-1.5 text-center">
-                <CalendarDays size={16} className="text-[#ed1d43]" />
-
-                <p className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-[#4b5563]">
-                  Draw Date
-                </p>
-
-                <p className="w-full truncate text-[12px] font-black text-[#173e70]">
-                  {drawDateText}
-                </p>
-              </div>
-
-              <div className="flex min-w-0 flex-col items-center px-1.5 text-center">
-                <Clock size={16} className="text-[#ed1d43]" />
-
-                <p className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-[#4b5563]">
-                  Draw Time
-                </p>
-
-                <p className="w-full truncate text-[12px] font-black text-[#173e70]">
-                  {drawTimeText}
-                </p>
-              </div>
-
-              <div className="flex min-w-0 flex-col items-center px-1.5 text-center">
-                <span className="relative flex h-4 items-center">
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      isBetClosed ? "bg-red-500" : "animate-pulse bg-[#14a06a]"
-                    }`}
-                  />
-                </span>
-
-                <p className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-[#4b5563]">
-                  {isBetClosed ? "Betting" : "Bets Close In"}
-                </p>
-
-                <p
-                  className={`w-full truncate font-mono text-[12px] font-black ${
-                    isBetClosed ? "text-red-600" : "text-[#14a06a]"
-                  }`}
-                >
-                  {countdownText}
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
+        <PremiumTicketCard
+          imageUrl={USE_API_IMAGE ? displayLottery?.imageUrl : null}
+          marketName={displayLottery?.marketName}
+          firstPrizeAmount={firstPrizeAmount}
+          firstPrizePerTicket={firstPrizePerTicket}
+          priceText={priceText}
+          drawDateText={drawDateText}
+          drawTimeText={drawTimeText}
+          countdownText={countdownText}
+          isBetClosed={isBetClosed}
+          ruleTickets={RULE_TICKETS}
+          maxTickets={MAX_TICKETS}
+          heroNumber={HERO_TICKET_NUMBER}
+        />
 
         {/* =================================================
             HOW MANY TICKETS
@@ -2301,16 +2204,34 @@ const Card = ({ children }) => (
 // DATE CHIP
 // =====================================================
 
-const DateChip = ({ chip, today, active, onClick, fluid = false }) => {
+const DateChip = ({
+  chip,
+  today,
+  active: activeProp,
+  onClick,
+  fluid = false,
+}) => {
   const hasMarket = Boolean(chip?.hasMarket);
+
+  // ✅ Jis date ka market active nahi hai wo kabhi "active/selected" nahi dikhega
+  const active = activeProp && hasMarket;
+
+  const handleClick = () => {
+    if (!hasMarket) return;
+    onClick?.();
+  };
 
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={handleClick}
+      disabled={!hasMarket}
+      aria-disabled={!hasMarket}
       className={`relative flex h-[66px] ${
         fluid ? "w-full" : "w-[64px] shrink-0"
-      } flex-col items-center justify-center rounded-xl border text-center transition active:scale-95 ${
+      } flex-col items-center justify-center rounded-xl border text-center transition ${
+        hasMarket ? "active:scale-95" : "cursor-not-allowed"
+      } ${
         active
           ? "border-2 border-green-500 bg-[#fff0f2]"
           : hasMarket
@@ -2365,7 +2286,7 @@ const DateChip = ({ chip, today, active, onClick, fluid = false }) => {
       ) : (
         <span
           className="absolute bottom-1 h-1 w-1 rounded-full bg-gray-400"
-          title="No Active Market"
+          title="No active market for this date"
         />
       )}
     </button>
@@ -2469,6 +2390,162 @@ const TicketMock = ({ prize, price, number, small = false }) => (
     </div>
   </div>
 );
+
+// =====================================================
+// PREMIUM TICKET CARD (Festival Info style)
+// Left: API image (imageUrl) / TicketMock fallback
+// Right: title + tagline + First Prize | Draw Date | Draw Time
+// =====================================================
+
+const PREMIUM_CSS = `
+@keyframes dl-glow {
+  0%, 100% { box-shadow: 0 6px 18px rgba(240,180,41,0.28); }
+  50%      { box-shadow: 0 6px 26px rgba(240,180,41,0.55); }
+}
+@keyframes dl-shine {
+  0%   { transform: translateX(-130%) skewX(-20deg); }
+  100% { transform: translateX(380%) skewX(-20deg); }
+}
+.dl-glow  { animation: dl-glow 2.6s ease-in-out infinite; }
+.dl-shine { animation: dl-shine 3.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .dl-glow, .dl-shine { animation: none !important; }
+}
+`;
+
+const InfoMini = ({ icon, title, sub }) => (
+  <div className="flex min-w-0 flex-col items-center gap-0.5 text-center">
+    <span className="shrink-0 text-[#8a4b12]">{icon}</span>
+    <div className="w-full min-w-0">
+      <p className="truncate text-[10.5px] font-bold leading-tight text-[#173e70]">
+        {title}
+      </p>
+      <p className="truncate text-[8px] leading-tight text-[#4b5563]">{sub}</p>
+    </div>
+  </div>
+);
+
+const PremiumTicketCard = ({
+  imageUrl,
+  marketName,
+  firstPrizeAmount,
+  firstPrizePerTicket,
+  priceText,
+  drawDateText,
+  drawTimeText,
+  countdownText,
+  isBetClosed,
+  ruleTickets,
+  maxTickets,
+  heroNumber,
+}) => {
+  const [imgFailed, setImgFailed] = useState(false);
+
+  // Image URL badle (date/market change) to dobara try karo
+  useEffect(() => {
+    setImgFailed(false);
+  }, [imageUrl]);
+
+  const showImage = Boolean(imageUrl) && !imgFailed;
+
+  return (
+    <section className="dl-glow relative rounded-[18px] bg-gradient-to-br from-[#ffe58a] via-[#f0b429] to-[#ed1d43] p-[2px]">
+      <style>{PREMIUM_CSS}</style>
+
+      <div className="relative overflow-hidden rounded-[16px] border border-[#f1d9a0] bg-gradient-to-r from-[#fff0c9] via-[#fff8e8] to-[#ffe7b8]">
+        {/* soft shine sweep */}
+        <span className="dl-shine pointer-events-none absolute inset-y-0 left-0 w-1/5 bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+
+        {/* ---------- MAIN ROW: IMAGE + INFO ---------- */}
+        <div className="relative grid grid-cols-[auto_1fr] items-center gap-3 p-3">
+          {showImage ? (
+            <div className="relative h-[95px] w-[104px] shrink-0 overflow-hidden rounded-xl border-2 border-[#f1d9a0] bg-white shadow-md">
+              <img
+                src={imageUrl}
+                alt={`${marketName || "Daily"} Lottery`}
+                loading="lazy"
+                onError={() => setImgFailed(true)}
+                className="h-full w-full object-cover"
+              />
+              <span className="absolute bottom-1 right-1 rounded bg-[#d7198c] px-1.5 py-0.5 text-[9px] font-bold text-white shadow">
+                {priceText}
+              </span>
+            </div>
+          ) : (
+            <div className="w-[104px]">
+              <TicketMock
+                small
+                prize={firstPrizeAmount}
+                price={priceText}
+                number={heroNumber}
+              />
+            </div>
+          )}
+
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <h3 className="min-w-0 truncate font-serif text-[16px] font-black leading-tight text-[#173e70]">
+                Daily Lottery Ticket
+              </h3>
+              <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-[#2b0a16] px-1.5 py-0.5 text-[8px] font-extrabold uppercase tracking-wide text-[#ffd34e]">
+                <Crown size={9} />
+                Premium
+              </span>
+            </div>
+
+            <p className="mt-0.5 text-[10px] leading-snug text-[#4b5563]">
+              Small Ticket, Big Opportunities. Pick your numbers and play for a
+              bigger prize!
+            </p>
+
+            <div className="mt-2 grid grid-cols-3 gap-1">
+              <InfoMini
+                icon={<Trophy size={20} />}
+                title={firstPrizeAmount}
+                sub="First Prize"
+              />
+              <InfoMini
+                icon={<CalendarDays size={20} />}
+                title={drawDateText}
+                sub="Draw Date"
+              />
+              <InfoMini
+                icon={<Clock size={20} />}
+                title={drawTimeText}
+                sub="Draw Time"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ---------- STATUS STRIP: BETS CLOSE IN + MAX ---------- */}
+        <div className="relative flex items-center justify-between gap-2 border-t border-[#f1d9a0] bg-white/60 px-3 py-2">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span
+              className={`h-2 w-2 shrink-0 rounded-full ${
+                isBetClosed ? "bg-red-500" : "animate-pulse bg-[#14a06a]"
+              }`}
+            />
+            <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-[#4b5563]">
+              {isBetClosed ? "Betting" : "Bets close in"}
+            </span>
+            <span
+              className={`truncate font-mono text-[12px] font-black ${
+                isBetClosed ? "text-red-600" : "text-[#14a06a]"
+              }`}
+            >
+              {countdownText}
+            </span>
+          </div>
+
+          <span className="shrink-0 rounded-md border border-[#e6c97c] bg-[#fff6df] px-2 py-0.5 text-[10px] font-bold text-[#8a4b12]">
+            Max {maxTickets} / order
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+};
 
 // =====================================================
 // RULE ROW
