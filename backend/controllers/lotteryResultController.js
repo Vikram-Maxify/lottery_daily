@@ -24,17 +24,45 @@ const PRIZE_DIGITS = {
 };
 
 // =====================================================
-// VALIDATE 8-CHAR ALPHANUMERIC
+// VALIDATE 8-CHAR ALPHANUMERIC (1st prize)
 // =====================================================
 const validateLotteryNumber = (number) => {
   if (number === undefined || number === null) return false;
-  return /^[a-zA-Z0-9]{8}$/.test(String(number).trim());
+  return /^[A-Z0-9]{8}$/.test(String(number).trim().toUpperCase());
 };
 
-// 5th prize: allow 3-8 alphanumeric chars
+// =====================================================
+// VALIDATE PER-PRIZE NUMBER
+// 1st: 8 alphanumeric
+// 2nd: 5 digits
+// 3rd: 4 digits
+// 4th: 4 digits
+// 5th: 3 digits
+// =====================================================
+const validatePrizeNumber = (prizeKey, number) => {
+  if (number === undefined || number === null || number === "") return false;
+  const v = String(number).trim().toUpperCase();
+
+  switch (prizeKey) {
+    case "first":
+      return /^[A-Z0-9]{8}$/.test(v);
+    case "second":
+      return /^[0-9]{5}$/.test(v);
+    case "third":
+      return /^[0-9]{4}$/.test(v);
+    case "fourth":
+      return /^[0-9]{4}$/.test(v);
+    case "fifth":
+      return /^[0-9]{3}$/.test(v);
+    default:
+      return false;
+  }
+};
+
+// Legacy aliases (kept for backward compatibility)
 const validateShortLotteryNumber = (number) => {
   if (number === undefined || number === null) return false;
-  return /^[a-zA-Z0-9]{3,8}$/.test(String(number).trim());
+  return /^[A-Z0-9]{3,8}$/.test(String(number).trim().toUpperCase());
 };
 
 const validateSixDigitNumber = validateLotteryNumber;
@@ -193,10 +221,12 @@ const buildUserPrizeObject = (prizeType, prizeAmounts) => {
 };
 
 // =====================================================
-// VALIDATE WINNING NUMBERS OBJECT
-// 1st: exact 8 chars
-// 2nd/3rd/4th: exact 8 chars
-// 5th: 3-8 alphanumeric chars (flexible)
+// VALIDATE WINNING NUMBERS OBJECT (per-prize format)
+// 1st: 8 alphanumeric
+// 2nd: 5 digits
+// 3rd: 4 digits
+// 4th: 4 digits
+// 5th: 3 digits
 // =====================================================
 const validateWinningNumbers = (winningNumbers) => {
   const errors = [];
@@ -205,18 +235,20 @@ const validateWinningNumbers = (winningNumbers) => {
     return ["winningNumbers object is required"];
   }
 
-  // First: single 8-char
+  // ---------- 1st: single 8-char alphanumeric ----------
   if (
     winningNumbers.first !== undefined &&
     winningNumbers.first !== null &&
     winningNumbers.first !== ""
   ) {
-    if (!validateLotteryNumber(winningNumbers.first)) {
-      errors.push("1st prize winning number must be 8 alphanumeric characters");
+    if (!validatePrizeNumber("first", winningNumbers.first)) {
+      errors.push(
+        "1st prize winning number must be 8 alphanumeric characters (e.g. 12A12345)"
+      );
     }
   }
 
-  // Second: array (max 10), 8-char each
+  // ---------- 2nd: array of 5-digit numbers, max 10 ----------
   if (winningNumbers.second !== undefined) {
     if (!Array.isArray(winningNumbers.second)) {
       errors.push("2nd prize winningNumbers.second must be an array");
@@ -224,14 +256,14 @@ const validateWinningNumbers = (winningNumbers) => {
       errors.push(`2nd prize allows max ${PRIZE_COUNTS.second} numbers`);
     } else {
       for (const n of winningNumbers.second) {
-        if (n && !validateLotteryNumber(n)) {
-          errors.push(`Invalid 2nd prize number: ${n}`);
+        if (n && !validatePrizeNumber("second", n)) {
+          errors.push(`Invalid 2nd prize number: ${n} (must be 5 digits)`);
         }
       }
     }
   }
 
-  // Third: array (max 10), 8-char each
+  // ---------- 3rd: array of 4-digit numbers, max 10 ----------
   if (winningNumbers.third !== undefined) {
     if (!Array.isArray(winningNumbers.third)) {
       errors.push("3rd prize winningNumbers.third must be an array");
@@ -239,14 +271,14 @@ const validateWinningNumbers = (winningNumbers) => {
       errors.push(`3rd prize allows max ${PRIZE_COUNTS.third} numbers`);
     } else {
       for (const n of winningNumbers.third) {
-        if (n && !validateLotteryNumber(n)) {
-          errors.push(`Invalid 3rd prize number: ${n}`);
+        if (n && !validatePrizeNumber("third", n)) {
+          errors.push(`Invalid 3rd prize number: ${n} (must be 4 digits)`);
         }
       }
     }
   }
 
-  // Fourth: array (max 10), 8-char each
+  // ---------- 4th: array of 4-digit numbers, max 10 ----------
   if (winningNumbers.fourth !== undefined) {
     if (!Array.isArray(winningNumbers.fourth)) {
       errors.push("4th prize winningNumbers.fourth must be an array");
@@ -254,14 +286,14 @@ const validateWinningNumbers = (winningNumbers) => {
       errors.push(`4th prize allows max ${PRIZE_COUNTS.fourth} numbers`);
     } else {
       for (const n of winningNumbers.fourth) {
-        if (n && !validateLotteryNumber(n)) {
-          errors.push(`Invalid 4th prize number: ${n}`);
+        if (n && !validatePrizeNumber("fourth", n)) {
+          errors.push(`Invalid 4th prize number: ${n} (must be 4 digits)`);
         }
       }
     }
   }
 
-  // Fifth: array (max 100), 3-8 alphanumeric chars each (flexible)
+  // ---------- 5th: array of 3-digit numbers, max 100 ----------
   if (winningNumbers.fifth !== undefined) {
     if (!Array.isArray(winningNumbers.fifth)) {
       errors.push("5th prize winningNumbers.fifth must be an array");
@@ -269,10 +301,8 @@ const validateWinningNumbers = (winningNumbers) => {
       errors.push(`5th prize allows max ${PRIZE_COUNTS.fifth} numbers`);
     } else {
       for (const n of winningNumbers.fifth) {
-        if (n && !validateShortLotteryNumber(n)) {
-          errors.push(
-            `Invalid 5th prize number: ${n} (3-8 alphanumeric chars)`
-          );
+        if (n && !validatePrizeNumber("fifth", n)) {
+          errors.push(`Invalid 5th prize number: ${n} (must be 3 digits)`);
         }
       }
     }
@@ -674,8 +704,7 @@ const getAllResults = async (req, res) => {
 };
 
 // =====================================================
-// GET UNBET NUMBERS
-// =====================================================
+// GENERATE RANDOM LOTTERY NUMBER (8-char alphanumeric)
 // =====================================================
 const generateRandomNumber = () => {
   // 2 random digits
