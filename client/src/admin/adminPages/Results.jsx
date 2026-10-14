@@ -36,28 +36,62 @@ const TH_CLS =
   "px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-[#9A5B00]";
 
 // =====================================================
-// WINNING NUMBER FORMAT — 8 chars: 2 digits + 1 letter + 5 digits
-// =====================================================
-const WINNING_NUMBER_REGEX = /^[0-9]{2}[A-Z][0-9]{5}$/;
-
-const isValidWinningNumber = (value) => {
-  const v = String(value || "").trim().toUpperCase();
-  return WINNING_NUMBER_REGEX.test(v);
-};
-
-const NUMBER_FORMAT_HINT =
-  "8 chars — 2 digits + 1 letter (A-Z) + 5 digits. Example: 12A12345";
-
-// =====================================================
-// PRIZE CONFIG  ✅ 5th = last 3 digits
+// PRIZE CONFIG — Format & Validation per prize
 // =====================================================
 const PRIZE_CONFIG = {
-  first: { label: "1st Prize (8-digit exact)", max: 1, digits: 8 },
-  second: { label: "2nd Prize (last 5 digits)", max: 10, digits: 5 },
-  third: { label: "3rd Prize (last 4 digits)", max: 10, digits: 4 },
-  fourth: { label: "4th Prize (last 4 digits)", max: 10, digits: 4 },
-  fifth: { label: "5th Prize (last 3 digits)", max: 100, digits: 3 },
+  first: {
+    label: "1st Prize (8-char: 2 digits + 1 letter + 5 digits)",
+    max: 1,
+    length: 8,
+    // 1st: 2 digits + 1 letter + 5 digits e.g. 12A12345
+    validate: (v) => /^[0-9]{2}[A-Z][0-9]{5}$/.test(v),
+    hint: "e.g. 12A12345",
+  },
+  second: {
+    label: "2nd Prize (last 5 digits)",
+    max: 10,
+    length: 5,
+    // 2nd: 5 digits only
+    validate: (v) => /^[0-9]{5}$/.test(v),
+    hint: "e.g. 66950",
+  },
+  third: {
+    label: "3rd Prize (last 4 digits)",
+    max: 10,
+    length: 4,
+    // 3rd: 4 digits only
+    validate: (v) => /^[0-9]{4}$/.test(v),
+    hint: "e.g. 6950",
+  },
+  fourth: {
+    label: "4th Prize (last 4 digits)",
+    max: 10,
+    length: 4,
+    // 4th: 4 digits only
+    validate: (v) => /^[0-9]{4}$/.test(v),
+    hint: "e.g. 6950",
+  },
+  fifth: {
+    label: "5th Prize (last 3 digits)",
+    max: 100,
+    length: 3,
+    // 5th: 3 digits only
+    validate: (v) => /^[0-9]{3}$/.test(v),
+    hint: "e.g. 950",
+  },
 };
+
+// Generic validity check (uses per-prize validate)
+const isValidForPrize = (prizeKey, value) => {
+  const cfg = PRIZE_CONFIG[prizeKey];
+  if (!cfg) return false;
+  const v = String(value || "").trim().toUpperCase();
+  return cfg.validate(v);
+};
+
+// 1st prize hint (single source of truth)
+const NUMBER_FORMAT_HINT =
+  "8 chars — 2 digits + 1 letter (A-Z) + 5 digits. Example: 12A12345";
 
 // =====================================================
 // SAFE DATE-ONLY STRING (YYYY-MM-DD)
@@ -87,25 +121,31 @@ const emptyForm = {
 
 // =====================================================
 // AUTO FILL FROM UNBET NUMBER
-// 1st = full (8-digit), 2nd = last 5, 3rd/4th = last 4, 5th = last 3 (100 nums)
+//  1st = full 8-char (e.g. 12A12345)
+//  2nd = last 5 digits
+//  3rd = last 4 digits
+//  4th = last 4 digits
+//  5th = last 3 digits  → 100 numbers (000–099)
 // =====================================================
 const buildAutoFill = (rawNumber) => {
-  const clean = String(rawNumber || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const clean = String(rawNumber || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
   if (!clean) return null;
 
-  // Base 8-char
+  // Base 8-char number (pad if needed)
   const base8 = clean.padStart(8, "0").slice(-8);
 
-  // 1st — full 8-char
+  // 1st — full 8-char number
   const first = base8;
 
-  // 2nd — last 5 digits (base ke last 5 + 0-9 suffix variations)
+  // 2nd — last 5 digits (10 variations: change last digit 0-9)
   const last5 = base8.slice(-5);
   const second = Array.from({ length: 10 }, (_, i) =>
     last5.slice(0, 4) + String(i)
   );
 
-  // 3rd — last 4 digits (0-9 suffix variations)
+  // 3rd — last 4 digits (10 variations: change last digit 0-9)
   const last4 = base8.slice(-4);
   const third = Array.from({ length: 10 }, (_, i) =>
     last4.slice(0, 3) + String(i)
@@ -114,12 +154,11 @@ const buildAutoFill = (rawNumber) => {
   // 4th — same as 3rd
   const fourth = [...third];
 
-  // 5th — last 3 digits (100 numbers: 00-99 prefix + last 3)
+  // 5th — last 3 digits → 100 numbers (000–099)
   const last3 = base8.slice(-3);
-  const fifth = Array.from({ length: 100 }, (_, i) => {
-    const suffix = String(i).padStart(3, "0");
-    return suffix;
-  });
+  const fifth = Array.from({ length: 100 }, (_, i) =>
+    String(i).padStart(3, "0")
+  );
 
   return { first, second, third, fourth, fifth };
 };
@@ -223,12 +262,13 @@ const Results = () => {
     if (formError) setFormError("");
   };
 
-  /* ---------------- ARRAY INPUT CHANGE ---------------- */
+  /* ---------------- ARRAY INPUT CHANGE (per-prize length) ---------------- */
   const handleArrayChange = (prizeKey, index, value) => {
+    const maxLen = PRIZE_CONFIG[prizeKey]?.length || 8;
     const cleaned = String(value)
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, "")
-      .slice(0, 8);
+      .slice(0, maxLen);
 
     setFormData((prev) => {
       const arr = [...prev.winningNumbers[prizeKey]];
@@ -297,28 +337,32 @@ const Results = () => {
     setFormError("");
   };
 
-  /* ---------------- VALIDATE FORM ---------------- */
+  /* ---------------- VALIDATE FORM (per-prize) ---------------- */
   const validateForm = () => {
     if (!formData.lotteryConfigId) return "Please select a lottery config.";
     if (!formData.date) return "Please select a result date.";
 
     const wn = formData.winningNumbers;
 
-    if (!isValidWinningNumber(wn.first)) {
-      return "1st prize number is required (e.g. 12A12345).";
+    // 1st prize
+    if (!isValidForPrize("first", wn.first)) {
+      return `1st prize number is required (e.g. 12A12345).`;
     }
 
+    // 2nd - 5th
     for (const key of ["second", "third", "fourth", "fifth"]) {
+      const cfg = PRIZE_CONFIG[key];
       const arr = (wn[key] || []).filter((x) => String(x).trim() !== "");
+
       if (arr.length === 0) {
-        return `${PRIZE_CONFIG[key].label}: at least 1 number required.`;
+        return `${cfg.label}: at least 1 number required.`;
       }
-      if (arr.length > PRIZE_CONFIG[key].max) {
-        return `${PRIZE_CONFIG[key].label}: max ${PRIZE_CONFIG[key].max} numbers allowed.`;
+      if (arr.length > cfg.max) {
+        return `${cfg.label}: max ${cfg.max} numbers allowed.`;
       }
       for (const n of arr) {
-        if (!isValidWinningNumber(n)) {
-          return `Invalid number in ${PRIZE_CONFIG[key].label}: ${n}`;
+        if (!isValidForPrize(key, n)) {
+          return `Invalid number in ${cfg.label}: ${n}`;
         }
       }
     }
@@ -418,7 +462,7 @@ const Results = () => {
 
   /* ---------------- RENDER ARRAY INPUT GROUP ---------------- */
   const renderArrayGroup = (prizeKey) => {
-    const { label, max } = PRIZE_CONFIG[prizeKey];
+    const { label, max, length, hint } = PRIZE_CONFIG[prizeKey];
     const arr = formData.winningNumbers[prizeKey] || [""];
     const filled = arr.filter(Boolean).length;
 
@@ -447,9 +491,11 @@ const Results = () => {
               <input
                 type="text"
                 value={val}
-                onChange={(e) => handleArrayChange(prizeKey, idx, e.target.value)}
-                maxLength={8}
-                placeholder={`#${idx + 1}`}
+                onChange={(e) =>
+                  handleArrayChange(prizeKey, idx, e.target.value)
+                }
+                maxLength={length}
+                placeholder={`#${idx + 1} (${hint})`}
                 className={`${INPUT_CLS} !py-2 font-mono font-bold tracking-widest uppercase`}
               />
               {arr.length > 1 && (
@@ -537,11 +583,15 @@ const Results = () => {
             Create Lottery Result
           </h2>
           <p className="mb-6 text-sm text-[#6B7280]">
-            1st prize = 1 exact 8-digit number. 2nd = 10 numbers (last 5 digits).
-            3rd/4th = 10 numbers (last 4 digits). 5th = 100 numbers (last 3 digits).
+            1st = 1 exact 8-char number (e.g. 12A12345). 2nd = 10 numbers (last
+            5 digits). 3rd/4th = 10 numbers (last 4 digits). 5th = 100 numbers
+            (last 3 digits).
           </p>
 
-          <form onSubmit={handleCreate} className="grid grid-cols-1 gap-5 md:grid-cols-3">
+          <form
+            onSubmit={handleCreate}
+            className="grid grid-cols-1 gap-5 md:grid-cols-3"
+          >
             {/* CONFIG */}
             <div>
               <label className={LABEL_CLS}>Lottery Config</label>
@@ -621,7 +671,9 @@ const Results = () => {
                   {unbetLoading ? (
                     <p className="text-xs text-[#6B7280]">Loading...</p>
                   ) : unbetNumbers.length === 0 ? (
-                    <p className="text-xs text-[#6B7280]">No unbet numbers found.</p>
+                    <p className="text-xs text-[#6B7280]">
+                      No unbet numbers found.
+                    </p>
                   ) : (
                     <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto">
                       {unbetNumbers.map((n, i) => (
@@ -646,7 +698,9 @@ const Results = () => {
 
             {/* 1ST PRIZE — SINGLE INPUT */}
             <div className="md:col-span-3">
-              <label className={LABEL_CLS}>1st Prize Number (8-digit exact)</label>
+              <label className={LABEL_CLS}>
+                1st Prize Number (8-char exact)
+              </label>
               <input
                 type="text"
                 value={formData.winningNumbers.first}
@@ -673,31 +727,41 @@ const Results = () => {
                 <div className="rounded-xl border border-[#F3E7C4] bg-[#FFF9E3] p-4">
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
                     <div>
-                      <p className="text-xs font-semibold text-[#8A8F98]">Market</p>
+                      <p className="text-xs font-semibold text-[#8A8F98]">
+                        Market
+                      </p>
                       <p className="mt-1 font-bold text-[#1A1A1A]">
                         {selectedConfig.marketName || "-"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-[#8A8F98]">Draw Date</p>
+                      <p className="text-xs font-semibold text-[#8A8F98]">
+                        Draw Date
+                      </p>
                       <p className="mt-1 font-bold text-[#1A1A1A]">
                         {formatDate(selectedConfig.drawDate)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-[#8A8F98]">Draw Time</p>
+                      <p className="text-xs font-semibold text-[#8A8F98]">
+                        Draw Time
+                      </p>
                       <p className="mt-1 font-bold text-[#1A1A1A]">
                         {selectedConfig.drawTime || "-"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-[#8A8F98]">Month</p>
+                      <p className="text-xs font-semibold text-[#8A8F98]">
+                        Month
+                      </p>
                       <p className="mt-1 font-bold text-[#1A1A1A]">
                         {selectedConfig.month || "-"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-[#8A8F98]">Year</p>
+                      <p className="text-xs font-semibold text-[#8A8F98]">
+                        Year
+                      </p>
                       <p className="mt-1 font-bold text-[#1A1A1A]">
                         {selectedConfig.year || "-"}
                       </p>
