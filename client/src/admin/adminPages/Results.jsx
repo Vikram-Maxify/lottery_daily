@@ -86,6 +86,45 @@ const emptyForm = {
 };
 
 // =====================================================
+// AUTO FILL FROM UNBET NUMBER
+// 1st = full (8-digit), 2nd = last 5, 3rd/4th = last 4, 5th = last 3 (100 nums)
+// =====================================================
+const buildAutoFill = (rawNumber) => {
+  const clean = String(rawNumber || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!clean) return null;
+
+  // Base 8-char
+  const base8 = clean.padStart(8, "0").slice(-8);
+
+  // 1st — full 8-char
+  const first = base8;
+
+  // 2nd — last 5 digits (base ke last 5 + 0-9 suffix variations)
+  const last5 = base8.slice(-5);
+  const second = Array.from({ length: 10 }, (_, i) =>
+    last5.slice(0, 4) + String(i)
+  );
+
+  // 3rd — last 4 digits (0-9 suffix variations)
+  const last4 = base8.slice(-4);
+  const third = Array.from({ length: 10 }, (_, i) =>
+    last4.slice(0, 3) + String(i)
+  );
+
+  // 4th — same as 3rd
+  const fourth = [...third];
+
+  // 5th — last 3 digits (100 numbers: 00-99 prefix + last 3)
+  const last3 = base8.slice(-3);
+  const fifth = Array.from({ length: 100 }, (_, i) => {
+    const suffix = String(i).padStart(3, "0");
+    return suffix;
+  });
+
+  return { first, second, third, fourth, fifth };
+};
+
+// =====================================================
 // COMPONENT
 // =====================================================
 const Results = () => {
@@ -238,6 +277,24 @@ const Results = () => {
     }
     setShowUnbet(true);
     dispatch(getUnbetNumbers(formData.lotteryConfigId));
+  };
+
+  /* ---------------- CLICK UNBET NUMBER → AUTO FILL ---------------- */
+  const handleUnbetClick = (num) => {
+    const filled = buildAutoFill(num);
+    if (!filled) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      winningNumbers: {
+        first: filled.first,
+        second: filled.second,
+        third: filled.third,
+        fourth: filled.fourth,
+        fifth: filled.fifth,
+      },
+    }));
+    setFormError("");
   };
 
   /* ---------------- VALIDATE FORM ---------------- */
@@ -568,15 +625,21 @@ const Results = () => {
                   ) : (
                     <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto">
                       {unbetNumbers.map((n, i) => (
-                        <span
+                        <button
                           key={i}
-                          className="rounded-lg bg-white px-2.5 py-1 font-mono text-xs font-bold text-[#1A1204] ring-1 ring-[#F2B705]/60"
+                          type="button"
+                          onClick={() => handleUnbetClick(n)}
+                          title="Click to auto-fill"
+                          className="rounded-lg bg-white px-2.5 py-1 font-mono text-xs font-bold text-[#1A1204] ring-1 ring-[#F2B705]/60 transition hover:bg-[#FFEFA8] hover:ring-[#E39A00] active:scale-95"
                         >
                           {n}
-                        </span>
+                        </button>
                       ))}
                     </div>
                   )}
+                  <p className="mt-3 text-[11px] text-[#8A8F98]">
+                    💡 Click any number to auto-fill all 5 prize tiers.
+                  </p>
                 </div>
               </div>
             )}

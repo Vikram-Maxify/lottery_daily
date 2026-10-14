@@ -676,11 +676,49 @@ const getAllResults = async (req, res) => {
 // =====================================================
 // GET UNBET NUMBERS
 // =====================================================
+// =====================================================
+const generateRandomNumber = () => {
+  // 2 random digits
+  const d1 = Math.floor(Math.random() * 10);
+  const d2 = Math.floor(Math.random() * 10);
+
+  // 1 random uppercase letter (A-Z)
+  const letter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+
+  // 5 random digits
+  let last5 = "";
+  for (let i = 0; i < 5; i++) {
+    last5 += Math.floor(Math.random() * 10);
+  }
+
+  return `${d1}${d2}${letter}${last5}`;
+};
+
+// =====================================================
+// GENERATE N UNIQUE NUMBERS (safety cap ke saath)
+// =====================================================
+const generateUniqueNumbers = (count) => {
+  const set = new Set();
+  let attempts = 0;
+  const maxAttempts = count * 100;
+
+  while (set.size < count && attempts < maxAttempts) {
+    set.add(generateRandomNumber());
+    attempts++;
+  }
+  return [...set];
+};
+
+// =====================================================
+// GET UNBET LOTTERY NUMBERS
+// =====================================================
 const getUnbetLotteryNumbers = async (req, res) => {
   const startTime = Date.now();
   try {
     const { lotteryConfigId } = req.query;
+    const TOTAL_NUMBERS = 150;
 
+    // -------- DB connection check --------
     if (mongoose.connection.readyState !== 1) {
       return res.status(503).json({
         success: false,
@@ -688,6 +726,7 @@ const getUnbetLotteryNumbers = async (req, res) => {
       });
     }
 
+    // -------- Validate lotteryConfigId --------
     const lotteryid = String(lotteryConfigId || "").trim();
     if (!lotteryid) {
       return res
@@ -700,6 +739,7 @@ const getUnbetLotteryNumbers = async (req, res) => {
         .json({ success: false, message: "Invalid lotteryConfigId" });
     }
 
+    // -------- Fetch lottery config --------
     const lotteryConfig = await LotteryConfig.findOne({ _id: lotteryid })
       .maxTimeMS(8000)
       .lean();
@@ -710,39 +750,40 @@ const getUnbetLotteryNumbers = async (req, res) => {
         .json({ success: false, message: "Lottery configuration not found" });
     }
 
-    const allNumbers = Array.isArray(lotteryConfig.numbers)
-      ? lotteryConfig.numbers
-          .map((item) => {
-            if (typeof item === "string") return item.trim();
-            if (item && typeof item === "object")
-              return String(item.number ?? "").trim();
-            if (typeof item === "number") return String(item).trim();
-            return "";
-          })
-          .filter(Boolean)
+    // -------- DB me existing numbers ka Set banao --------
+    const entries = Array.isArray(lotteryConfig.users)
+      ? lotteryConfig.users
       : [];
 
-    const uniqueNumbers = [...new Set(allNumbers)];
+    const existingNumbers = new Set();
 
-    const entries = await LotteryConfig.find({
-      lotteryConfigId: lotteryConfig._id,
-    })
-      .select("number -_id")
-      .maxTimeMS(8000)
-      .lean();
-
-    const bettedNumbers = new Set();
     for (const entry of entries) {
-      if (entry && entry.number !== undefined && entry.number !== null) {
-        const n = String(entry.number).trim();
-        if (n) bettedNumbers.add(n);
-      }
+      if (!entry) continue;
+      if (entry.number === undefined || entry.number === null) continue;
+
+      const n = String(entry.number).trim();
+      if (n) existingNumbers.add(n);
     }
 
-    const unbetNumbers = uniqueNumbers.filter(
-      (number) => !bettedNumbers.has(number)
-    );
+    // -------- 150 naye numbers generate karo --------
+    const unbetNumbers = [];
+    const generatedSet = new Set();
+    let attempts = 0;
+    const maxAttempts = TOTAL_NUMBERS * 200;
 
+    while (unbetNumbers.length < TOTAL_NUMBERS && attempts < maxAttempts) {
+      const candidate = generateRandomNumber();
+      attempts++;
+
+      // Skip agar DB me already hai ya humne already generate kar liya
+      if (existingNumbers.has(candidate)) continue;
+      if (generatedSet.has(candidate)) continue;
+
+      generatedSet.add(candidate);
+      unbetNumbers.push(candidate);
+    }
+
+    // -------- Response --------
     return res.status(200).json({
       success: true,
       message: "Unbet lottery numbers fetched successfully",
@@ -750,14 +791,15 @@ const getUnbetLotteryNumbers = async (req, res) => {
       lotteryName: lotteryConfig.marketName || null,
       drawDate: lotteryConfig.drawDate || null,
       drawTime: lotteryConfig.drawTime || null,
-      totalNumbers: uniqueNumbers.length,
-      totalBettedNumbers: bettedNumbers.size,
+      requestedCount: TOTAL_NUMBERS,
+      totalExistingNumbers: existingNumbers.size,
       totalUnbetNumbers: unbetNumbers.length,
       numbers: unbetNumbers,
       elapsedMs: Date.now() - startTime,
     });
   } catch (error) {
     console.error("getUnbetLotteryNumbers ERROR:", error);
+
     if (
       error.name === "MongooseError" ||
       error.message?.includes("maxTimeMS")
@@ -767,11 +809,13 @@ const getUnbetLotteryNumbers = async (req, res) => {
         message: "Database query timed out. Please try again.",
       });
     }
+
     if (error.name === "CastError") {
       return res
         .status(400)
         .json({ success: false, message: "Invalid ID format" });
     }
+
     return res.status(500).json({
       success: false,
       message: "Failed to fetch unbet lottery numbers",

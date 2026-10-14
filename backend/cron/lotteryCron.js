@@ -2,6 +2,14 @@ const cron = require("node-cron");
 const LotteryConfig = require("../models/LotteryConfig");
 
 // =====================================================
+// ⚠️ TIMEZONE NOTE
+// Server ko IST par chalao: env me TZ=Asia/Kolkata set karo
+// (pm2 ecosystem / .env / Dockerfile / hosting panel).
+// Warna new Date(), setHours(), getDate() UTC me chalenge
+// aur 12 AM IST par "aaj" ki date galat aa sakti hai.
+// =====================================================
+
+// =====================================================
 // HELPER: FORMAT DATE AS YYYY-MM-DD
 // =====================================================
 
@@ -31,6 +39,49 @@ const getDayRange = (date) => {
   end.setHours(23, 59, 59, 999);
 
   return { start, end };
+};
+
+// =====================================================
+// HELPER: SYNC isActive FLAGS
+// Target din ki SAARI lotteries active, baaki sab inactive.
+// Create ho ya skip (already exists), dono case me chalega.
+// =====================================================
+
+const syncActiveFlags = async (targetDate) => {
+  const { start, end } = getDayRange(targetDate);
+
+  // Safety: agar target din ki ek bhi lottery nahi hai to
+  // kuch bhi deactivate mat karo (warna sab inactive ho jayega)
+  const targetCount = await LotteryConfig.countDocuments({
+    drawDate: { $gte: start, $lte: end },
+  });
+
+  if (targetCount === 0) {
+    console.log(
+      `⚠️ ${formatDateString(targetDate)} ki koi lottery nahi mili, active flags change nahi kiye`,
+    );
+    return;
+  }
+
+  // 1) Target din ki saari lotteries -> active
+  const activated = await LotteryConfig.updateMany(
+    { drawDate: { $gte: start, $lte: end }, isActive: { $ne: true } },
+    { $set: { isActive: true } },
+  );
+
+  // 2) Baaki sab (purani + future) -> inactive
+  const deactivated = await LotteryConfig.updateMany(
+    {
+      isActive: true,
+      $or: [{ drawDate: { $lt: start } }, { drawDate: { $gt: end } }],
+    },
+    { $set: { isActive: false } },
+  );
+
+  console.log(
+    `🔄 Active flags synced for ${formatDateString(targetDate)} ` +
+      `(activated: ${activated.modifiedCount}, deactivated: ${deactivated.modifiedCount})`,
+  );
 };
 
 // =====================================================
@@ -90,6 +141,19 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
     }
 
     // =====================================================
+    // TARGET DAY (referenceDate + 1), normalized to midnight
+    // Template.drawDate + 1 nahi, kyunki template future config
+    // ho sakta hai aur markets aage aage bante rehte.
+    // =====================================================
+
+    const nextDate = new Date(referenceDate);
+    nextDate.setDate(nextDate.getDate() + 1);
+    nextDate.setHours(0, 0, 0, 0);
+
+    const { start: nextStart, end: nextEnd } = getDayRange(nextDate);
+    const nextDateString = formatDateString(nextDate);
+
+    // =====================================================
     // HAR MARKET KE LIYE NEXT DAY LOTTERY CREATE KARO
     // =====================================================
 
@@ -135,21 +199,6 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
           );
         }
 
-        // =====================================================
-        // NEXT DAY DATE CALCULATE KARO (normalized to midnight)
-        // =====================================================
-
-        // Target day is always (referenceDate + 1), NOT (template.drawDate + 1).
-        // Template may be a latest/future config; using its date caused
-        // markets to be generated further and further ahead on every run.
-        const nextDate = new Date(referenceDate);
-        nextDate.setDate(nextDate.getDate() + 1);
-        nextDate.setHours(0, 0, 0, 0); // 🔥 normalize — time hata do
-
-        const { start: nextStart, end: nextEnd } = getDayRange(nextDate);
-
-        const nextDateString = formatDateString(nextDate);
-
         // Never create markets for future days — only up to today
         if (nextStart > todayEnd) {
           console.log(
@@ -169,7 +218,7 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
         }).lean();
 
         if (existingNext) {
-          // If existing next lottery has no imageUrl, repair it immediately!
+          // If existing next lottery has no imageUrl, repair it immediately
           if (!existingNext.imageUrl && imageUrl) {
             await LotteryConfig.findByIdAndUpdate(existingNext._id, {
               imageUrl,
@@ -188,6 +237,7 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
 
         // =====================================================
         // CREATE NEXT DAY LOTTERY
+        // (isActive yahan true set hota hai, final sync loop ke baad)
         // =====================================================
 
         const nextLottery = await LotteryConfig.create({
@@ -213,14 +263,8 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
 
           users: [],
 
-          isActive: true, // 🔥 next day lottery is always active by default
+          isActive: true,
         });
-
-        // Only ONE Daily market may be active: the new current-day market wins
-        await LotteryConfig.updateMany(
-          { _id: { $ne: nextLottery._id }, isActive: true },
-          { $set: { isActive: false } },
-        );
 
         console.log(
           `✅ CREATED: ${marketName} - ${nextDateString} (id: ${nextLottery._id}, image: ${imageUrl ? "yes" : "no"})`,
@@ -239,6 +283,21 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
           );
           errorCount++;
         }
+      }
+    }
+
+    // =====================================================
+    // SYNC ACTIVE FLAGS (loop ke BAAD, sirf ek baar)
+    // Target din ki saari market lotteries active,
+    // baaki sab inactive. Create/skip dono case cover.
+    // =====================================================
+
+    if (nextStart <= todayEnd) {
+      try {
+        await syncActiveFlags(nextDate);
+      } catch (syncError) {
+        console.error("❌ ERROR syncing active flags:", syncError.message);
+        errorCount++;
       }
     }
 
@@ -273,11 +332,11 @@ const createNextDayLotteries = async (referenceDate = new Date()) => {
 // =====================================================
 
 const startLotteryCron = () => {
-  // Run on startup (after 3s) to repair any existing missing images and ensure tomorrow exists
+  // Startup par (3s baad): aaj ki lottery exist kare + isActive flags sync ho
   setTimeout(async () => {
     try {
       console.log("🔄 Initializing lottery check & banner repair...");
-      // Pass yesterday so the target day is TODAY (ensure today's market exists)
+      // Yesterday pass karo taaki target day = TODAY ho
       const yesterdayStart = new Date();
       yesterdayStart.setDate(yesterdayStart.getDate() - 1);
       await createNextDayLotteries(yesterdayStart);
@@ -292,8 +351,6 @@ const startLotteryCron = () => {
     async () => {
       console.log("\n🕛 Cron triggered at 12:00 AM IST");
 
-      // 🔥 FIX: 12 AM par date already next day hai,
-      // isliye previous day (yesterday) pass karo
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
 
@@ -315,4 +372,5 @@ const startLotteryCron = () => {
 module.exports = {
   startLotteryCron,
   createNextDayLotteries, // manual trigger ke liye bhi export
+  syncActiveFlags,
 };

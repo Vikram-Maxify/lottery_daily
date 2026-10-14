@@ -58,7 +58,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://www.setthelife.com",
+      "https://dearlottery1.com",
       "https://setthelife.com",
       "https://dearlottery1.com",
     ],
@@ -172,7 +172,7 @@ const io = new Server(server, {
   cors: {
     origin: [
       "http://localhost:5173",
-      "https://www.setthelife.com",
+      "https://dearlottery1.com",
       "https://setthelife.com",
       "https://dearlottery1.com",
     ],
