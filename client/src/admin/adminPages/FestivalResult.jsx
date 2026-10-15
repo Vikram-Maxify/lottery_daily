@@ -334,6 +334,42 @@ const FestivalResult = () => {
     dispatch(getFestivalUnbetNumbers(formData.lotteryConfigId));
   };
 
+
+  // Clicking an unbet suggestion fills the first four prize tiers from the
+  // selected number and fills up to 100 fifth-prize boxes from unbet suggestions.
+  const handleUnbetNumberClick = (value) => {
+    const number = String(value || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+
+    if (!isValidWinningNumber(number)) {
+      setFormError(`Invalid unbet number: ${value}`);
+      return;
+    }
+
+    // Keep the clicked suggestion first, then use the other unbet suggestions
+    // to populate the 100 fifth-prize entries with their last 3 digits.
+    const fifthNumbers = [number, ...(Array.isArray(unbetNumbers) ? unbetNumbers : [])]
+      .map((item) => String(item || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, ""))
+      .filter(isValidWinningNumber)
+      .map((item) => item.slice(-3))
+      .slice(0, PRIZE_CONFIG.fifth.max);
+
+    setFormData((prev) => ({
+      ...prev,
+      winningNumbers: {
+        ...prev.winningNumbers,
+        first: number,
+        second: [number.slice(-5)],
+        third: [number.slice(-4)],
+        fourth: [number.slice(-4)],
+        fifth: fifthNumbers.length ? fifthNumbers : [number.slice(-3)],
+      },
+    }));
+    setFormError("");
+  };
+
   const validateForm = () => {
     if (!formData.lotteryConfigId) return "Please select a festival lottery.";
     if (!formData.date) return "Please select the result date.";
@@ -346,6 +382,8 @@ const FestivalResult = () => {
 
     for (const key of ["second", "third", "fourth"]) {
       const arr = (wn[key] || []).filter((x) => String(x).trim() !== "");
+      const expectedDigits = key === "second" ? 5 : 4;
+
       if (arr.length === 0) {
         return `${PRIZE_CONFIG[key].label}: at least 1 number required.`;
       }
@@ -353,8 +391,8 @@ const FestivalResult = () => {
         return `${PRIZE_CONFIG[key].label}: max ${PRIZE_CONFIG[key].max} numbers allowed.`;
       }
       for (const n of arr) {
-        if (!isValidWinningNumber(n)) {
-          return `Invalid number in ${PRIZE_CONFIG[key].label}: ${n}`;
+        if (!new RegExp(`^\\d{${expectedDigits}}$`).test(String(n).trim())) {
+          return `${PRIZE_CONFIG[key].label}: exactly ${expectedDigits} digits required.`;
         }
       }
     }
@@ -368,8 +406,8 @@ const FestivalResult = () => {
       return `5th Prize: max ${PRIZE_CONFIG.fifth.max} numbers allowed.`;
     }
     for (const n of fifthArr) {
-      if (!isValidShortNumber(n)) {
-        return `Invalid 5th prize number: ${n} (3-8 alphanumeric chars)`;
+      if (!/^\d{3}$/.test(String(n).trim())) {
+        return `Invalid 5th prize number: ${n} (exactly 3 digits required)`;
       }
     }
 
@@ -653,8 +691,8 @@ const FestivalResult = () => {
             Create Festival Result
           </h2>
           <p className="mb-6 text-sm text-[#6B7280]">
-            1st = 1 exact 8-digit number. 2nd = 10 (last 5 digits). 3rd/4th =
-            10 (last 4 digits). 5th = 100 (last 3 digits).
+            1st = exact 8-character number. 2nd = last 5 digits. 3rd/4th =
+            last 4 digits each. 5th = last 3 digits. Click any Unbet Number to auto-fill all prize fields.
           </p>
 
           <form
@@ -734,12 +772,15 @@ const FestivalResult = () => {
                   ) : (
                     <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto">
                       {unbetNumbers.map((n, i) => (
-                        <span
-                          key={i}
-                          className="rounded-lg bg-white px-2.5 py-1 font-mono text-xs font-bold text-[#1A1204] ring-1 ring-[#F2B705]/60"
+                        <button
+                          key={`${n}-${i}`}
+                          type="button"
+                          onClick={() => handleUnbetNumberClick(n)}
+                          title="Click to auto-fill all prize fields"
+                          className="rounded-lg bg-white px-3 py-2 font-mono text-xs font-bold text-[#1A1204] ring-1 ring-[#F2B705]/60 transition hover:bg-[#FFE680] hover:ring-2 hover:ring-[#F2B705] active:scale-95"
                         >
                           {n}
-                        </span>
+                        </button>
                       ))}
                     </div>
                   )}
