@@ -15,7 +15,7 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
 import {
@@ -119,17 +119,26 @@ const KYC_VIEW = {
   none: { label: "Not Submitted", tone: "gray" },
 };
 
-// KYC document se user id nikalna (populated ho ya plain id, dono chalega)
+// KYC document se user id nikalna (populated object ho ya plain id, dono chalega)
+const refId = (ref) => {
+  if (!ref) return "";
+  if (typeof ref === "object") return String(ref._id || ref.uuid || ref.id || "");
+  return String(ref);
+};
+
 const kycUserKey = (doc) =>
-  String(
-    doc?.user?.uuid ||
-      doc?.user?._id ||
-      doc?.user ||
-      doc?.userUuid ||
-      doc?.userId ||
-      doc?.uuid ||
-      "",
-  );
+  refId(doc?.userId) ||
+  refId(doc?.user) ||
+  String(doc?.userUuid || doc?.uuid || "");
+
+// Higher number = more meaningful KYC status when a user has multiple docs
+const KYC_STATUS_RANK = {
+  approved: 4,
+  pending: 3,
+  rejected: 2,
+  incomplete: 1,
+  none: 0,
+};
 
 const EmptyChart = ({ text = "No data yet" }) => (
   <div className="flex h-full items-center justify-center text-[12px] font-semibold text-[#9CA3AF]">
@@ -154,6 +163,55 @@ const SectionTitle = ({ icon: Icon, title, to }) => (
   </div>
 );
 
+const SALES_RANGES = [7, 15, 30];
+
+const fmtINR = (v) => `₹${Number(v || 0).toLocaleString("en-IN")}`;
+
+const fmtCompactINR = (v) => {
+  const n = Number(v || 0);
+  if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
+  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
+  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
+  return `₹${n}`;
+};
+
+const SalesTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  const row = payload[0].payload;
+  return (
+    <div className="rounded-xl border border-[#F3E7C4] bg-white px-3 py-2 text-[11px] shadow-lg">
+      <p className="mb-1 font-black text-[#1F2A6B]">{label}</p>
+      <p className="flex items-center gap-1.5 text-[#374151]">
+        <span className="h-2 w-2 rounded-full bg-[#F7B500]" />
+        Daily: <b>{row.dailyTickets.toLocaleString("en-IN")}</b> tickets
+      </p>
+      <p className="flex items-center gap-1.5 text-[#374151]">
+        <span className="h-2 w-2 rounded-full bg-[#A855F7]" />
+        Festival: <b>{row.festivalTickets.toLocaleString("en-IN")}</b> tickets
+      </p>
+      <p className="mt-1 border-t border-[#F3E7C4] pt-1 font-bold text-[#12A36B]">
+        Revenue: {fmtINR(row.revenue)}
+      </p>
+    </div>
+  );
+};
+
+const DistributionTooltip = ({ active, payload }) => {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="rounded-xl border border-[#F3E7C4] bg-white px-3 py-2 text-[11px] shadow-lg">
+      <p className="font-black text-[#1F2A6B]">{d.name}</p>
+      <p className="text-[#6B7280]">{d.type} Lottery</p>
+      <p className="mt-1 text-[#374151]">
+        <b>{Number(d.tickets || 0).toLocaleString("en-IN")}</b> tickets (
+        {d.percent}%)
+      </p>
+      <p className="font-bold text-[#12A36B]">{fmtINR(d.revenue)}</p>
+    </div>
+  );
+};
+
 /* ================= COMPONENT ================= */
 
 const Dashboard = () => {
@@ -163,7 +221,13 @@ const Dashboard = () => {
   const { dashboardStats = {}, dashboardLoading } = useSelector(
     (state) => state.admin,
   );
-  const kycDocs = useSelector(selectAdminKycDocuments);
+  const rawKycDocs = useSelector(selectAdminKycDocuments);
+  const kycDocs = useMemo(() => {
+    if (Array.isArray(rawKycDocs)) return rawKycDocs;
+    if (Array.isArray(rawKycDocs?.data)) return rawKycDocs.data;
+    if (Array.isArray(rawKycDocs?.documents)) return rawKycDocs.documents;
+    return [];
+  }, [rawKycDocs]);
 
   useEffect(() => {
     dispatch(fetchDashboardStats());
@@ -207,27 +271,45 @@ const Dashboard = () => {
 
   /* ---------- KYC MAP: userKey -> status ---------- */
   const kycMap = useMemo(() => {
-    const map = {};
+    const userDocsMap = new Map();
     kycDocs.forEach((doc) => {
       const key = kycUserKey(doc);
       if (!key) return;
-      // ek user ke multiple docs hon to latest wala rakho
-      const prev = map[key];
-      if (
-        !prev ||
-        new Date(doc.updatedAt || doc.createdAt || 0) > new Date(prev.at || 0)
-      ) {
-        map[key] = {
-          status: String(doc.status || "pending").toLowerCase(),
-          at: doc.updatedAt || doc.createdAt,
-        };
+      if (!userDocsMap.has(key)) userDocsMap.set(key, []);
+      userDocsMap.get(key).push(doc);
+    });
+
+    const map = {};
+    userDocsMap.forEach((docs, key) => {
+      const statuses = docs.map((d) => String(d.status || "none").toLowerCase());
+
+      // If user has any pending document, their KYC is pending review
+      if (statuses.includes("pending")) {
+        map[key] = { status: "pending" };
+      } else if (statuses.includes("rejected") && !statuses.includes("approved")) {
+        map[key] = { status: "rejected" };
+      } else if (statuses.every((s) => s === "approved")) {
+        map[key] = { status: "approved" };
+      } else {
+        const sorted = [...docs].sort(
+          (a, b) =>
+            new Date(b.updatedAt || b.createdAt || 0) -
+            new Date(a.updatedAt || a.createdAt || 0),
+        );
+        map[key] = { status: sorted[0]?.status || "none" };
       }
     });
     return map;
   }, [kycDocs]);
 
-  const getKycStatus = (u) =>
-    kycMap[String(u.uuid)]?.status || kycMap[String(u._id)]?.status || "none";
+  const getKycStatus = (u) => {
+    if (u?.isKycVerified) return "approved";
+    return (
+      kycMap[String(u?._id)]?.status ||
+      kycMap[String(u?.uuid)]?.status ||
+      "none"
+    );
+  };
 
   /* ---------- TOP 5 RECENT USERS ---------- */
   const recentUsers = useMemo(
@@ -264,6 +346,13 @@ const Dashboard = () => {
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
 
+    const pendingCount =
+      dashboardStats?.kycStats?.pending !== undefined
+        ? dashboardStats.kycStats.pending
+        : dashboardStats?.pendingKyc !== undefined
+          ? dashboardStats.pendingKyc
+          : users.filter((u) => getKycStatus(u) === "pending").length;
+
     return [
       { name: "Total Users", value: users.length, color: "#E39A00" },
       {
@@ -279,7 +368,7 @@ const Dashboard = () => {
       },
       {
         name: "Pending KYC",
-        value: users.filter((u) => getKycStatus(u) === "pending").length,
+        value: pendingCount,
         color: "#FB923C",
       },
       {
@@ -289,11 +378,34 @@ const Dashboard = () => {
       },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [users, kycMap]);
+  }, [users, kycMap, dashboardStats?.kycStats?.pending, dashboardStats?.pendingKyc]);
 
-  /* ---------- BACKEND DATA (optional) ---------- */
-  const sales = dashboardStats.salesOverview || [];
+  /* ---------- BACKEND DATA ---------- */
+  const [salesRange, setSalesRange] = useState(7);
+
+  const allSales = useMemo(
+    () => dashboardStats.salesOverview || [],
+    [dashboardStats.salesOverview],
+  );
+  const sales = useMemo(
+    () => allSales.slice(-salesRange),
+    [allSales, salesRange],
+  );
+  const salesSummary = useMemo(
+    () =>
+      sales.reduce(
+        (acc, d) => ({
+          tickets: acc.tickets + (d.tickets || 0),
+          revenue: acc.revenue + (d.revenue || 0),
+        }),
+        { tickets: 0, revenue: 0 },
+      ),
+    [sales],
+  );
+  const hasSales = salesSummary.tickets > 0;
+
   const distribution = dashboardStats.distribution || [];
+  const ticketTotals = dashboardStats.ticketTotals || {};
   const todayDraws = dashboardStats.todayDraws || [];
   const winningTickets = (dashboardStats.recentWinningTickets || []).slice(
     0,
@@ -432,17 +544,72 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         {/* Ticket Sales Overview */}
         <div className={`${CARD} p-4`}>
-          <SectionTitle icon={BarChart3} title="Ticket Sales Overview" />
-          <div className="h-56">
-            {sales.length === 0 ? (
-              <EmptyChart />
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <BarChart3 size={17} className="text-[#E39A00]" strokeWidth={2.4} />
+              <h3 className="text-[14px] font-black text-[#1F2A6B]">
+                Ticket Sales Overview
+              </h3>
+            </div>
+            <div className="flex rounded-lg bg-[#FFF6D6] p-0.5">
+              {SALES_RANGES.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setSalesRange(r)}
+                  className={`rounded-md px-2 py-0.5 text-[10px] font-extrabold transition ${
+                    salesRange === r
+                      ? "bg-gradient-to-b from-[#FFD83D] to-[#E39A00] text-[#1A1204] shadow"
+                      : "text-[#9A5B00] hover:bg-[#FFEFA8]"
+                  }`}
+                >
+                  {r}D
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-2 grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-[#FFF9E3] px-3 py-1.5">
+              <p className="text-[9px] font-semibold text-[#6B7280]">
+                Tickets ({salesRange} days)
+              </p>
+              <p className="text-sm font-black text-[#1F2A6B]">
+                {dashboardLoading
+                  ? "..."
+                  : salesSummary.tickets.toLocaleString("en-IN")}
+              </p>
+            </div>
+            <div className="rounded-xl bg-[#E6F6EF] px-3 py-1.5">
+              <p className="text-[9px] font-semibold text-[#6B7280]">
+                Revenue ({salesRange} days)
+              </p>
+              <p className="text-sm font-black text-[#12A36B]">
+                {dashboardLoading ? "..." : fmtINR(salesSummary.revenue)}
+              </p>
+            </div>
+          </div>
+
+          <div className="h-44">
+            {!hasSales ? (
+              <EmptyChart
+                text={
+                  dashboardLoading
+                    ? "Loading..."
+                    : `No ticket sales in the last ${salesRange} days`
+                }
+              />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={sales}>
+                <ComposedChart data={sales} margin={{ top: 4, right: 0, left: -18 }}>
                   <defs>
                     <linearGradient id="goldBar" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#F7B500" />
-                      <stop offset="100%" stopColor="#9A5B00" />
+                      <stop offset="0%" stopColor="#FFD83D" />
+                      <stop offset="100%" stopColor="#E39A00" />
+                    </linearGradient>
+                    <linearGradient id="purpleBar" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#C084FC" />
+                      <stop offset="100%" stopColor="#7E22CE" />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
@@ -452,41 +619,101 @@ const Dashboard = () => {
                   />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 10 }}
+                    tick={{ fontSize: 9 }}
                     axisLine={false}
                     tickLine={false}
+                    interval="preserveStartEnd"
+                    minTickGap={8}
                   />
                   <YAxis
-                    tick={{ fontSize: 10 }}
+                    yAxisId="tickets"
+                    tick={{ fontSize: 9 }}
                     axisLine={false}
                     tickLine={false}
+                    allowDecimals={false}
                   />
-                  <Tooltip />
+                  <YAxis
+                    yAxisId="revenue"
+                    orientation="right"
+                    tick={{ fontSize: 9 }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={fmtCompactINR}
+                    width={44}
+                  />
+                  <Tooltip content={<SalesTooltip />} cursor={{ fill: "#FFF9E3" }} />
                   <Bar
-                    dataKey="tickets"
+                    yAxisId="tickets"
+                    dataKey="dailyTickets"
+                    name="Daily"
+                    stackId="tickets"
                     fill="url(#goldBar)"
+                    maxBarSize={22}
+                  />
+                  <Bar
+                    yAxisId="tickets"
+                    dataKey="festivalTickets"
+                    name="Festival"
+                    stackId="tickets"
+                    fill="url(#purpleBar)"
                     radius={[4, 4, 0, 0]}
-                    barSize={22}
+                    maxBarSize={22}
                   />
                   <Line
+                    yAxisId="revenue"
                     type="monotone"
-                    dataKey="tickets"
-                    stroke="#E39A00"
+                    dataKey="revenue"
+                    name="Revenue"
+                    stroke="#12A36B"
                     strokeWidth={2}
-                    dot={{ r: 3 }}
+                    dot={salesRange <= 15 ? { r: 2.5 } : false}
                   />
                 </ComposedChart>
               </ResponsiveContainer>
             )}
+          </div>
+
+          <div className="mt-2 flex items-center justify-center gap-4 text-[10px] font-semibold text-[#374151]">
+            <span className="flex items-center gap-1">
+              <span className="h-2.5 w-2.5 rounded-sm bg-[#F7B500]" /> Daily
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="h-2.5 w-2.5 rounded-sm bg-[#A855F7]" /> Festival
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="h-0.5 w-3 bg-[#12A36B]" /> Revenue
+            </span>
           </div>
         </div>
 
         {/* Ticket Distribution */}
         <div className={`${CARD} p-4`}>
           <SectionTitle icon={Ticket} title="Ticket Distribution" />
-          <div className="h-56">
-            {distribution.length === 0 ? (
-              <EmptyChart />
+
+          <div className="mb-2 grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-[#FFF9E3] px-3 py-1.5">
+              <p className="text-[9px] font-semibold text-[#6B7280]">
+                Daily Lottery
+              </p>
+              <p className="text-sm font-black text-[#1F2A6B]">
+                {Number(ticketTotals.daily || 0).toLocaleString("en-IN")}
+              </p>
+            </div>
+            <div className="rounded-xl bg-[#F5EDFF] px-3 py-1.5">
+              <p className="text-[9px] font-semibold text-[#6B7280]">
+                Festival Lottery
+              </p>
+              <p className="text-sm font-black text-[#7E22CE]">
+                {Number(ticketTotals.festival || 0).toLocaleString("en-IN")}
+              </p>
+            </div>
+          </div>
+
+          <div className="h-44">
+            {totalDist === 0 ? (
+              <EmptyChart
+                text={dashboardLoading ? "Loading..." : "No tickets sold yet"}
+              />
             ) : (
               <div className="flex h-full items-center gap-2">
                 <div className="relative h-full w-1/2">
@@ -495,18 +722,20 @@ const Dashboard = () => {
                       <Pie
                         data={distribution}
                         dataKey="value"
+                        nameKey="name"
                         innerRadius="62%"
                         outerRadius="92%"
-                        paddingAngle={2}
+                        paddingAngle={distribution.length > 1 ? 2 : 0}
+                        stroke="none"
                       >
-                        {distribution.map((_, i) => (
+                        {distribution.map((d, i) => (
                           <Cell
-                            key={i}
+                            key={d.name}
                             fill={PIE_COLORS[i % PIE_COLORS.length]}
                           />
                         ))}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip content={<DistributionTooltip />} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
@@ -520,20 +749,27 @@ const Dashboard = () => {
                 </div>
                 <ul className="w-1/2 space-y-2">
                   {distribution.map((d, i) => (
-                    <li
-                      key={d.name}
-                      className="flex items-center justify-between text-[11px]"
-                    >
-                      <span className="flex items-center gap-1.5 text-[#374151]">
-                        <span
-                          className="h-2.5 w-2.5 rounded-full"
-                          style={{
-                            background: PIE_COLORS[i % PIE_COLORS.length],
-                          }}
-                        />
-                        {d.name}
-                      </span>
-                      <span className="font-bold">{d.value}%</span>
+                    <li key={d.name} className="text-[11px]">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="flex min-w-0 items-center gap-1.5 text-[#374151]">
+                          <span
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{
+                              background: PIE_COLORS[i % PIE_COLORS.length],
+                            }}
+                          />
+                          <span className="truncate" title={d.name}>
+                            {d.name}
+                          </span>
+                        </span>
+                        <span className="font-bold text-[#1F2A6B]">
+                          {d.percent}%
+                        </span>
+                      </div>
+                      <p className="pl-4 text-[9px] text-[#9CA3AF]">
+                        {Number(d.tickets || 0).toLocaleString("en-IN")} tickets
+                        · {fmtINR(d.revenue)}
+                      </p>
                     </li>
                   ))}
                 </ul>

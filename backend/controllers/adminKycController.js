@@ -8,36 +8,53 @@ const User = require("../models/userModel");
 const getOverallKycStatus = (document) => {
   if (!document) return "none";
 
-  const hasAadhaar = Boolean(
-    document.aadhaar?.front?.url && document.aadhaar?.back?.url,
-  );
-  const hasPan = Boolean(document.pan?.front?.url);
-  const hasSelfie = Boolean(document.selfie?.url);
+  const rawStatus = (document.status || "").toLowerCase();
+  const aadhaarStatus = (document.aadhaar?.review?.status || "").toLowerCase();
+  const panStatus = (document.pan?.review?.status || "").toLowerCase();
 
   const submittedStatuses = [];
-  if (hasAadhaar) {
-    submittedStatuses.push(document.aadhaar?.review?.status || "pending");
+  if (aadhaarStatus) {
+    submittedStatuses.push(aadhaarStatus);
   }
-  if (hasPan) {
-    submittedStatuses.push(document.pan?.review?.status || "pending");
-  }
-
-  if (submittedStatuses.length === 0) {
-    if (hasSelfie || document.dob) return "incomplete";
-    return "none";
+  if (panStatus) {
+    submittedStatuses.push(panStatus);
   }
 
-  if (submittedStatuses.includes("rejected")) {
-    return "rejected";
+  // If nested document reviews are present, evaluate them
+  if (submittedStatuses.length > 0) {
+    if (submittedStatuses.includes("rejected")) {
+      return "rejected";
+    }
+    if (submittedStatuses.includes("pending")) {
+      return "pending";
+    }
+    if (submittedStatuses.every((s) => s === "approved")) {
+      return "approved";
+    }
   }
-  if (submittedStatuses.includes("pending")) {
+
+  // Fallback to top-level document status if valid (used by legacy and direct docs)
+  if (["pending", "approved", "rejected", "verified"].includes(rawStatus)) {
+    return rawStatus === "verified" ? "approved" : rawStatus;
+  }
+
+  // Check if any document files are uploaded
+  const hasFiles = Boolean(
+    document.documentUrl ||
+      document.backDocumentUrl ||
+      document.aadhaar?.front?.url ||
+      document.aadhaar?.back?.url ||
+      document.pan?.front?.url ||
+      document.pan?.url ||
+      document.selfie?.url
+  );
+
+  if (hasFiles) {
     return "pending";
   }
-  if (submittedStatuses.every((s) => s === "approved")) {
-    return "approved";
-  }
 
-  return "pending";
+  if (document.dob) return "incomplete";
+  return "none";
 };
 
 // =====================================================
@@ -53,11 +70,15 @@ const formatKycDocument = (document) => {
     ...raw,
     status: overallStatus,
     rejectionReason:
+      document.rejectionReason ||
       document.aadhaar?.review?.rejectionReason ||
       document.pan?.review?.rejectionReason ||
       null,
   };
 };
+
+exports.getOverallKycStatus = getOverallKycStatus;
+exports.formatKycDocument = formatKycDocument;
 
 // =====================================================
 // GET ALL KYC DOCUMENTS
@@ -171,10 +192,17 @@ exports.approveKyc = async (req, res) => {
 
     const panExists = Boolean(document.pan?.front?.url);
 
-    if (!aadhaarExists && !panExists) {
+    const legacyExists = Boolean(
+      document.documentUrl ||
+        document.backDocumentUrl ||
+        document.documentType ||
+        document.status
+    );
+
+    if (!aadhaarExists && !panExists && !legacyExists) {
       return res.status(400).json({
         success: false,
-        message: "No Aadhaar or PAN document found to approve",
+        message: "No document found to approve",
       });
     }
 
@@ -204,15 +232,36 @@ exports.approveKyc = async (req, res) => {
       };
     }
 
+    // -----------------------------------------------
+    // Approve legacy document
+    // -----------------------------------------------
+
+    if (legacyExists) {
+      document.status = "approved";
+      document.rejectionReason = null;
+      document.reviewedBy = req.user._id;
+      document.reviewedAt = new Date();
+    }
+
     await document.save();
 
     // -----------------------------------------------
     // Update User KYC verification flag
     // -----------------------------------------------
 
-    await User.findByIdAndUpdate(document.userId, {
-      isKycVerified: true,
+    const otherDocs = await KycDocument.find({
+      userId: document.userId,
+      _id: { $ne: document._id },
     });
+    const anyOtherPending = otherDocs.some(
+      (d) => getOverallKycStatus(d) === "pending"
+    );
+
+    if (!anyOtherPending) {
+      await User.findByIdAndUpdate(document.userId, {
+        isKycVerified: true,
+      });
+    }
 
     // Populate for response
     const updatedDocument = await KycDocument.findById(document._id)
@@ -287,10 +336,17 @@ exports.rejectKyc = async (req, res) => {
 
     const panExists = Boolean(document.pan?.front?.url);
 
-    if (!aadhaarExists && !panExists) {
+    const legacyExists = Boolean(
+      document.documentUrl ||
+        document.backDocumentUrl ||
+        document.documentType ||
+        document.status
+    );
+
+    if (!aadhaarExists && !panExists && !legacyExists) {
       return res.status(400).json({
         success: false,
-        message: "No Aadhaar or PAN document found to reject",
+        message: "No document found to reject",
       });
     }
 
@@ -318,6 +374,17 @@ exports.rejectKyc = async (req, res) => {
         reviewedBy: req.user._id,
         reviewedAt: new Date(),
       };
+    }
+
+    // -----------------------------------------------
+    // Reject legacy document
+    // -----------------------------------------------
+
+    if (legacyExists) {
+      document.status = "rejected";
+      document.rejectionReason = reason;
+      document.reviewedBy = req.user._id;
+      document.reviewedAt = new Date();
     }
 
     await document.save();

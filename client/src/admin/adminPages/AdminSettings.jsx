@@ -1,32 +1,27 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import {
-  Settings,
-  Ticket,
+  AlertCircle,
+  Calendar,
+  Check,
+  CheckCircle2,
+  Edit3,
+  ExternalLink,
+  Eye,
+  Image as ImageIcon,
   PartyPopper,
   Percent,
-  RefreshCw,
-  CheckCircle2,
-  AlertCircle,
-  X,
-  IndianRupee,
-  Clock,
-  Save,
-  Check,
-  ShieldAlert,
-  Sparkles,
-  Share2,
-  TrendingUp,
-  Image as ImageIcon,
   Plus,
-  Trash2,
-  Edit3,
-  Eye,
-  Calendar,
-  UploadCloud,
   Power,
-  ExternalLink,
+  RefreshCw,
+  Save,
+  Settings,
+  Sparkles,
+  Ticket,
+  Trash2,
+  UploadCloud,
+  X,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 
 import {
   clearSettingsMessages,
@@ -47,20 +42,20 @@ import {
 } from "../../reducer/slice/settingsSlice";
 
 import {
+  clearResultImageErrors,
+  clearResultImageMessages,
   createResultImage,
   deleteResultImage,
   getAllResultImages,
+  selectAllResultImages,
+  selectResultImagesActionError,
+  selectResultImagesActionLoading,
+  selectResultImagesError,
+  selectResultImagesLoading,
+  selectResultImagesMessage,
+  selectResultImagesSuccess,
   toggleResultImage,
   updateResultImage,
-  clearResultImageMessages,
-  clearResultImageErrors,
-  selectAllResultImages,
-  selectResultImagesLoading,
-  selectResultImagesActionLoading,
-  selectResultImagesSuccess,
-  selectResultImagesError,
-  selectResultImagesActionError,
-  selectResultImagesMessage,
 } from "../../reducer/slice/resultImageSlice";
 
 /* =========================================================
@@ -116,7 +111,9 @@ const AdminSettings = () => {
   const [editingItem, setEditingItem] = useState(null); // null for create, object for edit
   const [formType, setFormType] = useState("DAILY"); // "DAILY" | "FESTIVAL"
   const [formTitle, setFormTitle] = useState("");
-  const [formDate, setFormDate] = useState(new Date().toISOString().split("T")[0]);
+  const [formDate, setFormDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
   const [formFestival, setFormFestival] = useState("");
   const [formSortOrder, setFormSortOrder] = useState("0");
   const [formIsActive, setFormIsActive] = useState(true);
@@ -253,7 +250,7 @@ const AdminSettings = () => {
         dailyLotteryAmount: dailyNum,
         festivalLotteryAmount: festivalNum,
         referralPercentage: referralNum,
-      })
+      }),
     );
     setUpdatingField(null);
   };
@@ -285,7 +282,11 @@ const AdminSettings = () => {
     setEditingItem(item);
     setFormType(item.type || "DAILY");
     setFormTitle(item.title || "");
-    setFormDate(item.resultDate ? item.resultDate.split("T")[0] : new Date().toISOString().split("T")[0]);
+    setFormDate(
+      item.resultDate
+        ? item.resultDate.split("T")[0]
+        : new Date().toISOString().split("T")[0],
+    );
     setFormFestival(item.festivalName || "");
     setFormSortOrder(String(item.sortOrder || 0));
     setFormIsActive(item.isActive !== false);
@@ -341,7 +342,9 @@ const AdminSettings = () => {
 
     try {
       if (editingItem) {
-        await dispatch(updateResultImage({ id: editingItem._id, formData })).unwrap();
+        await dispatch(
+          updateResultImage({ id: editingItem._id, formData }),
+        ).unwrap();
       } else {
         await dispatch(createResultImage(formData)).unwrap();
       }
@@ -353,7 +356,11 @@ const AdminSettings = () => {
   };
 
   const handleDeleteResultImage = async (id) => {
-    if (window.confirm("Are you sure you want to permanently delete this result image?")) {
+    if (
+      window.confirm(
+        "Are you sure you want to permanently delete this result image?",
+      )
+    ) {
       try {
         await dispatch(deleteResultImage(id)).unwrap();
         dispatch(getAllResultImages());
@@ -381,7 +388,9 @@ const AdminSettings = () => {
       if (searchQuery.trim()) {
         const query = searchQuery.trim().toLowerCase();
         const titleMatch = (item.title || "").toLowerCase().includes(query);
-        const festivalMatch = (item.festivalName || "").toLowerCase().includes(query);
+        const festivalMatch = (item.festivalName || "")
+          .toLowerCase()
+          .includes(query);
         const dateMatch = (item.resultDate || "").includes(query);
         if (!titleMatch && !festivalMatch && !dateMatch) return false;
       }
@@ -393,7 +402,9 @@ const AdminSettings = () => {
   const resultStats = useMemo(() => {
     const total = resultImagesList.length;
     const daily = resultImagesList.filter((i) => i.type === "DAILY").length;
-    const festival = resultImagesList.filter((i) => i.type === "FESTIVAL").length;
+    const festival = resultImagesList.filter(
+      (i) => i.type === "FESTIVAL",
+    ).length;
     const active = resultImagesList.filter((i) => i.isActive).length;
     return { total, daily, festival, active };
   }, [resultImagesList]);
@@ -413,7 +424,8 @@ const AdminSettings = () => {
               System Settings
             </h1>
             <p className="text-xs font-medium text-[#6B7280]">
-              Configure lottery ticket prices, referral commission rates, and manage official result charts
+              Configure lottery ticket prices, referral commission rates, and
+              manage official result charts
             </p>
           </div>
         </div>
@@ -429,7 +441,9 @@ const AdminSettings = () => {
             >
               <RefreshCw
                 size={17}
-                className={loading ? "animate-spin" : "transition active:rotate-180"}
+                className={
+                  loading ? "animate-spin" : "transition active:rotate-180"
+                }
               />
             </button>
           )}
@@ -443,7 +457,11 @@ const AdminSettings = () => {
             >
               <RefreshCw
                 size={17}
-                className={resultLoading ? "animate-spin" : "transition active:rotate-180"}
+                className={
+                  resultLoading
+                    ? "animate-spin"
+                    : "transition active:rotate-180"
+                }
               />
             </button>
           )}
@@ -535,12 +553,15 @@ const AdminSettings = () => {
                     <h2 className="text-base font-black text-[#1A1A1A]">
                       Daily Ticket Price
                     </h2>
-                    <p className="text-xs text-[#6B7280]">Per single number entry</p>
+                    <p className="text-xs text-[#6B7280]">
+                      Per single number entry
+                    </p>
                   </div>
                 </div>
 
                 <p className="mt-4 text-xs leading-relaxed text-[#6B7280]">
-                  This price applies as the base ticket amount for all daily routine lottery draws.
+                  This price applies as the base ticket amount for all daily
+                  routine lottery draws.
                 </p>
 
                 <form onSubmit={handleUpdateDaily} className="mt-5 space-y-4">
@@ -567,9 +588,11 @@ const AdminSettings = () => {
 
                   {/* Presets */}
                   <div>
-                    <span className="text-[11px] font-bold text-[#9A5B00]">Quick Presets:</span>
+                    <span className="text-[11px] font-bold text-[#9A5B00]">
+                      Quick Presets:
+                    </span>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {[10, 20, 30, 50, 100].map((preset) => (
+                      {[200, 300, 500, 700, 1000].map((preset) => (
                         <button
                           key={preset}
                           type="button"
@@ -611,7 +634,8 @@ const AdminSettings = () => {
               </div>
 
               <div className="mt-5 border-t border-[#F3E7C4] pt-3 text-[11px] text-[#6B7280]">
-                Last updated: <strong>{formatDate(settingsState?.updatedAt)}</strong>
+                Last updated:{" "}
+                <strong>{formatDate(settingsState?.updatedAt)}</strong>
               </div>
             </div>
 
@@ -626,15 +650,21 @@ const AdminSettings = () => {
                     <h2 className="text-base font-black text-[#1A1A1A]">
                       Festival Bumper Price
                     </h2>
-                    <p className="text-xs text-[#6B7280]">Per festival bumper ticket</p>
+                    <p className="text-xs text-[#6B7280]">
+                      Per festival bumper ticket
+                    </p>
                   </div>
                 </div>
 
                 <p className="mt-4 text-xs leading-relaxed text-[#6B7280]">
-                  Default ticket price for special festival bumper draws with elevated jackpot prize pools.
+                  Default ticket price for special festival bumper draws with
+                  elevated jackpot prize pools.
                 </p>
 
-                <form onSubmit={handleUpdateFestival} className="mt-5 space-y-4">
+                <form
+                  onSubmit={handleUpdateFestival}
+                  className="mt-5 space-y-4"
+                >
                   <div>
                     <label className="block text-xs font-bold text-[#1A1A1A]">
                       Ticket Price (INR)
@@ -658,9 +688,11 @@ const AdminSettings = () => {
 
                   {/* Presets */}
                   <div>
-                    <span className="text-[11px] font-bold text-[#cc5de8]">Quick Presets:</span>
+                    <span className="text-[11px] font-bold text-[#cc5de8]">
+                      Quick Presets:
+                    </span>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {[50, 100, 200, 500, 1000].map((preset) => (
+                      {[300, 500, 700, 900, 1000].map((preset) => (
                         <button
                           key={preset}
                           type="button"
@@ -702,7 +734,8 @@ const AdminSettings = () => {
               </div>
 
               <div className="mt-5 border-t border-[#F3E7C4] pt-3 text-[11px] text-[#6B7280]">
-                Last updated: <strong>{formatDate(settingsState?.updatedAt)}</strong>
+                Last updated:{" "}
+                <strong>{formatDate(settingsState?.updatedAt)}</strong>
               </div>
             </div>
 
@@ -717,15 +750,21 @@ const AdminSettings = () => {
                     <h2 className="text-base font-black text-[#1A1A1A]">
                       Referral Commission Rate
                     </h2>
-                    <p className="text-xs text-[#6B7280]">Percentage credited to referrers</p>
+                    <p className="text-xs text-[#6B7280]">
+                      Percentage credited to referrers
+                    </p>
                   </div>
                 </div>
 
                 <p className="mt-4 text-xs leading-relaxed text-[#6B7280]">
-                  Users earn this percentage when a friend registers using their referral link and makes deposits.
+                  Users earn this percentage when a friend registers using their
+                  referral link and makes deposits.
                 </p>
 
-                <form onSubmit={handleUpdateReferral} className="mt-5 space-y-4">
+                <form
+                  onSubmit={handleUpdateReferral}
+                  className="mt-5 space-y-4"
+                >
                   <div>
                     <label className="block text-xs font-bold text-[#1A1A1A]">
                       Commission Percentage (%)
@@ -750,7 +789,9 @@ const AdminSettings = () => {
 
                   {/* Presets */}
                   <div>
-                    <span className="text-[11px] font-bold text-emerald-700">Quick Presets:</span>
+                    <span className="text-[11px] font-bold text-emerald-700">
+                      Quick Presets:
+                    </span>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {[2, 5, 7.5, 10, 15].map((preset) => (
                         <button
@@ -794,7 +835,8 @@ const AdminSettings = () => {
               </div>
 
               <div className="mt-5 border-t border-[#F3E7C4] pt-3 text-[11px] text-[#6B7280]">
-                Last updated: <strong>{formatDate(settingsState?.updatedAt)}</strong>
+                Last updated:{" "}
+                <strong>{formatDate(settingsState?.updatedAt)}</strong>
               </div>
             </div>
           </div>
@@ -806,7 +848,8 @@ const AdminSettings = () => {
                 Unified Bulk Save
               </h3>
               <p className="text-xs text-[#6B7280]">
-                You can change any values above and click "Save All Settings" to sync everything simultaneously.
+                You can change any values above and click "Save All Settings" to
+                sync everything simultaneously.
               </p>
             </div>
 
@@ -841,7 +884,9 @@ const AdminSettings = () => {
             <div className="flex items-center justify-between rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-emerald-800 shadow-sm animate-in fade-in">
               <div className="flex items-center gap-2 text-xs font-bold">
                 <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                <span>{resultMessage || "Operation completed successfully!"}</span>
+                <span>
+                  {resultMessage || "Operation completed successfully!"}
+                </span>
               </div>
               <button
                 onClick={() => dispatch(clearResultImageMessages())}
@@ -873,25 +918,33 @@ const AdminSettings = () => {
           {/* Stats Cards */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-2xl border border-[#F3E7C4] bg-white p-4 shadow-sm">
-              <p className="text-[11px] font-bold text-[#6B7280]">Total Charts</p>
+              <p className="text-[11px] font-bold text-[#6B7280]">
+                Total Charts
+              </p>
               <p className="mt-1 text-2xl font-black text-[#1A1A1A]">
                 {resultStats.total}
               </p>
             </div>
             <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 shadow-sm">
-              <p className="text-[11px] font-bold text-amber-800">Daily Results</p>
+              <p className="text-[11px] font-bold text-amber-800">
+                Daily Results
+              </p>
               <p className="mt-1 text-2xl font-black text-amber-900">
                 {resultStats.daily}
               </p>
             </div>
             <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-4 shadow-sm">
-              <p className="text-[11px] font-bold text-purple-800">Festival Results</p>
+              <p className="text-[11px] font-bold text-purple-800">
+                Festival Results
+              </p>
               <p className="mt-1 text-2xl font-black text-purple-900">
                 {resultStats.festival}
               </p>
             </div>
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-sm">
-              <p className="text-[11px] font-bold text-emerald-800">Active Published</p>
+              <p className="text-[11px] font-bold text-emerald-800">
+                Active Published
+              </p>
               <p className="mt-1 text-2xl font-black text-emerald-900">
                 {resultStats.active}
               </p>
@@ -965,7 +1018,9 @@ const AdminSettings = () => {
           ) : filteredResultImages.length === 0 ? (
             <div className="flex h-60 flex-col items-center justify-center rounded-2xl border border-dashed border-[#F3E7C4] bg-white p-6 text-center">
               <ImageIcon size={36} className="text-[#8A8F98] mb-2" />
-              <p className="text-sm font-black text-[#1A1A1A]">No Result Images Found</p>
+              <p className="text-sm font-black text-[#1A1A1A]">
+                No Result Images Found
+              </p>
               <p className="mt-1 text-xs text-[#6B7280]">
                 {searchQuery || filterType !== "ALL" || filterStatus !== "ALL"
                   ? "Try resetting your search or filters."
@@ -1033,25 +1088,35 @@ const AdminSettings = () => {
                   {/* Card Body */}
                   <div className="flex-1 p-3.5 space-y-2">
                     <h3 className="truncate text-sm font-black text-[#1A1A1A]">
-                      {item.title || (item.type === "DAILY" ? "Daily Result" : item.festivalName || "Festival Result")}
+                      {item.title ||
+                        (item.type === "DAILY"
+                          ? "Daily Result"
+                          : item.festivalName || "Festival Result")}
                     </h3>
 
                     {item.type === "DAILY" && (
                       <div className="flex items-center gap-1.5 text-xs text-[#6B7280]">
                         <Calendar size={13} className="text-[#9A5B00]" />
-                        <span>Draw Date: <strong>{formatDateOnly(item.resultDate)}</strong></span>
+                        <span>
+                          Draw Date:{" "}
+                          <strong>{formatDateOnly(item.resultDate)}</strong>
+                        </span>
                       </div>
                     )}
 
                     {item.type === "FESTIVAL" && (
                       <div className="flex items-center gap-1.5 text-xs text-purple-700 font-bold">
                         <Sparkles size={13} />
-                        <span>Festival: <strong>{item.festivalName}</strong></span>
+                        <span>
+                          Festival: <strong>{item.festivalName}</strong>
+                        </span>
                       </div>
                     )}
 
                     <div className="flex items-center justify-between text-[11px] text-[#8A8F98] pt-1 border-t border-[#F3E7C4]/50">
-                      <span>Sort Order: <strong>{item.sortOrder || 0}</strong></span>
+                      <span>
+                        Sort Order: <strong>{item.sortOrder || 0}</strong>
+                      </span>
                       <span>{formatDate(item.createdAt)}</span>
                     </div>
                   </div>
@@ -1127,7 +1192,8 @@ const AdminSettings = () => {
                     {editingItem ? "Edit Result Image" : "Upload Result Image"}
                   </h3>
                   <p className="text-[11px] text-[#6B7280]">
-                    Official draw chart for users to view & check winning numbers
+                    Official draw chart for users to view & check winning
+                    numbers
                   </p>
                 </div>
               </div>
@@ -1141,7 +1207,10 @@ const AdminSettings = () => {
             </div>
 
             {/* Modal Form Body */}
-            <form onSubmit={handleSubmitResultImage} className="flex-1 overflow-y-auto p-5 space-y-4">
+            <form
+              onSubmit={handleSubmitResultImage}
+              className="flex-1 overflow-y-auto p-5 space-y-4"
+            >
               {formValidationError && (
                 <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-700">
                   <AlertCircle size={15} className="shrink-0" />
@@ -1230,7 +1299,8 @@ const AdminSettings = () => {
               {/* Image Upload Field */}
               <div>
                 <label className="block text-xs font-black text-[#1A1A1A] mb-1">
-                  Result Image / Chart {!editingItem && <span className="text-red-500">*</span>}
+                  Result Image / Chart{" "}
+                  {!editingItem && <span className="text-red-500">*</span>}
                 </label>
 
                 <div className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#F3E7C4] bg-[#FFFDF7] p-4 text-center hover:bg-[#FFEFA8]/20 transition">
@@ -1326,7 +1396,9 @@ const AdminSettings = () => {
                   ) : (
                     <>
                       <Check size={14} className="stroke-[3]" />
-                      <span>{editingItem ? "Update Result Image" : "Upload Image"}</span>
+                      <span>
+                        {editingItem ? "Update Result Image" : "Upload Image"}
+                      </span>
                     </>
                   )}
                 </button>

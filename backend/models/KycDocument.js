@@ -48,8 +48,57 @@ const kycDocumentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true,
       index: true,
+    },
+
+    // ==========================================
+    // LEGACY DOCUMENT FIELDS
+    // ==========================================
+
+    documentType: {
+      type: String,
+      default: null,
+    },
+
+    documentUrl: {
+      type: String,
+      default: null,
+    },
+
+    documentPublicId: {
+      type: String,
+      default: null,
+    },
+
+    backDocumentUrl: {
+      type: String,
+      default: null,
+    },
+
+    backDocumentPublicId: {
+      type: String,
+      default: null,
+    },
+
+    status: {
+      type: String,
+      default: null,
+    },
+
+    rejectionReason: {
+      type: String,
+      default: null,
+    },
+
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
+
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
 
     // ==========================================
@@ -113,6 +162,7 @@ const kycDocumentSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    strict: false,
   }
 );
 

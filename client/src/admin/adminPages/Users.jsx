@@ -10,7 +10,6 @@ import {
   EyeOff,
   History,
   Pencil,
-  Phone,
   RefreshCw,
   Search,
   Shield,
@@ -161,9 +160,10 @@ const docUserId = (doc) => idOf(doc?.user ?? doc?.userId ?? doc?.userID);
 const deriveKycDocsStatus = (docs) => {
   if (!Array.isArray(docs) || docs.length === 0) return "not_submitted";
   const s = docs.map((d) => String(d?.status || "").toLowerCase());
-  if (s.includes("approved") || s.includes("verified")) return "approved";
   if (s.includes("pending")) return "pending";
   if (s.includes("rejected")) return "rejected";
+  if (s.every((status) => status === "approved" || status === "verified"))
+    return "approved";
   return "not_submitted";
 };
 
@@ -699,7 +699,7 @@ const Users = () => {
       </div>
 
       {/* STATS */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <StatCard
           bg="bg-[#FFEFA8]"
           label="Total Users"
@@ -729,12 +729,6 @@ const Users = () => {
           label="Pending KYC"
           value={stats.pendingKyc}
           icon={<Shield size={22} className="text-[#B26A00]" />}
-        />
-        <StatCard
-          bg="bg-[#E8F1FD]"
-          label="Verified Mobile"
-          value={stats.mobileVerified}
-          icon={<Phone size={22} className="text-[#2E7DD7]" />}
         />
       </div>
 
