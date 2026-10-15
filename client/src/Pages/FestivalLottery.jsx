@@ -216,12 +216,26 @@ const FestivalLottery = () => {
   const draftRefs = useRef({});
   const tabsScrollRef = useRef(null);
   const tabRefs = useRef({});
-
   // =====================================================
   // FESTIVAL TABS (Derived from backend configurations)
+  // Order: jo pehle add hua wo pehle, jo sabse last me add hua wo sabse last me
   // =====================================================
   const festivalTabs = useMemo(() => {
-    const list = Array.isArray(allFestivalConfigs) ? allFestivalConfigs : [];
+    const rawList = Array.isArray(allFestivalConfigs) ? allFestivalConfigs : [];
+
+    // createdAt ascending (oldest -> newest). createdAt na ho to _id (ObjectId
+    // time ke saath badhta hai) se fallback.
+    const getCreatedTime = (c) => {
+      const t = new Date(c?.createdAt).getTime();
+      return Number.isFinite(t) ? t : 0;
+    };
+
+    const list = [...rawList].sort((a, b) => {
+      const diff = getCreatedTime(a) - getCreatedTime(b);
+      if (diff !== 0) return diff;
+      return String(a?._id || "").localeCompare(String(b?._id || ""));
+    });
+
     const seen = new Set();
     const tabs = [];
 
@@ -674,14 +688,18 @@ const FestivalLottery = () => {
   const ticketStatuses = useMemo(() => {
     const counts = {};
     ticketCodes.forEach((c) => {
-      const trimmed = String(c || "").trim().toUpperCase();
+      const trimmed = String(c || "")
+        .trim()
+        .toUpperCase();
       if (trimmed.length === TICKET_LENGTH) {
         counts[trimmed] = (counts[trimmed] || 0) + 1;
       }
     });
 
     return ticketCodes.map((c) => {
-      const trimmed = String(c || "").trim().toUpperCase();
+      const trimmed = String(c || "")
+        .trim()
+        .toUpperCase();
       const isValid = TICKET_REGEX.test(trimmed);
       const isSold = soldNumbers.includes(trimmed);
       const isDuplicate = isValid && counts[trimmed] > 1;
@@ -699,7 +717,9 @@ const FestivalLottery = () => {
     const expectedCount = Math.max(1, Math.floor(quantity / 10));
     if (ticketCodes.length !== expectedCount) return false;
     const normalized = ticketCodes.map((c) =>
-      String(c || "").trim().toUpperCase(),
+      String(c || "")
+        .trim()
+        .toUpperCase(),
     );
     if (!normalized.every((c) => TICKET_REGEX.test(c))) return false;
     if (new Set(normalized).size !== normalized.length) return false;
@@ -770,7 +790,9 @@ const FestivalLottery = () => {
       }
 
       for (let i = 0; i < ticketCodes.length; i++) {
-        const code = String(ticketCodes[i] || "").trim().toUpperCase();
+        const code = String(ticketCodes[i] || "")
+          .trim()
+          .toUpperCase();
 
         if (!code || !TICKET_REGEX.test(code)) {
           setManualError(
@@ -789,7 +811,9 @@ const FestivalLottery = () => {
 
       // Check duplicates among entered tickets
       const normalizedCodes = ticketCodes.map((c) =>
-        String(c || "").trim().toUpperCase(),
+        String(c || "")
+          .trim()
+          .toUpperCase(),
       );
       const uniqueCodes = new Set(normalizedCodes);
 

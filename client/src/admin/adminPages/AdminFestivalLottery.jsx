@@ -636,7 +636,7 @@ const AdminFestivalLottery = () => {
 
             <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 text-center">
               <p className="text-[11px] font-bold tracking-[0.3em] text-[#FFD83D]">
-                BHARAT LOTTERY
+                DEAR LOTTERY
               </p>
 
               <h2 className="mt-2 bg-gradient-to-b from-[#FFF3B0] via-[#FFD83D] to-[#E39A00] bg-clip-text text-4xl font-black tracking-tight text-transparent md:text-6xl">

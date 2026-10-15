@@ -50,6 +50,38 @@ const MENU_ITEMS = [
   },
 ];
 
+// =====================================================
+// PROFILE AVATAR
+// API ki profileImage dikhata hai, image na ho ya load fail ho to icon fallback
+// =====================================================
+
+const ProfileAvatar = ({ src, name }) => {
+  const [failed, setFailed] = useState(false);
+
+  // Image URL badle to dobara try karo
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  const showImage = Boolean(src) && !failed;
+
+  return (
+    <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#e8c778] bg-white/10">
+      {showImage ? (
+        <img
+          src={src}
+          alt={name ? `${name} profile` : "Profile"}
+          onError={() => setFailed(true)}
+          className="h-full w-full object-cover"
+          draggable={false}
+        />
+      ) : (
+        <UserRound size={25} className="text-[#f5d47d]" strokeWidth={1.7} />
+      )}
+    </span>
+  );
+};
+
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -64,6 +96,10 @@ const Header = () => {
       user?.walletAmount ??
       0,
   );
+
+  // Profile image (API: data.profileImage)
+  const profileImage =
+    user?.profileImage || user?.profile_image || user?.avatar || "";
 
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -228,13 +264,7 @@ const Header = () => {
                   onClick={() => goTo("/profile")}
                   className="relative mt-4 flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.06] p-3 text-left transition hover:bg-white/10"
                 >
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-[#e8c778] bg-white/10">
-                    <UserRound
-                      size={25}
-                      className="text-[#f5d47d]"
-                      strokeWidth={1.7}
-                    />
-                  </span>
+                  <ProfileAvatar src={profileImage} name={user?.name} />
 
                   <span className="min-w-0 flex-1">
                     <span className="block text-[11px] text-white/65">

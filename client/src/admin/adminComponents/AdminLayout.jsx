@@ -218,7 +218,7 @@ const AdminLayout = () => {
 
             <div className="min-w-0">
               <p className="truncate text-[17px] font-black leading-none tracking-tight text-[#1A1A1A]">
-                BHARAT LOTTERY
+                DEAR LOTTERY
               </p>
               <p className="mt-1 truncate text-[9px] font-bold uppercase leading-tight tracking-[0.2em] text-[#9A5B00]">
                 Admin Panel
@@ -289,7 +289,7 @@ const AdminLayout = () => {
               strokeWidth={2.4}
             />
             <p className="relative text-[12px] font-black uppercase tracking-widest text-[#1A1204]">
-              Bharat Lottery
+              DEAR LOTTERY
             </p>
             <p className="relative mt-0.5 text-[9.5px] font-bold text-[#7A4A00]">
               Play • Win • Repeat
