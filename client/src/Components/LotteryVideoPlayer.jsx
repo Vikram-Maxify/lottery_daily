@@ -1,10 +1,7 @@
-import React from "react";
 import { PlayCircle, Sparkles } from "lucide-react";
 
-const VIDEO_URL =
-  "https://player.mediadelivery.net/play/769180/e3144a3a-a45d-494f-a9c7-142c6bdef4dd";
-
 const LotteryVideoPlayer = ({
+  videoUrl = "",
   title = "How It Works & Winning Guide",
   subtitle = "Watch step-by-step video on how to play and win",
   className = "",
@@ -39,14 +36,16 @@ const LotteryVideoPlayer = ({
 
         {/* 16:9 Video Iframe Embed */}
         <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-inner">
-          <iframe
-            src={VIDEO_URL}
-            title={title}
-            loading="lazy"
-            className="absolute inset-0 h-full w-full border-0"
-            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-            allowFullScreen={true}
-          />
+          {videoUrl ? (
+            <iframe
+              src={videoUrl}
+              title={title}
+              loading="lazy"
+              className="absolute inset-0 h-full w-full border-0"
+              allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+              allowFullScreen={true}
+            />
+          ) : null}
         </div>
       </section>
     </div>

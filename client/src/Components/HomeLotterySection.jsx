@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import LotteryVideoPlayer from "../Components/LotteryVideoPlayer";
 import { fetchProfile } from "../reducer/slice/authSlice";
 
 // DAILY lottery slice (existing)
@@ -395,7 +396,10 @@ const RULES_GRID = "grid-cols-[24px_minmax(0,1fr)_70px_54px_58px]";
 // COMPONENT
 // =====================================================
 
-const HomeLotterySection = () => {
+const HOME_VIDEO_URL =
+  "https://player.mediadelivery.net/play/781705/ba7cf0a4-a4b5-457b-b945-24465b45bff8";
+
+const HomeLotterySection = ({ videoUrl = HOME_VIDEO_URL }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const location = useLocation();
@@ -699,7 +703,10 @@ const HomeLotterySection = () => {
         {/* =====================================================
             VIDEO TUTORIAL PLAYER
         ====================================================== */}
-        {/* <LotteryVideoPlayer containerClassName="px-2.5 pt-3" /> */}
+        <LotteryVideoPlayer
+          videoUrl={videoUrl}
+          containerClassName="px-2.5 pt-3"
+        />
 
         {/* =====================================================
             WINNING RULES

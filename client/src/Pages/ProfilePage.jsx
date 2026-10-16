@@ -42,6 +42,7 @@ import {
 
 import { getMyDeposits } from "../reducer/slice/depositSlice";
 import { getMyKyc, selectKycDocuments } from "../reducer/slice/kycReducer";
+import { fetchUserTickets } from "../reducer/slice/supportSlice";
 import { fetchMyWithdrawals } from "../reducer/slice/withdrawalSlice";
 
 // =====================================================
@@ -67,7 +68,6 @@ const PRESET_AVATARS = [
   { id: "six", src: six, label: "Shadow King" },
 ];
 
-const WHATSAPP_NUMBER = "919876543210";
 const BOTTOM_NAV_HEIGHT = 68;
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1605196560547-b2f7281b7355?auto=format&fit=crop&w=1400&q=80";
@@ -94,6 +94,7 @@ const ProfilePage = () => {
   );
 
   const kycDocuments = useSelector(selectKycDocuments);
+  const { userUnreadCount = 0 } = useSelector((state) => state.support || {});
 
   // Edit Profile Modal State
   const [showEditModal, setShowEditModal] = useState(false);
@@ -115,6 +116,7 @@ const ProfilePage = () => {
     dispatch(getMyDeposits({ page: 1, limit: 10, sort: "desc" }));
     dispatch(fetchMyWithdrawals());
     dispatch(getMyKyc());
+    dispatch(fetchUserTickets());
   }, [dispatch, user]);
 
   // Derive KYC status
@@ -246,12 +248,8 @@ const ProfilePage = () => {
     }
   };
 
-  const handleWhatsAppSupport = () => {
-    const message = encodeURIComponent(
-      "Hello, I need assistance with my lottery account.",
-    );
-    const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${message}`;
-    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+  const handleChatSupport = () => {
+    navigate("/support");
   };
 
   const walletBalance = Number(user?.wallet || 0);
@@ -598,9 +596,10 @@ const ProfilePage = () => {
               <MenuRowLight
                 icon={<Headphones size={19} className="text-[#10B981]" />}
                 iconBg="bg-emerald-50"
-                title="WhatsApp Support"
-                subtitle="24/7 dedicated support representative"
-                onClick={handleWhatsAppSupport}
+                title="Chat Support"
+                subtitle="24/7 live customer support & ticket desk"
+                onClick={handleChatSupport}
+                badge={userUnreadCount > 0 ? `${userUnreadCount} New` : null}
                 rightElement={
                   <span className="flex h-2 w-2 relative">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>

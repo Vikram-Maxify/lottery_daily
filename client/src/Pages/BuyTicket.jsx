@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import DailyNumbersSection from "../Components/DailyNumbersSection";
+import LotteryVideoPlayer from "../Components/LotteryVideoPlayer";
 import NumberSoldNotification from "../Components/NumberSoldNotification";
 import QuickVerifyTicket from "../Components/QuickVerifyTicket";
 import {
@@ -72,6 +73,9 @@ import banner from "../assets/dear-1.jpg";
 // =====================================================
 // CONSTANTS
 // =====================================================
+
+const BUY_TICKET_VIDEO_URL =
+  "https://player.mediadelivery.net/play/781705/fd1d45cd-5bf7-4264-93fb-c3c38beea85c";
 
 const MAX_TICKETS = 100;
 const MIN_TICKETS = 10;
@@ -1980,7 +1984,7 @@ const BuyTicket = () => {
         {/* =================================================
             HOW TO PLAY VIDEO TUTORIAL
         ================================================= */}
-        {/* <LotteryVideoPlayer /> */}
+        <LotteryVideoPlayer videoUrl={BUY_TICKET_VIDEO_URL} />
 
         {/* =================================================
             WINNING RULES

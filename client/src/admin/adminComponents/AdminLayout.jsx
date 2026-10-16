@@ -8,6 +8,7 @@ import {
   Cog,
   Crown,
   FileText,
+  Headphones,
   IdCard,
   LayoutDashboard,
   LogOut,
@@ -27,6 +28,11 @@ import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
 import { adminLogout } from "../../reducer/slice/adminAuthReducer";
+import {
+  fetchAdminUnreadCount,
+  receiveSocketUnreadCounts,
+} from "../../reducer/slice/supportSlice";
+import { socket, ensureSocketAuthenticated } from "../../socket";
 
 /* =========================================================
    WINZOX THEME TOKENS  (Bright Gold + White)
@@ -50,12 +56,12 @@ const AdminLayout = () => {
   const location = useLocation();
 
   const { admin, loading } = useSelector((state) => state.adminAuth);
+  const { adminCounts } = useSelector((state) => state.support);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // TODO: apne real notification count se connect karo
-  const notificationCount = 5;
+  const notificationCount = adminCounts?.totalUnreadMessages || 0;
 
   // =========================
   // LIVE CLOCK
@@ -64,6 +70,30 @@ const AdminLayout = () => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // =========================
+  // SUPPORT UNREAD COUNTS + SOCKET
+  // =========================
+  useEffect(() => {
+    dispatch(fetchAdminUnreadCount());
+    ensureSocketAuthenticated();
+
+    const onUnreadCountUpdated = (counts) => {
+      dispatch(receiveSocketUnreadCounts(counts));
+    };
+
+    const onTicketCreated = () => {
+      dispatch(fetchAdminUnreadCount());
+    };
+
+    socket.on("support:unreadCountUpdated", onUnreadCountUpdated);
+    socket.on("support:ticketCreated", onTicketCreated);
+
+    return () => {
+      socket.off("support:unreadCountUpdated", onUnreadCountUpdated);
+      socket.off("support:ticketCreated", onTicketCreated);
+    };
+  }, [dispatch]);
 
   // =========================
   // LOGOUT
@@ -100,6 +130,12 @@ const AdminLayout = () => {
     { to: "/users", label: "Users Management", icon: Users },
     { to: "/adminkyc", label: "KYC Verification", icon: IdCard },
     { to: "/admin/withdrawals", label: "Withdrawals", icon: Wallet },
+    {
+      to: "/admin/support",
+      label: "Chat Support",
+      icon: Headphones,
+      badge: adminCounts?.totalUnreadMessages || 0,
+    },
     // { to: "/amount", label: "Amount", icon: Cog },
     { to: "/home_banner", label: "Home Banner", icon: Cog },
     { to: "/admin/top-winners", label: "Top Winners", icon: Trophy },
@@ -133,6 +169,8 @@ const AdminLayout = () => {
     if (path === "/admin/deposits") return "All Deposits";
     if (path === "/lottery-config") return "Lottery Config";
     if (path === "/admin/settings") return "Settings";
+    if (path === "/admin/support" || path === "/support-chat")
+      return "Customer Support Chat";
 
     return "Admin Panel";
   };
@@ -266,12 +304,18 @@ const AdminLayout = () => {
                     <span className="relative flex-1 truncate">
                       {item.label}
                     </span>
-                    <ChevronRight
-                      size={15}
-                      className={`relative shrink-0 transition-transform group-hover:translate-x-0.5 ${
-                        isActive ? "text-[#1A1204]/70" : "text-[#D9B54A]"
-                      }`}
-                    />
+                    {item.badge > 0 ? (
+                      <span className="relative flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#D93025] px-1.5 text-[10px] font-black text-white shadow-sm">
+                        {item.badge > 99 ? "99+" : item.badge}
+                      </span>
+                    ) : (
+                      <ChevronRight
+                        size={15}
+                        className={`relative shrink-0 transition-transform group-hover:translate-x-0.5 ${
+                          isActive ? "text-[#1A1204]/70" : "text-[#D9B54A]"
+                        }`}
+                      />
+                    )}
                   </>
                 )}
               </NavLink>
@@ -361,13 +405,15 @@ const AdminLayout = () => {
               {/* NOTIFICATIONS */}
               <button
                 type="button"
+                onClick={() => navigate("/admin/support")}
+                title="Customer Support Notifications"
                 className="relative flex h-11 w-11 items-center justify-center rounded-full bg-[#FFFDF7] text-[#9A5B00] ring-1 ring-[#F2B705] transition hover:bg-[#FFEFA8]"
                 aria-label="Notifications"
               >
                 <Bell size={19} strokeWidth={2.2} />
                 {notificationCount > 0 && (
                   <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#D93025] px-1 text-[10px] font-bold text-white ring-2 ring-white">
-                    {notificationCount > 9 ? "9+" : notificationCount}
+                    {notificationCount > 99 ? "99+" : notificationCount}
                   </span>
                 )}
               </button>

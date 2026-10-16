@@ -108,21 +108,19 @@ router.put(
   updateLotteryConfig
 );
 
-// GET all lottery configs
-// GET /api/lottery-config/all
+// GET all lottery configs (accessible to authenticated users and admins)
+// GET /api/lottery/all
 router.get(
   "/all",
   authMiddleware,
-  adminMiddleware,
   getAllLotteryConfigs
 );
 
-// GET lottery config by ID
-// GET /api/lottery-config/:id
+// GET lottery config by ID (accessible to authenticated users and admins)
+// GET /api/lottery/:id
 router.get(
   "/:id",
   authMiddleware,
-  adminMiddleware,
   getLotteryConfigById
 );
 

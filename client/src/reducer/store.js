@@ -25,6 +25,7 @@ import topWinnerReducer from './slice/topWinnerSlice'
 import settingsReducer from './slice/settingsSlice'
 import dailyNumberReducer from './slice/dailyNumberSlice'
 import resultImageReducer from './slice/resultImageSlice'
+import supportReducer from './slice/supportSlice'
 
 export const store = configureStore({
   reducer: {
@@ -49,5 +50,6 @@ export const store = configureStore({
     settings: settingsReducer,
     dailyNumbers: dailyNumberReducer,
     resultImages: resultImageReducer,
+    support: supportReducer,
   },
 });

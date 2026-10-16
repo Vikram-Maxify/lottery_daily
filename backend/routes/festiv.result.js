@@ -37,11 +37,9 @@ router.get(
   getAllResults
 );
 
-// Test number matching
+// Test / verify number matching
 router.post(
   "/check-number",
-  authMiddleware,
-  adminMiddleware,
   checkNumber
 );
 

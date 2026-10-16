@@ -103,6 +103,8 @@ const bannerRoutes = require("./routes/bannerRoutes");
 const { startLotteryNumberJobs } = require("./jobs/lotteryNumberJob");
 const referralSettingRoutes = require("./routes/referralSettingRoutes");
 const topWinnerRoutes = require("./routes/topWinnerRoutes");
+const supportRoutes = require("./routes/supportRoutes");
+const adminSupportRoutes = require("./routes/adminSupportRoutes");
 
 app.use("/uploads", express.static("uploads"));
 app.use("/api/kyc", kycRoutes);
@@ -118,6 +120,12 @@ app.use("/api/top-winners", topWinnerRoutes);
 app.use("/api/festival-amount", require("./routes/festivalamountRoutes"));
 
 app.use("/api/result-images", resultImageRoutes);
+
+// Customer Support & Live Chat Routes (mounted at both /api/* and /api/v1/*)
+app.use("/api/support", supportRoutes);
+app.use("/api/v1/support", supportRoutes);
+app.use("/api/admin/support", adminSupportRoutes);
+app.use("/api/v1/admin/support", adminSupportRoutes);
 
 // =======================
 // HEALTH CHECK
@@ -172,29 +180,16 @@ const io = new Server(server, {
   cors: {
     origin: [
       "http://localhost:5173",
+      "http://localhost:6099",
       "https://dearlottery1.com",
       "https://setthelife.com",
-      "https://dearlottery1.com",
     ],
     credentials: true,
   },
 });
 
-// Socket instance globally register karo (cron isko use karega)
+// Socket instance globally register karo (cron + support chat isko use karega)
 socketManager.init(io);
-
-io.on("connection", (socket) => {
-  console.log(`[SOCKET] Client connected: ${socket.id}`);
-
-  socket.on("joinRoom", (room) => {
-    socket.join(room);
-    console.log(`[SOCKET] ${socket.id} joined room: ${room}`);
-  });
-
-  socket.on("disconnect", () => {
-    console.log(`[SOCKET] Client disconnected: ${socket.id}`);
-  });
-});
 
 // =======================
 // DATABASE + SERVER

@@ -113,17 +113,19 @@ router.put(
   updateLotteryConfig
 );
 
+// GET all festival lottery configs (accessible to authenticated users and admins)
+// GET /api/festival/all
 router.get(
   "/all",
   authMiddleware,
-  adminMiddleware,
   getAllLotteryConfigs
 );
 
+// GET festival lottery config by ID (accessible to authenticated users and admins)
+// GET /api/festival/:id
 router.get(
   "/:id",
   authMiddleware,
-  adminMiddleware,
   getLotteryConfigById
 );
 

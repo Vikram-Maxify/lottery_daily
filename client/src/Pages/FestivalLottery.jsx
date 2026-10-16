@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import DailyNumbersSection from "../Components/DailyNumbersSection";
+import LotteryVideoPlayer from "../Components/LotteryVideoPlayer";
 import NumberSoldNotification from "../Components/NumberSoldNotification";
 import QuickVerifyTicket from "../Components/QuickVerifyTicket";
 import { verifyNumberForBet } from "../reducer/slice/dailyNumberSlice";
@@ -65,6 +66,9 @@ import banner from "../assets/dear-fastival-2.jpg";
 // =====================================================
 // CONSTANTS
 // =====================================================
+const FESTIVAL_VIDEO_URL =
+  "https://player.mediadelivery.net/play/781705/fc60841d-ea2d-4b14-b22e-ebf4aa8ba8af";
+
 const BOTTOM_NAV_HEIGHT = 64;
 const PURCHASE_BAR_HEIGHT = 90;
 
@@ -1454,7 +1458,7 @@ const FestivalLottery = () => {
           />
 
           {/* ================= HOW TO PLAY VIDEO TUTORIAL ================= */}
-          {/* <LotteryVideoPlayer /> */}
+          <LotteryVideoPlayer videoUrl={FESTIVAL_VIDEO_URL} />
 
           {/* ================= WINNING RULES ================= */}
           <section className="overflow-hidden rounded-[18px] bg-gradient-to-br from-[#3a0b17] via-[#2b0a16] to-[#1a0710] p-2.5 shadow-lg">

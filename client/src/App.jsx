@@ -32,6 +32,7 @@ import AdminHomeBanner from "./admin/adminPages/AdminHomeBanner";
 import AdminKycVerification from "./admin/adminPages/AdminKycVerification";
 import AdminSettings from "./admin/adminPages/AdminSettings";
 import AdminTopWinners from "./admin/adminPages/AdminTopWinners";
+import AdminSupportChat from "./admin/adminPages/AdminSupportChat";
 import FestivalResult from "./admin/adminPages/FestivalResult";
 import LotteryPurchaseReports from "./admin/adminPages/LotteryPurchaseReports";
 import FestivalLottery from "./Pages/FestivalLottery";
@@ -42,6 +43,7 @@ import ReferralPage from "./Pages/ReferralPage";
 import VarifyTicket from "./Pages/VarifyTicket";
 import WithdrawHistory from "./Pages/WithdrawHistory";
 import MyTickets from "./Pages/MyTickets";
+import SupportChatPage from "./Pages/SupportChatPage";
 
 // ==========================================================
 // HOME ROUTE
@@ -111,6 +113,10 @@ function App() {
 
             {/* Payment Success */}
             <Route path="/payment-success" element={<PaymentSuccess />} />
+
+            {/* Customer Support Chat */}
+            <Route path="/support" element={<SupportChatPage />} />
+            <Route path="/chat-support" element={<SupportChatPage />} />
           </Route>
         </Route>
 
@@ -173,6 +179,10 @@ function App() {
               path="/admin/withdrawals"
               element={<WithdrawalManagement />}
             />
+
+            {/* Admin Customer Support Chat */}
+            <Route path="/admin/support" element={<AdminSupportChat />} />
+            <Route path="/support-chat" element={<AdminSupportChat />} />
 
             {/* Admin Top Winners */}
             <Route path="/admin/top-winners" element={<AdminTopWinners />} />
