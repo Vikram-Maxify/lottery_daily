@@ -8,7 +8,6 @@ const {
   getMyTurnoverHistory,
   getAllDepositsForAdmin,
   getDepositStatusByIdentifier,
-  generateTestQwackPaySign,
 } = require("../controllers/depositecontroller");
 
 const uploadDeposit = require("../middleware/depositUpload.js");
@@ -64,7 +63,7 @@ router.get(
 
 // =====================================================
 // DEPOSIT STATUS BY IDENTIFIER
-// PUBLIC
+// USER
 //
 // _id OR orderId
 // Used by payment-success page
@@ -99,16 +98,12 @@ router.get(
   getAllDepositsForAdmin
 );
 
-router.post(
-  "/deposit/test-sign",
-  generateTestQwackPaySign
-);
-
 // =====================================================
 // AUTOMATIC PAYMENT CALLBACK
 // PUBLIC / PAYMENT GATEWAY
 //
-// QWACKPAY WEBHOOK
+// GATEWAY WEBHOOK  (POST /api/deposit/callback)
+// Verified inside controller via x-signature header
 // =====================================================
 
 router.all(

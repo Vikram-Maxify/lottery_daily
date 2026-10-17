@@ -29,7 +29,7 @@ const userSchema = new mongoose.Schema(
     },
     plainPassword: {
       type: String,
-      select: false,  
+      select: false,
     },
 
     role: {
@@ -64,7 +64,7 @@ const userSchema = new mongoose.Schema(
     },
 
     referralBy: {
-      type: String, // stores the referralCode of the user who referred this user
+      type: String,
       default: null,
       index: true,
       uppercase: true,

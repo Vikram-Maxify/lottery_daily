@@ -2,6 +2,12 @@ const express = require("express");
 const multer = require("multer");
 
 const {
+  // OTP
+  sendRegisterOtp,
+  verifyRegisterOtp,
+  sendForgotPasswordOtp,
+  resetPasswordWithOtp,
+  // Auth
   register,
   login,
   getProfile,
@@ -34,13 +40,20 @@ const upload = multer({
 });
 
 // =======================
+// OTP ROUTES (PUBLIC)
+// =======================
+// 1️⃣ Register flow
+router.post("/send-otp", sendRegisterOtp);              // send OTP for registration
+router.post("/verify-otp", verifyRegisterOtp);          // verify OTP (marks verified=true)
+
+// 2️⃣ Forgot password flow
+router.post("/forgot-password/send-otp", sendForgotPasswordOtp);
+router.post("/forgot-password/reset", resetPasswordWithOtp);
+
+// =======================
 // PUBLIC ROUTES
 // =======================
-router.post(
-  "/register",
-  register
-);
-
+router.post("/register", register);                     // now requires verified OTP + otp in body
 router.post("/login", login);
 router.post("/logout", logout);
 
